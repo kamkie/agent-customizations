@@ -3,7 +3,7 @@
 Use this template after replacing bracketed fields with live, issue-specific details. Keep every core section, using `none` or `not applicable` with a reason when necessary; remove only optional issue-specific detail. Do not launch the child while any remaining placeholder is unresolved.
 
 ```text
-You own [work item and independently reviewable outcome] in [repository/project].
+Use $execute-campaign-work-item to execute this assigned campaign contract. You own [work item and independently reviewable outcome] in [repository/project].
 
 Applicable live policy:
 - Sources and scopes: [instruction paths, tracker rules, external policy, and precedence].

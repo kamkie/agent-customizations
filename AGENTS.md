@@ -107,23 +107,13 @@ does not have access, stop before PR creation and report the exact blocker.
 - Triage every finding: fix it or answer it on the PR. Commits that implement a
   review finding credit the reviewer with `Co-Authored-By: Claude
   <noreply@anthropic.com>` or `Co-Authored-By: Codex <noreply@openai.com>`.
-- Re-run affected validation after fixes. Immediately before marking the PR
-  ready, perform a thread-aware re-fetch of unresolved review threads, latest
-  reviews, review decision, and head SHA. Feedback submitted while the PR is
-  draft is still binding: if any actionable thread or finding is untriaged, a
-  `CHANGES_REQUESTED` review applies to the validated current head, or the head
-  differs from the validated head, keep the PR draft and address that state
-  before retrying readiness.
-- A `CHANGES_REQUESTED` review on an earlier head does not by itself keep the PR
-  draft after its findings are addressed, responses are recorded, threads are
-  resolved, and affected validation passes. Mark the PR ready for re-review,
-  but treat the stale blocking review as a merge blocker until the reviewer
-  clears it or approves the current head.
-- After marking the PR ready, re-fetch the same state. If feedback or a head
-  change raced the readiness transition, or a `CHANGES_REQUESTED` review applies
-  to the current head, immediately return the PR to draft and resolve it. Only a
-  stable clean preflight and post-transition check completes readiness.
-  CODEOWNERS then requests `kamkie` as the human owner reviewer.
+- Before marking ready, re-fetch the head and review threads. Keep the PR draft
+  if the head changed, a finding is untriaged, or `CHANGES_REQUESTED` applies to
+  the current head. Re-fetch after the transition and revert to draft if this
+  gate changed.
+- Resolved feedback on an earlier head does not block readiness, but its review
+  remains a merge blocker until current-head approval. CODEOWNERS then requests
+  `kamkie` as the human owner reviewer.
 
 ### Owner approval, checks, and merge
 

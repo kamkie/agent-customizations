@@ -16,6 +16,4 @@ When the user asks you to design something, provide ideas and proposals for disc
 
 ## Pull request readiness
 
-Treat review feedback submitted while a pull request is draft as binding. Immediately before marking any draft pull request ready, perform a thread-aware re-fetch of its current head, unresolved review threads, latest reviews, and review decision. Keep it draft while any actionable finding is untriaged, a `CHANGES_REQUESTED` review applies to the validated current head, or the head differs from the validated head.
-
-A `CHANGES_REQUESTED` review on an earlier head does not by itself block readiness after its findings are addressed, responses are recorded, threads are resolved, and affected validation passes; it still blocks merge until cleared or replaced by current-head approval. Re-fetch immediately after the readiness transition and return the pull request to draft if new feedback, a current-head change request, or a head change raced the transition. Do not rely on an earlier flat comment read or assume draft status prevented reviewers from requesting changes.
+Before marking a pull request ready, re-fetch its head and review threads. Keep it draft if the head changed, a finding is untriaged, or `CHANGES_REQUESTED` applies to the current head; re-fetch after the transition and revert to draft if this gate changed. Resolved feedback on an earlier head does not block readiness, but its review blocks merge until current-head approval.

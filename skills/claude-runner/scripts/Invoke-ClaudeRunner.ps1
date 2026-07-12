@@ -18,6 +18,7 @@ param(
     [ValidateSet("acceptEdits", "auto", "default", "dontAsk", "plan")]
     [string]$PermissionMode = "default",
     [switch]$BypassPermissions,
+    [string[]]$AllowedTools = @(),
 
     [string]$SessionId,
     [string]$Resume,
@@ -26,7 +27,7 @@ param(
     [string]$Name,
 
     [string]$WorkingDirectory = (Get-Location).Path,
-    [string]$RuntimeRoot,
+    [string]$ClaudeConfigDirectory,
     [string]$LogDir,
     [string]$LogPath,
     [switch]$AppendLog,
@@ -50,6 +51,7 @@ $forbiddenArgs = @("--bg", "--background", "--fork-session", "--no-session-persi
 $typedArgs = @(
     "-p", "--print", "--model", "--effort", "--permission-mode",
     "--dangerously-skip-permissions", "--allow-dangerously-skip-permissions",
+    "--allowedTools", "--allowed-tools",
     "--session-id", "--resume", "--continue", "--from-pr", "--name",
     "--max-budget-usd", "--max-turns", "--output-format",
     "--include-partial-messages", "--verbose", "--bare"
@@ -58,7 +60,7 @@ foreach ($arg in $ClaudeArgs) {
     if ($forbiddenArgs -contains $arg) {
         throw "Do not pass $arg through claude-runner. It breaks attached resumable execution."
     }
-    if ($typedArgs -contains $arg) {
+    if (($typedArgs -contains $arg) -or $arg.StartsWith("--allowedTools=") -or $arg.StartsWith("--allowed-tools=")) {
         throw "Use the typed claude-runner parameter for $arg instead of -ClaudeArgs."
     }
 }
@@ -67,13 +69,37 @@ if ($BypassPermissions -and $PSBoundParameters.ContainsKey("PermissionMode")) {
     throw "Use either -PermissionMode or -BypassPermissions, not both."
 }
 
+if ($BypassPermissions -and $AllowedTools.Count -gt 0) {
+    throw "Do not combine -AllowedTools with -BypassPermissions. Allowed tools do not constrain bypass mode."
+}
+
 if (-not [string]::IsNullOrWhiteSpace($ExactModel) -and $PSBoundParameters.ContainsKey("ModelAlias")) {
     throw "Use either -ModelAlias or -ExactModel, not both."
 }
 
 $selectedModel = if ([string]::IsNullOrWhiteSpace($ExactModel)) { $ModelAlias } else { $ExactModel }
-$selectedPermissionMode = $PermissionMode
-$displayPermissionMode = if ($BypassPermissions) { "bypassPermissions" } else { $PermissionMode }
+$reviewProfileEnabled = ($ReviewPr -gt 0) -and -not $BypassPermissions -and -not $PSBoundParameters.ContainsKey("PermissionMode")
+$selectedPermissionMode = if ($reviewProfileEnabled) { "dontAsk" } else { $PermissionMode }
+$displayPermissionMode = if ($BypassPermissions) {
+    "bypassPermissions"
+} elseif ($reviewProfileEnabled) {
+    "review-read-only (dontAsk + pre-approved tools)"
+} else {
+    $PermissionMode
+}
+
+$reviewAllowedTools = @(
+    "Read", "Glob", "Grep",
+    "Bash(gh pr view *)", "Bash(gh pr diff *)",
+    "Bash(git diff *)", "Bash(git log *)", "Bash(git rev-parse *)", "Bash(git show *)", "Bash(git status *)",
+    "PowerShell(gh pr view *)", "PowerShell(gh pr diff *)",
+    "PowerShell(git diff *)", "PowerShell(git log *)", "PowerShell(git rev-parse *)", "PowerShell(git show *)", "PowerShell(git status *)"
+)
+$effectiveAllowedTools = @()
+if ($reviewProfileEnabled) {
+    $effectiveAllowedTools += $reviewAllowedTools
+}
+$effectiveAllowedTools += $AllowedTools
 
 function Format-Arg {
     param([string]$Value)
@@ -106,20 +132,12 @@ function Format-CommandArgsForDisplay {
     return (($displayArgs | ForEach-Object { Format-Arg $_ }) -join " ")
 }
 
-function Get-DefaultRuntimeRoot {
-    if (-not [string]::IsNullOrWhiteSpace($env:AGENT_RUNNER_HOME)) {
-        return [System.IO.Path]::GetFullPath($env:AGENT_RUNNER_HOME)
+function Get-DefaultClaudeConfigDirectory {
+    if (-not [string]::IsNullOrWhiteSpace($env:CLAUDE_CONFIG_DIR)) {
+        return [System.IO.Path]::GetFullPath($env:CLAUDE_CONFIG_DIR)
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        return Join-Path $env:LOCALAPPDATA "agent-runners"
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($env:XDG_STATE_HOME)) {
-        return Join-Path $env:XDG_STATE_HOME "agent-runners"
-    }
-
-    return Join-Path ([System.IO.Path]::GetTempPath()) "agent-runners"
+    return Join-Path $HOME ".claude"
 }
 
 function Write-FullTextDelta {
@@ -430,15 +448,18 @@ if (-not $NoVerbose) {
     $cmdArgs += "--verbose"
 }
 $displayArgs = @($cmdArgs)
+if ($effectiveAllowedTools.Count -gt 0) {
+    $cmdArgs += @("--allowedTools", ($effectiveAllowedTools -join ","))
+}
 $cmdArgs += $ClaudeArgs
 
-$resolvedRuntimeRoot = if ([string]::IsNullOrWhiteSpace($RuntimeRoot)) {
-    Get-DefaultRuntimeRoot
+$resolvedClaudeConfigDirectory = if ([string]::IsNullOrWhiteSpace($ClaudeConfigDirectory)) {
+    Get-DefaultClaudeConfigDirectory
 } else {
-    Resolve-RunnerPath $resolvedWorkingDirectory $RuntimeRoot
+    Resolve-RunnerPath $resolvedWorkingDirectory $ClaudeConfigDirectory
 }
 $resolvedLogDir = if ([string]::IsNullOrWhiteSpace($LogDir)) {
-    Join-Path $resolvedRuntimeRoot "claude-runner\logs"
+    Join-Path $resolvedClaudeConfigDirectory "logs\claude-runner"
 } else {
     Resolve-RunnerPath $resolvedWorkingDirectory $LogDir
 }
@@ -457,8 +478,12 @@ Write-Host ("[claude-runner] session: {0}" -f $effectiveSession)
 Write-Host ("[claude-runner] model: {0}" -f $selectedModel)
 Write-Host ("[claude-runner] effort: {0}" -f $Effort)
 Write-Host ("[claude-runner] permissions: {0}{1}" -f $displayPermissionMode, $(if ($BypassPermissions) { " (EXPLICIT BYPASS)" } else { "" }))
-Write-Host ("[claude-runner] log: {0}" -f $LogPath)
+Write-Host ("[claude-runner] native sessions: {0} (managed by Claude Code)" -f (Join-Path $resolvedClaudeConfigDirectory "projects"))
+Write-Host ("[claude-runner] diagnostic log: {0}" -f $LogPath)
 $commandSummary = Format-CommandArgsForDisplay $displayArgs
+if ($effectiveAllowedTools.Count -gt 0) {
+    $commandSummary += " <allowed-tools:$($effectiveAllowedTools.Count) rules redacted>"
+}
 if ($ClaudeArgs.Count -gt 0) {
     $commandSummary += " <passthrough:$($ClaudeArgs.Count) args redacted>"
 }
@@ -478,8 +503,11 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $shouldAppendLog = [bool]$AppendLog -or (Test-Path -LiteralPath $LogPath)
 Write-Host ("[claude-runner] log mode: {0}" -f ($(if ($shouldAppendLog) { "append" } else { "create" })))
 $writer = [System.IO.StreamWriter]::new($LogPath, $shouldAppendLog, $utf8NoBom)
+$hadClaudeConfigDirectory = Test-Path Env:CLAUDE_CONFIG_DIR
+$previousClaudeConfigDirectory = $env:CLAUDE_CONFIG_DIR
 
 try {
+    $env:CLAUDE_CONFIG_DIR = $resolvedClaudeConfigDirectory
     Push-Location $resolvedWorkingDirectory
     try {
         & claude @cmdArgs 2>&1 | ForEach-Object {
@@ -494,6 +522,11 @@ try {
     }
 } finally {
     $writer.Dispose()
+    if ($hadClaudeConfigDirectory) {
+        $env:CLAUDE_CONFIG_DIR = $previousClaudeConfigDirectory
+    } else {
+        Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue
+    }
 }
 
 if ($script:NeedsNewline) {

@@ -5,7 +5,7 @@ description: Run Claude Code CLI from Codex with a resume-safe, foreground wrapp
 
 # Claude Runner
 
-Use this skill before running Claude CLI from Codex. Prefer the wrapper because it prints the session id, writes JSONL logs outside the target repository, streams live output, and makes resume mode explicit. The JSONL log and printed session id are the durable handoff; this skill does not provide a job registry, wakeups, or `$cc:*` commands.
+Use this skill before running Claude CLI from Codex. Prefer the wrapper because it prints the session id, preserves Claude Code's native session transcript, writes a separate diagnostic JSONL log outside the target repository, streams live output, and makes resume mode explicit. The native session id is the resumable handoff; the diagnostic log is troubleshooting evidence, not an importable session. This skill does not provide a job registry, wakeups, or `$cc:*` commands.
 
 ## Mode
 
@@ -26,7 +26,9 @@ Use this skill before running Claude CLI from Codex. Prefer the wrapper because 
 - Do not use `-Bare` for cross-reviews or runs that must load `CLAUDE.md`, skills, plugins, hooks, or project settings; reserve it for deterministic CI/script calls.
 - Treat model, budget, resume, prompt-file, and PR number as runtime controls, not natural-language task text.
 - Keep normal Claude permissions. Use `-BypassPermissions` only when the caller explicitly authorizes bypass; the wrapper makes that mode conspicuous in its output and invocation.
-- Normal permissions can deny mutation-capable tools in non-interactive `-p` runs. For delegated edits, choose a scoped normal mode such as `-PermissionMode acceptEdits` when appropriate, or obtain explicit authority before using bypass.
+- `-ReviewPr` automatically uses `dontAsk` with a built-in read-only allowlist for file inspection, `gh pr view/diff`, and non-mutating Git inspection. It does not allow posting reviews, unrestricted `gh api`, ref updates, or source edits.
+- For other non-interactive work, use typed `-AllowedTools` rules plus the narrowest suitable normal `-PermissionMode`. `acceptEdits` covers edits and common filesystem operations, not arbitrary build, Git, or GitHub commands.
+- If Claude must post a review or perform another mutation, add only the exact rule through `-AllowedTools` when that mutation is authorized. Otherwise, let Codex record Claude's returned verdict.
 - Select a documented moving alias with `-ModelAlias fable|haiku|opus|sonnet`, or an exact full model name with `-ExactModel claude-...`. Do not combine them.
 - Set effort with the typed `-Effort low|medium|high|xhigh|max` parameter. Do not route effort through `-ClaudeArgs`.
 - Preserve the user's task text except for removing routing controls. If it begins with `/`, pass it as Claude task text.
@@ -43,7 +45,7 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 $pr = <pr-number>
 ```
 
-Before a paid run, know the repo root, PR number or prompt file, model alias or exact model, effort, session/resume source, log path, and optional budget/turn cap.
+Before a paid run, know the repo root, PR number or prompt file, model alias or exact model, effort, session/resume source, Claude configuration directory, diagnostic log path, permission profile, and optional budget/turn cap.
 
 ## Wrapper
 
@@ -138,7 +140,11 @@ Return findings first, ordered by severity. Include file paths and line numbers.
 
 For resume follow-ups, resume the session and send only the delta instruction unless the task changed materially. Before composing a long custom prompt, read [references/claude-prompt-blocks.md](references/claude-prompt-blocks.md).
 
-## Interruptions And Logs
+## Sessions, Interruptions, And Logs
+
+Claude Code owns the canonical transcript under `CLAUDE_CONFIG_DIR\projects` (or `~/.claude/projects` when that variable is unset). The wrapper keeps session persistence enabled and reports that native directory plus the session id. Resume it with this wrapper or `claude --resume <session-id>`.
+
+Claude Code CLI and Claude Desktop keep separate histories. Use Claude Code's `/desktop` command when an interactive CLI session must move into Desktop. Codex can discover supported native Claude artifacts through its `/import` command; the wrapper's diagnostic log is not an import source. Likewise, Codex CLI/app continuity must use Codex-native sessions rather than a converted Claude stream log.
 
 When a Claude run times out or the terminal is interrupted:
 
@@ -147,9 +153,9 @@ When a Claude run times out or the terminal is interrupted:
 3. If exited without the required result, rerun with `-Resume <session-id>`, `-FromPr <pr>`, or `-ContinueLatest`.
 4. Start fresh only if no session was created or the user explicitly asks.
 
-The wrapper writes raw JSONL logs under an external agent-neutral runtime root by default: `AGENT_RUNNER_HOME` when set, otherwise the platform state root (for example, `LOCALAPPDATA\agent-runners` on Windows). It reports the resolved log path without printing the prompt or passthrough argument values. Raw logs may contain Claude events, so treat them as sensitive runtime records and never commit them.
+The wrapper writes its separate raw stream log under `CLAUDE_CONFIG_DIR\logs\claude-runner` by default, or `~/.claude/logs/claude-runner` when `CLAUDE_CONFIG_DIR` is unset. It reports this as a diagnostic log without printing the prompt, allowlist contents, or passthrough argument values. Raw logs may contain Claude events, so treat them as sensitive runtime records and never commit them.
 
-`-DryRun` resolves and reports the invocation without creating the runtime root, log directory, or log file. `-SelfTest` exercises stream rendering without requiring a working directory and also creates nothing. To override log placement deliberately, use `-RuntimeRoot`, `-LogDir`, or `-LogPath`; a relative `-LogDir` or `-LogPath` is resolved from the working directory.
+`-DryRun` resolves and reports the invocation without creating the Claude configuration directory, log directory, or log file. `-SelfTest` exercises stream rendering without requiring a working directory and also creates nothing. Tests and isolated callers can use `-ClaudeConfigDirectory`; deliberate diagnostic-log overrides use `-LogDir` or `-LogPath`. A relative override is resolved from the working directory.
 
 ## Regression Tests
 
@@ -159,4 +165,4 @@ The deterministic test harness uses a temporary mock `claude` command and perfor
 pwsh ./skills/claude-runner/tests/Invoke-ClaudeRunner.Tests.ps1
 ```
 
-It covers normal and explicit-bypass permissions, external logs, mutation-free dry-run and self-test behavior, typed effort and model selection, streaming, budgets, interrupted resume, and PR-linked recovery.
+It covers normal and explicit-bypass permissions, the least-privilege headless review profile, Claude-native diagnostic placement, mutation-free dry-run and self-test behavior, typed effort and model selection, streaming, budgets, interrupted resume, and PR-linked recovery.

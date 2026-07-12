@@ -154,7 +154,7 @@ switch ($Action) {
                 $wt = Get-Command wt.exe -ErrorAction Stop
                 $pwshArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
                 if ($KeepTerminalOpen) { $pwshArguments += '-NoExit' }
-                $pwshArguments += @('-File', $hostScript, '-JobFile', $jobFile, '-LaunchFile', $launchFile)
+                $pwshArguments += @('-File', ('"' + $hostScript + '"'), '-JobFile', ('"' + $jobFile + '"'), '-LaunchFile', ('"' + $launchFile + '"'))
                 $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
                 Start-Process -FilePath $wt.Source -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
             } else {
@@ -224,11 +224,13 @@ switch ($Action) {
         }
         & taskkill.exe /PID $job.hostPid /T /F | Out-Null
         $job = Read-ManagedJob -Path $path
-        $job.status = 'stopped'
-        $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
-        $job.exitCode = $null
-        $job.error = 'Stopped through managed-jobs.'
-        Write-ManagedJob -Path $path -Job $job
+        if ($job.status -in @('starting', 'running')) {
+            $job.status = 'stopped'
+            $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+            $job.exitCode = $null
+            $job.error = 'Stopped through managed-jobs.'
+            Write-ManagedJob -Path $path -Job $job
+        }
         Add-ManagedJobIdentity -Job $job | ConvertTo-Json -Depth 12
     }
     'reconcile' {

@@ -110,13 +110,20 @@ does not have access, stop before PR creation and report the exact blocker.
 - Re-run affected validation after fixes. Immediately before marking the PR
   ready, perform a thread-aware re-fetch of unresolved review threads, latest
   reviews, review decision, and head SHA. Feedback submitted while the PR is
-  draft is still binding: if any actionable thread is unresolved, any review is
-  `CHANGES_REQUESTED`, or the head differs from the validated head, keep the PR
-  draft and address that state before retrying readiness.
+  draft is still binding: if any actionable thread or finding is untriaged, a
+  `CHANGES_REQUESTED` review applies to the validated current head, or the head
+  differs from the validated head, keep the PR draft and address that state
+  before retrying readiness.
+- A `CHANGES_REQUESTED` review on an earlier head does not by itself keep the PR
+  draft after its findings are addressed, responses are recorded, threads are
+  resolved, and affected validation passes. Mark the PR ready for re-review,
+  but treat the stale blocking review as a merge blocker until the reviewer
+  clears it or approves the current head.
 - After marking the PR ready, re-fetch the same state. If feedback or a head
-  change raced the readiness transition, immediately return the PR to draft and
-  resolve it. Only a stable clean preflight and post-transition check completes
-  readiness. CODEOWNERS then requests `kamkie` as the human owner reviewer.
+  change raced the readiness transition, or a `CHANGES_REQUESTED` review applies
+  to the current head, immediately return the PR to draft and resolve it. Only a
+  stable clean preflight and post-transition check completes readiness.
+  CODEOWNERS then requests `kamkie` as the human owner reviewer.
 
 ### Owner approval, checks, and merge
 

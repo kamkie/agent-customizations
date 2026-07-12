@@ -57,11 +57,12 @@ $typedArgs = @(
     "--include-partial-messages", "--verbose", "--bare"
 )
 foreach ($arg in $ClaudeArgs) {
-    if ($forbiddenArgs -contains $arg) {
-        throw "Do not pass $arg through claude-runner. It breaks attached resumable execution."
+    $argName = if ($arg -match "^(--?[^=]+)=") { $Matches[1] } else { $arg }
+    if ($forbiddenArgs -contains $argName) {
+        throw "Do not pass $argName through claude-runner. It breaks attached resumable execution."
     }
-    if (($typedArgs -contains $arg) -or $arg.StartsWith("--allowedTools=") -or $arg.StartsWith("--allowed-tools=")) {
-        throw "Use the typed claude-runner parameter for $arg instead of -ClaudeArgs."
+    if ($typedArgs -contains $argName) {
+        throw "Use the typed claude-runner parameter for $argName instead of -ClaudeArgs."
     }
 }
 
@@ -73,12 +74,20 @@ if ($BypassPermissions -and $AllowedTools.Count -gt 0) {
     throw "Do not combine -AllowedTools with -BypassPermissions. Allowed tools do not constrain bypass mode."
 }
 
+if ($ReviewPr -gt 0 -and $BypassPermissions) {
+    throw "Do not combine -ReviewPr with -BypassPermissions. PR reviews use the read-only review profile."
+}
+
+if ($ReviewPr -gt 0 -and $PSBoundParameters.ContainsKey("PermissionMode") -and $PermissionMode -ne "dontAsk") {
+    throw "PR reviews require -PermissionMode dontAsk. Omit -PermissionMode to use the review profile automatically."
+}
+
 if (-not [string]::IsNullOrWhiteSpace($ExactModel) -and $PSBoundParameters.ContainsKey("ModelAlias")) {
     throw "Use either -ModelAlias or -ExactModel, not both."
 }
 
 $selectedModel = if ([string]::IsNullOrWhiteSpace($ExactModel)) { $ModelAlias } else { $ExactModel }
-$reviewProfileEnabled = ($ReviewPr -gt 0) -and -not $BypassPermissions -and -not $PSBoundParameters.ContainsKey("PermissionMode")
+$reviewProfileEnabled = $ReviewPr -gt 0
 $selectedPermissionMode = if ($reviewProfileEnabled) { "dontAsk" } else { $PermissionMode }
 $displayPermissionMode = if ($BypassPermissions) {
     "bypassPermissions"
@@ -133,8 +142,13 @@ function Format-CommandArgsForDisplay {
 }
 
 function Get-DefaultClaudeConfigDirectory {
+    param([string]$BaseDirectory)
+
     if (-not [string]::IsNullOrWhiteSpace($env:CLAUDE_CONFIG_DIR)) {
-        return [System.IO.Path]::GetFullPath($env:CLAUDE_CONFIG_DIR)
+        if ([System.IO.Path]::IsPathRooted($env:CLAUDE_CONFIG_DIR)) {
+            return $env:CLAUDE_CONFIG_DIR
+        }
+        return [System.IO.Path]::GetFullPath((Join-Path $BaseDirectory $env:CLAUDE_CONFIG_DIR))
     }
 
     return Join-Path $HOME ".claude"
@@ -466,7 +480,7 @@ if ($effectiveAllowedTools.Count -gt 0) {
 $cmdArgs += $ClaudeArgs
 
 $resolvedClaudeConfigDirectory = if ([string]::IsNullOrWhiteSpace($ClaudeConfigDirectory)) {
-    Get-DefaultClaudeConfigDirectory
+    Get-DefaultClaudeConfigDirectory $resolvedWorkingDirectory
 } else {
     Resolve-RunnerPath $resolvedWorkingDirectory $ClaudeConfigDirectory
 }

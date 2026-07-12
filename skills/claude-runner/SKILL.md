@@ -106,12 +106,12 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\.codex\skills\claude-runner
   -MaxTurns 8
 ```
 
-Explicit permission bypass is exceptional and must be visible at the call site:
+Explicit permission bypass is exceptional and must be visible at the call site. It is not available for `-ReviewPr`:
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\.codex\skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1" `
   -WorkingDirectory $repo `
-  -ReviewPr $pr `
+  -Prompt "Run the authorized task" `
   -ModelAlias opus `
   -Effort medium `
   -BypassPermissions

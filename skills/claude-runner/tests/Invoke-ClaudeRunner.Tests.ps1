@@ -72,6 +72,56 @@ exit [int]$env:FAKE_CLAUDE_EXIT
     Assert-True ($dry.Output.Contains("--effort medium")) "DryRun did not bind typed medium effort."
     Assert-True ($dry.Output.Contains("--model claude-opus-4-6")) "DryRun did not select the exact model."
 
+    $typedOverride = Invoke-RunnerProcess @(
+        "-Prompt", "safe",
+        "-WorkingDirectory", $target,
+        "-ClaudeConfigDirectory", (Join-Path $testRoot "typed-override-config-must-not-exist"),
+        "-ClaudeArgs", "--permission-mode=bypassPermissions",
+        "-DryRun"
+    )
+    Assert-True ($typedOverride.ExitCode -ne 0) "An equals-form typed control bypassed -ClaudeArgs validation."
+    Assert-True ($typedOverride.Output.Contains("typed claude-runner parameter for --permission-mode")) "Equals-form typed control failure was not explicit."
+    Assert-True (-not $typedOverride.Output.Contains("bypassPermissions")) "Equals-form typed control leaked its value in the error summary."
+
+    $reviewPermissionOverride = Invoke-RunnerProcess @(
+        "-ReviewPr", "17",
+        "-PermissionMode", "default",
+        "-WorkingDirectory", $target,
+        "-ClaudeConfigDirectory", (Join-Path $testRoot "review-permission-config-must-not-exist"),
+        "-DryRun"
+    )
+    Assert-True ($reviewPermissionOverride.ExitCode -ne 0) "PR review silently accepted a weaker explicit permission mode."
+
+    $reviewBypass = Invoke-RunnerProcess @(
+        "-ReviewPr", "17",
+        "-BypassPermissions",
+        "-WorkingDirectory", $target,
+        "-ClaudeConfigDirectory", (Join-Path $testRoot "review-bypass-config-must-not-exist"),
+        "-DryRun"
+    )
+    Assert-True ($reviewBypass.ExitCode -ne 0) "PR review silently accepted bypass permissions."
+
+    $hadOriginalClaudeConfig = Test-Path Env:CLAUDE_CONFIG_DIR
+    $originalClaudeConfig = $env:CLAUDE_CONFIG_DIR
+    try {
+        $env:CLAUDE_CONFIG_DIR = ".claude-relative"
+        $relativeConfig = Invoke-RunnerProcess @(
+            "-Prompt", "safe",
+            "-WorkingDirectory", $target,
+            "-DryRun"
+        )
+        $expectedRelativeProjects = Join-Path $target ".claude-relative\projects"
+        Assert-True ($relativeConfig.ExitCode -eq 0) "Relative CLAUDE_CONFIG_DIR DryRun failed."
+        Assert-True ($relativeConfig.Output.Contains($expectedRelativeProjects)) "Relative CLAUDE_CONFIG_DIR was not resolved against the working directory."
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $target ".claude-relative"))) "Relative CLAUDE_CONFIG_DIR DryRun created state."
+    } finally {
+        if ($hadOriginalClaudeConfig) {
+            $env:CLAUDE_CONFIG_DIR = $originalClaudeConfig
+        } else {
+            Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue
+        }
+    }
+
     $bypass = Invoke-RunnerProcess @(
         "-Prompt", "safe",
         "-WorkingDirectory", $target,

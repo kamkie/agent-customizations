@@ -86,7 +86,9 @@ function Add-ManagedJobIdentity {
 
 function Write-JobCollection {
     param([object[]]$Jobs)
-    $output = @($Jobs | ForEach-Object { Add-ManagedJobIdentity -Job $_ })
+    $output = @(foreach ($job in @($Jobs)) {
+        if ($null -ne $job) { Add-ManagedJobIdentity -Job $job }
+    })
     if ($Json) {
         ConvertTo-Json -InputObject $output -Depth 12
     } else {
@@ -98,6 +100,7 @@ switch ($Action) {
     'start' {
         if (-not $Name) { throw '-Name is required for start.' }
         if (-not $Executable) { throw '-Executable is required for start.' }
+        if ($KeepTerminalOpen -and -not $Visible) { throw '-KeepTerminalOpen requires -Visible.' }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
         $resolvedDirectory = (Resolve-Path -LiteralPath $WorkingDirectory).Path
         $fingerprint = Get-InvocationFingerprint -Executable $Executable -Arguments $Arguments -WorkingDirectory $resolvedDirectory -Environment $Environment

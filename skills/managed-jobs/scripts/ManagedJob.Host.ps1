@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 
 $job = Read-ManagedJob -Path $JobFile
+$keepTerminalOpen = [bool]$job.keepTerminalOpen
 $logDirectory = Split-Path -Parent $job.logPath
 $null = New-Item -ItemType Directory -Path $logDirectory -Force
 $writer = [IO.StreamWriter]::new($job.logPath, $true, [Text.UTF8Encoding]::new($false))
@@ -59,6 +60,7 @@ try {
     $footer = "[$([datetime]::Now.ToString('s'))] managed-job $($job.id) finished with exit code $exitCode"
     Write-Host $footer
     $writer.WriteLine($footer)
+    if ($keepTerminalOpen) { return }
     exit $exitCode
 } catch {
     $message = $_.Exception.Message
@@ -73,6 +75,7 @@ try {
     $line = "[$([datetime]::Now.ToString('s'))] managed-job failed: $message"
     Write-Host $line -ForegroundColor Red
     $writer.WriteLine($line)
+    if ($keepTerminalOpen) { return }
     exit 1
 } finally {
     $writer.Dispose()

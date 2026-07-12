@@ -9,12 +9,15 @@ discovered.
 
 ## Visible execution
 
+Use the `$jobs` and `$repo` values resolved by `SKILL.md`:
+
 ```powershell
 & $jobs start -Name api -Executable dotnet -Arguments @('run') -WorkingDirectory $repo -Visible
 ```
 
 Add `-KeepTerminalOpen` only when the user wants the terminal to remain open
-after completion.
+after completion. The user must close that terminal manually; `stop` manages
+active jobs and does not close a kept-open terminal after its job is complete.
 
 ## Duplicate detection
 

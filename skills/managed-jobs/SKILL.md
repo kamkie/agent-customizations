@@ -8,6 +8,13 @@ description: Run, inspect, recover, and stop long-running local processes with d
 Use `scripts/Invoke-ManagedJob.ps1` from this installed skill directory. It
 locates companion scripts relative to itself under either Codex or Claude.
 
+```powershell
+$jobs = Join-Path $managedJobsSkillDirectory 'scripts\Invoke-ManagedJob.ps1'
+```
+
+`$managedJobsSkillDirectory` is the directory containing this `SKILL.md`, as
+resolved by the agent that loaded it.
+
 ## State
 
 State-root precedence is `-StateRoot`, `MANAGED_JOBS_ROOT`, then

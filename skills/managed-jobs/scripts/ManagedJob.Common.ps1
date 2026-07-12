@@ -127,6 +127,7 @@ function ConvertTo-SafeJobName {
 
 function Assert-SecretSafeInvocation {
     param([string[]]$Arguments, [hashtable]$Environment)
+    $Arguments = @($Arguments)
     $secretName = '(?i)(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential|cookie)$'
     $secretOption = '(?i)^--?[^=]*(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential)(?:=|$)'
     foreach ($key in $Environment.Keys) {

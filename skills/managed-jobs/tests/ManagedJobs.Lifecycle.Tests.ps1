@@ -75,6 +75,9 @@ try {
         try { Assert-SecretSafeInvocation -Arguments $safeArguments -Environment @{} } catch { $safeAccepted = $false }
         Assert-True $safeAccepted "Benign option should not be rejected: $($safeArguments -join ' ')"
     }
+    $nullArgumentsAccepted = $true
+    try { Assert-SecretSafeInvocation -Arguments $null -Environment @{} } catch { $nullArgumentsAccepted = $false }
+    Assert-True $nullArgumentsAccepted 'An explicitly null argument array should be treated as empty.'
     foreach ($secretKey in @('DBPASSWORD', 'CLIENTSECRET', 'MYAPITOKEN', 'MY-SECRET')) {
         $secretNameRejected = $false
         try { Assert-SecretSafeInvocation -Arguments @() -Environment @{ $secretKey = 'do-not-store' } } catch { $secretNameRejected = $true }

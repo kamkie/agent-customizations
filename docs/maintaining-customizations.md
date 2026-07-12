@@ -91,12 +91,7 @@ reference does not prove that the entrypoint is self-contained.
 
 ## Validate and deliver
 
-- Run `pwsh ./scripts/verify.ps1` and `git diff --check` for every change.
-- Run `pwsh ./scripts/test.ps1` after changing installation, status,
-  verification, manifest, or other deployment tooling.
-- Use `pwsh ./scripts/status.ps1` when reviewed-versus-live drift is relevant.
-  Drift is evidence to report, not permission to install.
-- Inspect the final diff and remove unrelated changes before committing.
-- Follow the repository's branch, pull-request, cross-review, readiness, and
-  current-head verification workflow in `AGENTS.md`.
-- Do not run `install.ps1` unless live deployment was explicitly authorized.
+Follow the canonical [implementation and delivery workflow](../AGENTS.md#implement-validate-and-commit)
+in `AGENTS.md`. It owns the exact validation triggers, drift inspection,
+activation boundary, final-diff review, branch and pull-request workflow,
+cross-review, and current-head readiness checks.

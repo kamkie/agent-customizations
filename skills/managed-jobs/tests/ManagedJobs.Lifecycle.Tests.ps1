@@ -80,9 +80,18 @@ try {
         try { Assert-SecretSafeInvocation -Arguments @() -Environment @{ $secretKey = 'do-not-store' } } catch { $secretNameRejected = $true }
         Assert-True $secretNameRejected "Secret-like environment key should be rejected: $secretKey"
     }
+    foreach ($safeKey in @('PASSWORD_MIN_LENGTH', 'COOKIE_DOMAIN', 'TOKEN_BUCKET_SIZE', 'CSRF_TOKEN_HEADER')) {
+        $safeAccepted = $true
+        try { Assert-SecretSafeInvocation -Arguments @() -Environment @{ $safeKey = 'configuration' } } catch { $safeAccepted = $false }
+        Assert-True $safeAccepted "Benign environment key should not be rejected: $safeKey"
+    }
     $firstFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments @('-NoProfile') -WorkingDirectory (Get-Location).Path -Environment @{ PORT = '3000' }
     $secondFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments @('-NoProfile') -WorkingDirectory (Get-Location).Path -Environment @{ PORT = '4000' }
     Assert-True ($firstFingerprint -ne $secondFingerprint) 'Environment values should distinguish invocation fingerprints.'
+
+    $cmdletJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-cmdlet' -Executable 'Write-Output' -Arguments @('lifecycle-cmdlet') | Out-String) | ConvertFrom-Json
+    $cmdletJob = Wait-JobStatus -Id $cmdletJob.id -Expected @('completed', 'failed')
+    Assert-True ($cmdletJob.status -eq 'completed') 'PowerShell commands without LASTEXITCODE should complete successfully.'
 
     $emptyId = '20000101-000000-lifecycle-empty-000001'
     $emptyPath = Join-Path $stateRoot "jobs\$emptyId.json"

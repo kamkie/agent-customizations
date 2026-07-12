@@ -46,7 +46,7 @@ try {
             Write-Host $line
             $writer.WriteLine($line)
         }
-        $exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } elseif ($?) { 0 } else { 1 }
+        $exitCode = if (Test-Path variable:LASTEXITCODE) { [int]$LASTEXITCODE } elseif ($?) { 0 } else { 1 }
     } finally {
         $ErrorActionPreference = $previousErrorPreference
     }

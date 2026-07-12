@@ -18,6 +18,9 @@ tools' live configuration directories are deployment targets.
 - `config/manifest.json` — the exact files managed for each supported agent.
 - `docs/customization-ownership.md` — classification, admission, ownership,
   precedence, and authoring rules for proposed customizations.
+- `docs/maintaining-customizations.md` — maintenance rules for agent
+  instructions, skill entrypoints, references, and progressive-disclosure
+  validation.
 - `scripts/verify.ps1` — validates structure and scans managed sources for
   common publication hazards.
 - `scripts/status.ps1` — reports drift between this repository and live agent

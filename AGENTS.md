@@ -11,6 +11,10 @@ Code configuration directories are deployment targets, not editing locations.
 - Classify new guidance using [`docs/customization-ownership.md`](docs/customization-ownership.md)
   before adding it. Reusable skills own repeated workflows and discover
   repository policy; they do not embed repository-specific contracts.
+- Follow [`docs/maintaining-customizations.md`](docs/maintaining-customizations.md)
+  when changing agent instructions or skills. Keep each skill's common path
+  executable from `SKILL.md` alone; use references for uncommon branches and
+  details, not to complete the normal workflow.
 - Do not import sessions, memories, logs, artifacts, managed-job records,
   credentials, plugin caches, or machine-generated configuration.
 - Keep examples portable. Do not commit usernames, home-directory paths,

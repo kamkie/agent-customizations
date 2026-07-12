@@ -1,9 +1,31 @@
 {
-  "schemaVersion": 1,
-  "globalAgents": "global/AGENTS.md",
-  "skills": [
-    "claude-runner",
-    "managed-jobs",
-    "orchestrate-work-campaigns"
-  ]
+  "schemaVersion": 2,
+  "targets": {
+    "codex": {
+      "displayName": "Codex",
+      "homeEnvironmentVariable": "CODEX_HOME",
+      "defaultHomeDirectory": ".codex",
+      "instructions": {
+        "source": "global/AGENTS.md",
+        "destination": "AGENTS.md"
+      },
+      "skills": [
+        "claude-runner",
+        "managed-jobs",
+        "orchestrate-work-campaigns"
+      ]
+    },
+    "claude": {
+      "displayName": "Claude Code",
+      "homeEnvironmentVariable": "CLAUDE_CONFIG_DIR",
+      "defaultHomeDirectory": ".claude",
+      "instructions": {
+        "source": "global/CLAUDE.md",
+        "destination": "CLAUDE.md"
+      },
+      "skills": [
+        "managed-jobs"
+      ]
+    }
+  }
 }

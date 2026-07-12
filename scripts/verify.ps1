@@ -2,7 +2,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'CodexCustomization.Common.ps1')
+. (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 
 $repositoryRoot = Get-CustomizationRepositoryRoot
 $manifest = Get-CustomizationManifest
@@ -13,8 +13,7 @@ $requiredRepositoryFiles = @(
     'README.md',
     'LICENSE',
     'SECURITY.md',
-    'config\manifest.json',
-    'global\AGENTS.md'
+    'config\manifest.json'
 )
 foreach ($relativePath in $requiredRepositoryFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $repositoryRoot $relativePath) -PathType Leaf)) {
@@ -22,7 +21,33 @@ foreach ($relativePath in $requiredRepositoryFiles) {
     }
 }
 
-$declaredSkills = @($manifest.skills | ForEach-Object { [string]$_ })
+$targetNames = @($manifest.targets.PSObject.Properties.Name)
+if ($targetNames.Count -eq 0) { $errors.Add('Manifest declares no targets') }
+$declaredSkills = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($targetName in $targetNames) {
+    $target = $manifest.targets.PSObject.Properties[$targetName].Value
+    foreach ($field in @('displayName', 'homeEnvironmentVariable', 'defaultHomeDirectory')) {
+        if ([string]::IsNullOrWhiteSpace([string]$target.$field)) {
+            $errors.Add("Target '$targetName' has no $field")
+        }
+    }
+
+    foreach ($field in @('source', 'destination')) {
+        if ([string]::IsNullOrWhiteSpace([string]$target.instructions.$field)) {
+            $errors.Add("Target '$targetName' instructions have no $field")
+        }
+    }
+
+    $instructionSource = Join-Path $repositoryRoot ([string]$target.instructions.source)
+    if (-not (Test-Path -LiteralPath $instructionSource -PathType Leaf)) {
+        $errors.Add("Target '$targetName' instruction source does not exist: $($target.instructions.source)")
+    }
+
+    foreach ($skillName in @($target.skills)) {
+        [void]$declaredSkills.Add([string]$skillName)
+    }
+}
+
 $actualSkills = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'skills') -Directory -Force |
     Select-Object -ExpandProperty Name)
 foreach ($skillName in $declaredSkills) {
@@ -43,7 +68,7 @@ foreach ($skillName in $declaredSkills) {
     }
 }
 foreach ($skillName in $actualSkills) {
-    if ($skillName -notin $declaredSkills) {
+    if (-not $declaredSkills.Contains($skillName)) {
         $errors.Add("Undeclared skill directory: $skillName")
     }
 }
@@ -77,6 +102,7 @@ if ($errors.Count -gt 0) {
 [pscustomobject]@{
     repository = $repositoryRoot
     schemaVersion = $manifest.schemaVersion
+    targets = $targetNames.Count
     skills = $declaredSkills.Count
     managedSourceFiles = $managedFiles.Count
     result = 'Valid'

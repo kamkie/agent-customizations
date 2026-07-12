@@ -1,7 +1,7 @@
 # Security policy
 
 This repository intentionally contains reusable instructions and scripts, not
-Codex runtime state.
+agent runtime state.
 
 Do not commit API keys, OAuth tokens, credentials, session transcripts,
 memories, logs, managed-job records, private repository contents, or absolute

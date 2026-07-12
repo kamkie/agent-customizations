@@ -1,20 +1,19 @@
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
 param(
+    [ValidateSet('All', 'Codex', 'Claude')][string]$Target = 'All',
     [string]$CodexHome,
+    [string]$ClaudeHome,
     [switch]$AllowDirty,
     [switch]$AllowNonMain
 )
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'CodexCustomization.Common.ps1')
+. (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 
 $repositoryRoot = Get-CustomizationRepositoryRoot
-$resolvedCodexHome = Resolve-CustomizationCodexHome -CodexHome $CodexHome
-$manifest = Get-CustomizationManifest
 
 & (Join-Path $PSScriptRoot 'verify.ps1')
-$verificationSucceeded = $?
-if (-not $verificationSucceeded) { throw 'Repository verification failed.' }
+if (-not $?) { throw 'Repository verification failed.' }
 
 if (Test-Path -LiteralPath (Join-Path $repositoryRoot '.git')) {
     $dirty = @(& git -C $repositoryRoot status --porcelain)
@@ -34,64 +33,69 @@ if (Test-Path -LiteralPath (Join-Path $repositoryRoot '.git')) {
     }
 }
 
-$status = @(Get-CustomizationStatus -CodexHome $resolvedCodexHome)
-$drift = @($status | Where-Object State -ne 'InSync')
-if ($drift.Count -eq 0) {
-    Write-Host "Codex customizations are already in sync at $resolvedCodexHome"
-    exit 0
-}
-
-$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$backupRoot = Join-Path $resolvedCodexHome "customization-backups\$timestamp"
-$skillsRoot = Join-Path $resolvedCodexHome 'skills'
-
-if ($PSCmdlet.ShouldProcess($resolvedCodexHome, "Install $($drift.Count) customization change(s)")) {
-    New-Item -ItemType Directory -Path $resolvedCodexHome, $skillsRoot, $backupRoot -Force | Out-Null
-
-    $globalSource = Join-Path $repositoryRoot ([string]$manifest.globalAgents)
-    $globalTarget = Join-Path $resolvedCodexHome 'AGENTS.md'
-    $globalState = $status | Where-Object Kind -eq 'Global' | Select-Object -First 1
-    if ($globalState.State -ne 'InSync') {
-        if (Test-Path -LiteralPath $globalTarget -PathType Leaf) {
-            Copy-Item -LiteralPath $globalTarget -Destination (Join-Path $backupRoot 'AGENTS.md') -Force
-        }
-        $temporaryGlobal = Join-Path $resolvedCodexHome ('.AGENTS.md.install-' + [guid]::NewGuid().ToString('N'))
-        Copy-Item -LiteralPath $globalSource -Destination $temporaryGlobal -Force
-        Move-Item -LiteralPath $temporaryGlobal -Destination $globalTarget -Force
+foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
+    $targetConfig = Get-CustomizationTarget -Name $targetName
+    $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
+    $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
+    $status = @(Get-CustomizationStatus -TargetName $targetName -HomePath $resolvedHome)
+    $drift = @($status | Where-Object State -ne 'InSync')
+    if ($drift.Count -eq 0) {
+        Write-Host "$($targetConfig.displayName) customizations are already in sync at $resolvedHome"
+        continue
     }
 
-    foreach ($skillName in @($manifest.skills)) {
-        $skillDrift = @($status | Where-Object { $_.Kind -eq 'Skill' -and $_.Name -eq $skillName -and $_.State -ne 'InSync' })
-        if ($skillDrift.Count -eq 0) { continue }
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $backupRoot = Join-Path $resolvedHome "customization-backups\$timestamp"
+    $skillsRoot = Join-Path $resolvedHome 'skills'
 
-        $source = Join-Path $repositoryRoot "skills\$skillName"
-        $target = Join-Path $skillsRoot $skillName
-        $staging = Join-Path $skillsRoot ('.' + $skillName + '.install-' + [guid]::NewGuid().ToString('N'))
-        $backup = Join-Path (Join-Path $backupRoot 'skills') $skillName
+    if ($PSCmdlet.ShouldProcess($resolvedHome, "Install $($drift.Count) $($targetConfig.displayName) customization change(s)")) {
+        New-Item -ItemType Directory -Path $resolvedHome, $skillsRoot, $backupRoot -Force | Out-Null
 
-        Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
-        try {
-            if (Test-Path -LiteralPath $target -PathType Container) {
-                New-Item -ItemType Directory -Path (Split-Path -Parent $backup) -Force | Out-Null
-                Move-Item -LiteralPath $target -Destination $backup
+        $instructionSource = Join-Path $repositoryRoot ([string]$targetConfig.instructions.source)
+        $instructionTarget = Join-Path $resolvedHome ([string]$targetConfig.instructions.destination)
+        $instructionState = $status | Where-Object Kind -eq 'Instructions' | Select-Object -First 1
+        if ($instructionState.State -ne 'InSync') {
+            if (Test-Path -LiteralPath $instructionTarget -PathType Leaf) {
+                Copy-Item -LiteralPath $instructionTarget -Destination (Join-Path $backupRoot ([string]$targetConfig.instructions.destination)) -Force
             }
-            Move-Item -LiteralPath $staging -Destination $target
-        } catch {
-            if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
-            if (-not (Test-Path -LiteralPath $target) -and (Test-Path -LiteralPath $backup)) {
-                Move-Item -LiteralPath $backup -Destination $target
+            $temporaryInstruction = Join-Path $resolvedHome ('.instructions.install-' + [guid]::NewGuid().ToString('N'))
+            Copy-Item -LiteralPath $instructionSource -Destination $temporaryInstruction -Force
+            Move-Item -LiteralPath $temporaryInstruction -Destination $instructionTarget -Force
+        }
+
+        foreach ($skillName in @($targetConfig.skills)) {
+            $skillDrift = @($status | Where-Object { $_.Kind -eq 'Skill' -and $_.Name -eq $skillName -and $_.State -ne 'InSync' })
+            if ($skillDrift.Count -eq 0) { continue }
+
+            $source = Join-Path $repositoryRoot "skills\$skillName"
+            $destination = Join-Path $skillsRoot $skillName
+            $staging = Join-Path $skillsRoot ('.' + $skillName + '.install-' + [guid]::NewGuid().ToString('N'))
+            $backup = Join-Path (Join-Path $backupRoot 'skills') $skillName
+
+            Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
+            try {
+                if (Test-Path -LiteralPath $destination -PathType Container) {
+                    New-Item -ItemType Directory -Path (Split-Path -Parent $backup) -Force | Out-Null
+                    Move-Item -LiteralPath $destination -Destination $backup
+                }
+                Move-Item -LiteralPath $staging -Destination $destination
+            } catch {
+                if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+                if (-not (Test-Path -LiteralPath $destination) -and (Test-Path -LiteralPath $backup)) {
+                    Move-Item -LiteralPath $backup -Destination $destination
+                }
+                throw
             }
-            throw
         }
     }
+
+    if ($WhatIfPreference) { continue }
+
+    $remaining = @(Get-CustomizationStatus -TargetName $targetName -HomePath $resolvedHome | Where-Object State -ne 'InSync')
+    if ($remaining.Count -gt 0) {
+        throw "Installation completed with $($remaining.Count) remaining $($targetConfig.displayName) drift item(s)."
+    }
+
+    Write-Host "Installed $($targetConfig.displayName) customizations to $resolvedHome"
+    Write-Host "Previous files, when present, were backed up under $backupRoot"
 }
-
-if ($WhatIfPreference) { exit 0 }
-
-$remaining = @(Get-CustomizationStatus -CodexHome $resolvedCodexHome | Where-Object State -ne 'InSync')
-if ($remaining.Count -gt 0) {
-    throw "Installation completed with $($remaining.Count) remaining drift item(s)."
-}
-
-Write-Host "Installed Codex customizations to $resolvedCodexHome"
-Write-Host "Previous files, when present, were backed up under $backupRoot"

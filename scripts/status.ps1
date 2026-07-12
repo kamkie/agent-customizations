@@ -1,28 +1,41 @@
 [CmdletBinding()]
 param(
+    [ValidateSet('All', 'Codex', 'Claude')][string]$Target = 'All',
     [string]$CodexHome,
+    [string]$ClaudeHome,
     [switch]$SummaryOnly
 )
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'CodexCustomization.Common.ps1')
+. (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 
-$resolvedCodexHome = Resolve-CustomizationCodexHome -CodexHome $CodexHome
-$status = @(Get-CustomizationStatus -CodexHome $resolvedCodexHome)
-$drift = @($status | Where-Object State -ne 'InSync')
+$allStatus = [Collections.Generic.List[object]]::new()
+$summaries = [Collections.Generic.List[object]]::new()
+foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
+    $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
+    $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
+    $status = @(Get-CustomizationStatus -TargetName $targetName -HomePath $resolvedHome)
+    foreach ($item in $status) { $allStatus.Add($item) }
+    $drift = @($status | Where-Object State -ne 'InSync')
+    $summaries.Add([pscustomobject]@{
+        target = $targetName
+        home = $resolvedHome
+        managedFiles = $status.Count
+        inSync = @($status | Where-Object State -eq 'InSync').Count
+        drift = $drift.Count
+        missing = @($status | Where-Object State -eq 'Missing').Count
+        different = @($status | Where-Object State -eq 'Different').Count
+        extra = @($status | Where-Object State -eq 'Extra').Count
+    })
+}
 
 if (-not $SummaryOnly) {
-    $status | Format-Table Kind, Name, RelativePath, State -AutoSize
+    $allStatus | Format-Table Target, Kind, Name, RelativePath, State -AutoSize
 }
 
 [pscustomobject]@{
-    codexHome = $resolvedCodexHome
-    managedFiles = $status.Count
-    inSync = @($status | Where-Object State -eq 'InSync').Count
-    drift = $drift.Count
-    missing = @($status | Where-Object State -eq 'Missing').Count
-    different = @($status | Where-Object State -eq 'Different').Count
-    extra = @($status | Where-Object State -eq 'Extra').Count
-} | ConvertTo-Json -Depth 4
+    targets = $summaries
+    drift = @($allStatus | Where-Object State -ne 'InSync').Count
+} | ConvertTo-Json -Depth 5
 
-if ($drift.Count -gt 0) { exit 1 }
+if (@($allStatus | Where-Object State -ne 'InSync').Count -gt 0) { exit 1 }

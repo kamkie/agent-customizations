@@ -25,15 +25,11 @@ The registry is agent-neutral. Resolution order is:
 
 1. `-StateRoot` for one invocation;
 2. `MANAGED_JOBS_ROOT` for a deliberately shared installation;
-3. an existing legacy `<CODEX_HOME>/managed-jobs` registry when the new default
-   does not exist;
-4. the new default, `$HOME/.agent-customizations/managed-jobs`.
+3. the default, `$HOME/.agent-customizations/managed-jobs`.
 
 Set the same `MANAGED_JOBS_ROOT` for Codex and Claude when they should share one
-registry. New records written through a legacy fallback use the safe schema;
-existing records remain readable in place, without an implicit copy, deletion,
-or live-install mutation. Choose an explicit state root before creating new jobs
-if multiple legacy registries need manual consolidation.
+registry. The controller does not discover, import, migrate, or mutate registries
+under an agent-specific home directory.
 
 ## Secret boundary
 

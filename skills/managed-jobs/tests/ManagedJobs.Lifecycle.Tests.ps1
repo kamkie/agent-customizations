@@ -92,27 +92,6 @@ try {
     Assert-True ((Get-JobStatus -Id $freshId).status -eq 'starting') 'Fresh unclaimed starting record must not reconcile to orphaned.'
     Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$freshId.json") -Force
 
-    # Active schema-v1 records remain duplicate-aware without requiring migration.
-    $legacyId = '20000101-000000-lifecycle-legacy-000001'
-    $testProcess = Get-Process -Id $PID
-    $legacyArguments = @('-NoProfile', '-Command', 'Start-Sleep -Seconds 28')
-    $legacyRecord = [ordered]@{
-        schemaVersion = 1; id = $legacyId; name = 'lifecycle-legacy'; kind = 'test'; status = 'running'; visible = $false
-        keepTerminalOpen = $false; createdAtUtc = [datetime]::UtcNow.AddMinutes(-1).ToString('o'); startedAtUtc = [datetime]::UtcNow.AddMinutes(-1).ToString('o')
-        finishedAtUtc = $null; hostPid = $PID; hostStartedAtUtc = $testProcess.StartTime.ToUniversalTime().ToString('o')
-        executable = $pwsh; arguments = $legacyArguments; workingDirectory = (Get-Location).Path
-        environment = [ordered]@{ GIT_AUTHOR_NAME = 'not-read-for-fingerprint' }; logPath = (Join-Path $stateRoot "logs\$legacyId.log")
-        exitCode = $null; error = $null
-    }
-    $legacyRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$legacyId.json") -Encoding utf8
-    $legacyDuplicateRejected = $false
-    try {
-        & $controller start -StateRoot $stateRoot -Name 'lifecycle-legacy-duplicate' -Executable $pwsh -Arguments $legacyArguments `
-            -Environment @{ GIT_AUTHOR_NAME = 'ignored-value' } | Out-Null
-    } catch { $legacyDuplicateRejected = $_.Exception.Message -match [regex]::Escape($legacyId) }
-    Assert-True $legacyDuplicateRejected 'Equivalent active schema-v1 records should block new launches.'
-    Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$legacyId.json") -Force
-
     # Duplicate detection happens while the first equivalent helper is active.
     $running = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-running' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json

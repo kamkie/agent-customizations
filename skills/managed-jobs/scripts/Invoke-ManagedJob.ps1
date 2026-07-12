@@ -57,22 +57,6 @@ function Update-ReconciledJob {
     return $Job
 }
 
-function Get-LegacyInvocationFingerprint {
-    param($Job)
-    $required = @('executable', 'arguments', 'workingDirectory')
-    if (@($required | Where-Object { $Job.PSObject.Properties.Name -notcontains $_ }).Count) { return $null }
-    try {
-        $legacyEnvironment = @{}
-        if (($Job.PSObject.Properties.Name -contains 'environment') -and $Job.environment) {
-            foreach ($property in $Job.environment.PSObject.Properties) { $legacyEnvironment[$property.Name] = '' }
-        }
-        return Get-InvocationFingerprint -Executable $Job.executable -Arguments @($Job.arguments) `
-            -WorkingDirectory $Job.workingDirectory -Environment $legacyEnvironment
-    } catch {
-        return $null
-    }
-}
-
 function Select-ManagedJobs {
     param([object[]]$Jobs)
     if ($Status) { return @($Jobs | Where-Object { $_.status -in $Status }) }
@@ -122,8 +106,7 @@ switch ($Action) {
 
             $active = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ } | Where-Object status -in @('starting', 'running'))
             $duplicate = $active | Where-Object {
-                ($_.PSObject.Properties.Name -contains 'invocationFingerprint' -and $_.invocationFingerprint -eq $fingerprint) -or
-                (Get-LegacyInvocationFingerprint -Job $_) -eq $fingerprint
+                $_.PSObject.Properties.Name -contains 'invocationFingerprint' -and $_.invocationFingerprint -eq $fingerprint
             } | Select-Object -First 1
             if ($duplicate) {
                 throw "Equivalent managed job is already active: $($duplicate.id) [$($duplicate.status)] $($duplicate.name)"

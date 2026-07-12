@@ -13,13 +13,7 @@ function Get-ManagedJobRoot {
     } elseif ($env:MANAGED_JOBS_ROOT) {
         $root = [IO.Path]::GetFullPath($env:MANAGED_JOBS_ROOT)
     } else {
-        $neutralRoot = Join-Path $HOME '.agent-customizations\managed-jobs'
-        $legacyCodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
-        $legacyRoot = Join-Path $legacyCodexHome 'managed-jobs'
-        # Preserve existing installations without copying or mutating their records. A new
-        # installation uses the agent-neutral root unless an existing Codex registry exists.
-        $root = if ((Test-Path -LiteralPath $legacyRoot -PathType Container) -and
-            -not (Test-Path -LiteralPath $neutralRoot -PathType Container)) { $legacyRoot } else { $neutralRoot }
+        $root = Join-Path $HOME '.agent-customizations\managed-jobs'
     }
 
     foreach ($directory in @('jobs', 'logs', 'launch')) {

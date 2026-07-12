@@ -1,0 +1,4 @@
+interface:
+  display_name: "Managed Jobs"
+  short_description: "Run and recover long-lived local processes"
+  default_prompt: "Use $managed-jobs to start, inspect, recover, or stop a long-running local process with durable logs."

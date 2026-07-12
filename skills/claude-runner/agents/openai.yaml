@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Runner"
+  short_description: "Resume-safe Claude CLI runner for Codex"
+  default_prompt: "Use $claude-runner to run or resume a Claude Code review with streaming output, logs, and a stable session id."

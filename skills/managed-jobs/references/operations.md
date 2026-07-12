@@ -7,47 +7,43 @@ State-root precedence is `-StateRoot`, `MANAGED_JOBS_ROOT`, then
 Codex and Claude should share a registry. Agent-specific registries are not
 discovered.
 
-## Start
+## Visible execution
 
 ```powershell
-& $jobs start -Name api -Executable dotnet -Arguments @('run') -WorkingDirectory $repo
+& $jobs start -Name api -Executable dotnet -Arguments @('run') -WorkingDirectory $repo -Visible
 ```
 
-Hidden durable execution is the default. Add `-Visible` only when the user asks
-for a shared terminal, and `-KeepTerminalOpen` only when it should remain open.
+Add `-KeepTerminalOpen` only when the user wants the terminal to remain open
+after completion.
 
-Equivalent active invocations are rejected using a stable fingerprint and a
-serialized pre-launch check. Record the returned job id.
+## Duplicate detection
+
+Equivalent active invocations are rejected using a stable fingerprint under a
+serialized pre-launch check.
 
 ## Secret boundary
 
-Treat names, paths, arguments, environment entries, records, and logs as
-non-secret. Inherit secrets from the parent process or use standard input,
-response files, or credential stores. The controller rejects likely secrets.
+Inherit secrets from the parent process or use standard input, response files,
+or credential stores. The controller rejects likely secrets.
 
 Permanent records omit argument text and environment values. A short-lived
 launch file carries validated non-secret values and is deleted when claimed.
 Child output is logged verbatim. Logs merge stdout and stderr; use
 application-native structured logs when stream separation matters.
 
-## Inspect
+## Structured recovery
 
 ```powershell
-& $jobs reconcile
-& $jobs list -Status running,starting -Json
-& $jobs status -Id <job-id>
 & $jobs status -Status orphaned -Json
-& $jobs logs -Id <job-id> -Tail 100
 & $jobs logs -Id <job-id> -Follow
 ```
 
-Reconcile after an agent restart. Structured status includes the expected
-PID/start time, current snapshot when relevant, and identity-match result.
+Structured status includes the expected PID/start time, current snapshot when
+relevant, and identity-match result.
 
-## Stop and prune
+## Identity and prune
 
 ```powershell
-& $jobs stop -Id <job-id>
 & $jobs prune -OlderThanDays 14 -WhatIf
 & $jobs prune -OlderThanDays 14 -Status completed,failed,stopped,orphaned
 ```

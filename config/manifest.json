@@ -11,6 +11,7 @@
       },
       "skills": [
         "claude-runner",
+        "execute-campaign-work-item",
         "managed-jobs",
         "orchestrate-work-campaigns"
       ]

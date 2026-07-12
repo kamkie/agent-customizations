@@ -4,16 +4,6 @@ function Get-CustomizationRepositoryRoot {
     return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 }
 
-function Resolve-CustomizationCodexHome {
-    param([string]$CodexHome)
-
-    if ([string]::IsNullOrWhiteSpace($CodexHome)) {
-        $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
-    }
-
-    return [IO.Path]::GetFullPath($CodexHome)
-}
-
 function Get-CustomizationManifest {
     $path = Join-Path (Get-CustomizationRepositoryRoot) 'config\manifest.json'
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -21,10 +11,45 @@ function Get-CustomizationManifest {
     }
 
     $manifest = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-    if ($manifest.schemaVersion -ne 1) {
+    if ($manifest.schemaVersion -ne 2) {
         throw "Unsupported customization manifest schema: $($manifest.schemaVersion)"
     }
     return $manifest
+}
+
+function Get-CustomizationTargetNames {
+    param([ValidateSet('All', 'Codex', 'Claude')][string]$Target = 'All')
+
+    if ($Target -eq 'All') { return @('codex', 'claude') }
+    return @($Target.ToLowerInvariant())
+}
+
+function Get-CustomizationTarget {
+    param([Parameter(Mandatory)][string]$Name)
+
+    $manifest = Get-CustomizationManifest
+    $property = $manifest.targets.PSObject.Properties[$Name]
+    if (-not $property) { throw "Unknown customization target: $Name" }
+    return $property.Value
+}
+
+function Resolve-CustomizationHome {
+    param(
+        [Parameter(Mandatory)][string]$TargetName,
+        [string]$HomePath
+    )
+
+    $target = Get-CustomizationTarget -Name $TargetName
+    if ([string]::IsNullOrWhiteSpace($HomePath)) {
+        $environmentValue = [Environment]::GetEnvironmentVariable([string]$target.homeEnvironmentVariable)
+        $HomePath = if ($environmentValue) {
+            $environmentValue
+        } else {
+            Join-Path $HOME ([string]$target.defaultHomeDirectory)
+        }
+    }
+
+    return [IO.Path]::GetFullPath($HomePath)
 }
 
 function Get-RelativeFileMap {
@@ -62,32 +87,35 @@ function Test-FilesEqual {
 }
 
 function Get-CustomizationStatus {
-    param([string]$CodexHome)
+    param(
+        [Parameter(Mandatory)][string]$TargetName,
+        [Parameter(Mandatory)][string]$HomePath
+    )
 
     $repositoryRoot = Get-CustomizationRepositoryRoot
-    $resolvedCodexHome = Resolve-CustomizationCodexHome -CodexHome $CodexHome
-    $manifest = Get-CustomizationManifest
+    $target = Get-CustomizationTarget -Name $TargetName
     $results = [Collections.Generic.List[object]]::new()
 
-    $globalSource = Join-Path $repositoryRoot ([string]$manifest.globalAgents)
-    $globalTarget = Join-Path $resolvedCodexHome 'AGENTS.md'
-    $globalState = if (-not (Test-Path -LiteralPath $globalTarget -PathType Leaf)) {
+    $instructionSource = Join-Path $repositoryRoot ([string]$target.instructions.source)
+    $instructionTarget = Join-Path $HomePath ([string]$target.instructions.destination)
+    $instructionState = if (-not (Test-Path -LiteralPath $instructionTarget -PathType Leaf)) {
         'Missing'
-    } elseif (Test-FilesEqual -Source $globalSource -Target $globalTarget) {
+    } elseif (Test-FilesEqual -Source $instructionSource -Target $instructionTarget) {
         'InSync'
     } else {
         'Different'
     }
     $results.Add([pscustomobject]@{
-        Kind = 'Global'
-        Name = 'AGENTS.md'
-        RelativePath = 'AGENTS.md'
-        State = $globalState
+        Target = $TargetName
+        Kind = 'Instructions'
+        Name = [string]$target.instructions.destination
+        RelativePath = [string]$target.instructions.destination
+        State = $instructionState
     })
 
-    foreach ($skillName in @($manifest.skills)) {
+    foreach ($skillName in @($target.skills)) {
         $sourceRoot = Join-Path $repositoryRoot "skills\$skillName"
-        $targetRoot = Join-Path $resolvedCodexHome "skills\$skillName"
+        $targetRoot = Join-Path $HomePath "skills\$skillName"
         $sourceFiles = Get-RelativeFileMap -Root $sourceRoot
         $targetFiles = Get-RelativeFileMap -Root $targetRoot
         $relativePaths = @($sourceFiles.Keys) + @($targetFiles.Keys) | Sort-Object -Unique
@@ -106,6 +134,7 @@ function Get-CustomizationStatus {
             }
 
             $results.Add([pscustomobject]@{
+                Target = $TargetName
                 Kind = 'Skill'
                 Name = [string]$skillName
                 RelativePath = $relativePath

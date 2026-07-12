@@ -1,34 +1,37 @@
-# Codex customizations
+# Agent customizations
 
-Version-controlled global guidance and reusable custom skills for Codex on
-Windows. This repository is the reviewed source of truth; `~/.codex` is the
-live runtime installation.
+Version-controlled global guidance and reusable custom skills for Codex and
+Claude Code on Windows. This repository is the reviewed source of truth; the
+tools' live configuration directories are deployment targets.
 
 ## Contents
 
-- `global/AGENTS.md` — personal guidance applied across repositories.
-- `skills/claude-runner` — resume-safe foreground wrapper for Claude Code CLI.
-- `skills/managed-jobs` — durable supervision for long-running local processes.
-- `skills/orchestrate-work-campaigns` — visible, evidence-backed coordination of
-  multi-task delivery campaigns.
-- `config/manifest.json` — the exact set of files managed by this repository.
+- `global/AGENTS.md` — personal guidance applied across Codex repositories.
+- `global/CLAUDE.md` — personal guidance applied across Claude Code projects.
+- `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
+- `skills/managed-jobs` — durable supervision for long-running local processes,
+  shared by Codex and Claude Code.
+- `skills/orchestrate-work-campaigns` — Codex-specific, visible,
+  evidence-backed coordination of multi-task delivery campaigns.
+- `config/manifest.json` — the exact files managed for each supported agent.
 - `scripts/verify.ps1` — validates structure and scans managed sources for
   common publication hazards.
-- `scripts/status.ps1` — reports drift between this repository and the live
-  Codex installation.
-- `scripts/install.ps1` — explicitly deploys reviewed sources to the live
-  installation.
-- `scripts/test.ps1` — exercises verification, sandbox installation, clean
-  status, and drift detection.
+- `scripts/status.ps1` — reports drift between this repository and live agent
+  installations.
+- `scripts/install.ps1` — explicitly deploys reviewed sources to one or both
+  live installations.
+- `scripts/test.ps1` — exercises verification, sandbox installations, clean
+  status, target isolation, and drift detection.
+
+Claude Code loads personal instructions from `~/.claude/CLAUDE.md` and
+personal skills from `~/.claude/skills`. Codex uses `~/.codex/AGENTS.md` and
+`~/.codex/skills`. The manifest reuses portable sources where possible and
+keeps tool-specific skills on their compatible target.
 
 ## Why deployment is explicit
 
-The repository normally lives in a regular checkout such as
-`D:\Projects\github.com\<owner>\codex-customizations`. Codex continues to read
-its live files from `$CODEX_HOME` or `~/.codex`.
-
 Symlinks and junctions are not the default because switching branches or
-editing a worktree could otherwise change global Codex behavior immediately.
+editing a worktree could otherwise change global agent behavior immediately.
 The install step creates a deliberate boundary between reviewing a change and
 activating it.
 
@@ -36,7 +39,7 @@ activating it.
 
 - PowerShell 7
 - Git for clean-branch deployment checks
-- A local Codex installation
+- A local Codex and/or Claude Code installation
 
 ## Workflow
 
@@ -52,35 +55,43 @@ Run the deployment smoke test:
 pwsh ./scripts/test.ps1
 ```
 
-Compare it with the live installation:
+Compare both live installations:
 
 ```powershell
 pwsh ./scripts/status.ps1
 ```
 
-Preview a deployment:
+Compare only one target:
+
+```powershell
+pwsh ./scripts/status.ps1 -Target Claude
+```
+
+Preview a deployment to both targets:
 
 ```powershell
 pwsh ./scripts/install.ps1 -WhatIf
 ```
 
-Deploy from a clean `main` checkout:
+Deploy one target from a clean `main` checkout:
 
 ```powershell
-pwsh ./scripts/install.ps1
+pwsh ./scripts/install.ps1 -Target Codex
+pwsh ./scripts/install.ps1 -Target Claude
 ```
 
-Set `CODEX_HOME` or pass `-CodexHome` to target a non-default installation.
-The installer creates timestamped backups under
-`$CODEX_HOME/customization-backups` when it replaces existing files.
+`CODEX_HOME` and `CLAUDE_CONFIG_DIR` select non-default live directories. For
+one-off targeting, pass `-CodexHome` or `-ClaudeHome`. The installer creates
+timestamped backups under each target's `customization-backups` directory when
+it replaces existing files.
 
 ## Scope boundary
 
-The repository does not manage `hooks.json`, `config.toml`, authentication,
-plugins, caches, memories, sessions, logs, artifacts, or managed-job records.
-Those surfaces can contain machine-specific paths, private data, or generated
-state. The hook scripts used by `managed-jobs` are versioned with the skill,
-while machine-local hook registration remains outside this baseline.
+The repository does not manage settings, authentication, plugins, caches,
+memories, sessions, logs, artifacts, or managed-job records. Those surfaces can
+contain machine-specific paths, private data, or generated state. The hook
+scripts used by `managed-jobs` are versioned with the skill, while machine-local
+hook registration remains outside this baseline.
 
 ## License
 

@@ -14,6 +14,17 @@ If the user clarifies that an earlier request was only a question, treat that as
 
 When the user asks you to design something, provide ideas and proposals for discussion and iteration only. Do not implement the design or change files or external state until the user explicitly authorizes execution.
 
+## Scope discipline
+
+Implement exactly what the user requested using the smallest coherent diff.
+
+- Change only code required for the requested behavior.
+- Do not add legacy support, compatibility shims, fallbacks, aliases, migrations, feature flags, speculative abstractions, adjacent fixes, cleanup, or unrelated refactors unless explicitly requested.
+- When existing behavior is wrong, replace or delete it. Do not preserve both old and new behavior for existing callers or outdated tests.
+- Update only directly affected tests and run the narrowest relevant checks.
+- Before finishing, inspect the diff and revert every change not required by the request.
+- Do not silently expand scope. Report genuinely necessary extra work instead.
+
 ## Pull request readiness
 
 Before marking a pull request ready, re-fetch its head and review threads. Keep it draft if the head changed, a finding is untriaged, or `CHANGES_REQUESTED` applies to the current head; re-fetch after the transition and revert to draft if this gate changed. Resolved feedback on an earlier head does not block readiness, but its review blocks merge until current-head approval.

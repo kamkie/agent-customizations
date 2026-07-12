@@ -1,64 +1,74 @@
 ---
 name: managed-jobs
-description: Run, observe, recover, and stop long-running local processes with durable state and logs across Codex restarts. Use for dev servers, watchers, lengthy builds or tests, paid CLI agents, or any process expected to outlive a turn; use visible Windows Terminal mode only when the user asks to watch the same live output.
+description: Run, inspect, recover, and stop long-running local processes with durable state and logs across agent restarts; visible Windows Terminal output is opt-in.
 ---
 
 # Managed Jobs
 
-Use the bundled PowerShell controller instead of raw detached process launches.
+Use `scripts/Invoke-ManagedJob.ps1` from this installed skill directory. It
+locates companion scripts relative to itself under either Codex or Claude.
 
 ```powershell
-$jobs = Join-Path $HOME '.codex\skills\managed-jobs\scripts\Invoke-ManagedJob.ps1'
+$jobs = Join-Path $managedJobsSkillDirectory 'scripts\Invoke-ManagedJob.ps1'
 ```
 
-## Start
+`$managedJobsSkillDirectory` is the directory containing this `SKILL.md`, as
+resolved by the agent that loaded it.
 
-Default to a hidden durable host with a persistent combined log:
+## State
+
+State-root precedence is `-StateRoot`, `MANAGED_JOBS_ROOT`, then
+`$HOME/.agent-customizations/managed-jobs`. Set the same environment value when
+agents should share a registry. Agent-specific registries are not discovered.
+
+## Start
 
 ```powershell
 & $jobs start -Name api -Executable dotnet -Arguments @('run') -WorkingDirectory $repo
 ```
 
-When the user explicitly asks for a visible/shared terminal, add `-Visible`. The Windows Terminal tab and the durable log show the same output:
+Hidden durable execution is the default. Add `-Visible` only when the user asks
+for a shared terminal, and `-KeepTerminalOpen` only when it should remain open.
 
-```powershell
-& $jobs start -Name api -Executable dotnet -Arguments @('run') -WorkingDirectory $repo -Visible
-```
+Treat names, paths, arguments, environment entries, records, and logs as
+non-secret. Inherit secrets from the parent process or use standard input,
+response files, or credential stores. The controller rejects likely secrets;
+permanent records omit argument text and environment values, while the
+short-lived launch file is deleted when claimed. Child output is logged verbatim.
 
-Use `-KeepTerminalOpen` only when the user wants the tab to remain after completion. Pass environment variables with `-Environment @{ NAME = 'value' }`.
+Equivalent active invocations are rejected using a stable fingerprint and a
+serialized pre-launch check. Record the returned job id.
 
-Do not pass secrets through `-Environment`, because job launch metadata is persisted locally. Let secret-bearing values inherit from the already configured parent environment or use the target tool's credential store.
-
-Record the returned job id. Do not launch an equivalent second process if a matching managed job is already running.
-
-## Inspect and recover
+## Inspect
 
 ```powershell
 & $jobs reconcile
-& $jobs list
+& $jobs list -Status running,starting -Json
 & $jobs status -Id <job-id>
+& $jobs status -Status orphaned -Json
 & $jobs logs -Id <job-id> -Tail 100
 & $jobs logs -Id <job-id> -Follow
 ```
 
-Run `reconcile` after a Codex restart. A job is `orphaned` when its recorded host no longer exists and it did not record a terminal status.
+Reconcile after an agent restart. Structured status includes the expected
+PID/start time, current snapshot when relevant, and identity match result.
 
 ## Stop and prune
 
 ```powershell
 & $jobs stop -Id <job-id>
-& $jobs prune -OlderThanDays 14
+& $jobs prune -OlderThanDays 14 -WhatIf
+& $jobs prune -OlderThanDays 14 -Status completed,failed,stopped,orphaned
 ```
 
-`stop` verifies the recorded process creation time before terminating its process tree. Never bypass that check with ad hoc PID killing. `prune` removes only terminal-state registry entries and their logs.
-
-## Claude
-
-Continue using the `claude-runner` skill for Claude session ids, JSONL output, budget controls, and resume semantics. Wrap only genuinely long-lived Claude invocations here when restart survival is requested, and preserve the Claude session id in the job name or task handoff.
+Stop verifies PID and creation time before terminating the process tree. Prune
+excludes active and invalid records and removes only managed records and logs.
 
 ## Boundaries
 
-- Keep ordinary short commands attached to the active Codex tool call.
-- Do not use `Start-Process`, `Start-Job`, detached Windows Terminal tabs, or background switches directly for long-lived work.
-- Logs merge stdout and stderr in arrival order. Use application-native structured logs when exact stream separation matters.
-- Visible mode is optional and Windows-only; hidden durable mode is the default.
+- Keep short commands attached to the active agent tool call.
+- Do not directly use detached processes, jobs, terminal tabs, or background
+  flags for long-lived work.
+- Use `claude-runner` for Claude session, resume, budget, and review behavior.
+- Logs merge stdout and stderr; use application-native structured logs when
+  stream separation matters.

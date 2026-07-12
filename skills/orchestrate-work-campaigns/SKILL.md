@@ -10,7 +10,12 @@ Turn a broad objective into a controlled campaign whose tasks, authority, eviden
 ## Establish Authority
 
 1. Read repository and global instructions first.
-2. Create an authority-trigger matrix before action. For each action, record its authority source, activation trigger, authorized actor or identity, prerequisites, exact evidence to refresh, current state, and stop or revocation condition.
+2. Before acting, create an authority-trigger matrix. For each action, record:
+
+   - its authority source and activation trigger;
+   - the authorized actor or identity;
+   - prerequisites and evidence that must be refreshed;
+   - its current status and stop or revocation conditions.
 3. Separate authorization to design the campaign, write tracker state, create visible tasks or worktrees, implement, commit, publish draft branches or PRs, request or record review, mark work ready, accept campaign results, merge or enable auto-merge, deploy or release, message people, administer settings, and delete or clean up resources. Never treat one as authorization for another.
 4. An applicable repository instruction may supply standing, action-specific authority and name the live condition that activates it. Use that trigger only when no higher-priority instruction reserves the action and every condition is verified against the exact current artifact version.
 5. Keep authority, triggers, and gate satisfaction distinct. Authorization permits an action, a trigger activates authority already declared by an applicable instruction, and a gate proves its prerequisites. None substitutes for another.

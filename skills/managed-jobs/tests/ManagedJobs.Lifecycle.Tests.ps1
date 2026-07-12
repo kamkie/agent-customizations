@@ -92,6 +92,27 @@ try {
     Assert-True ((Get-JobStatus -Id $freshId).status -eq 'starting') 'Fresh unclaimed starting record must not reconcile to orphaned.'
     Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$freshId.json") -Force
 
+    # Active schema-v1 records remain duplicate-aware without requiring migration.
+    $legacyId = '20000101-000000-lifecycle-legacy-000001'
+    $testProcess = Get-Process -Id $PID
+    $legacyArguments = @('-NoProfile', '-Command', 'Start-Sleep -Seconds 28')
+    $legacyRecord = [ordered]@{
+        schemaVersion = 1; id = $legacyId; name = 'lifecycle-legacy'; kind = 'test'; status = 'running'; visible = $false
+        keepTerminalOpen = $false; createdAtUtc = [datetime]::UtcNow.AddMinutes(-1).ToString('o'); startedAtUtc = [datetime]::UtcNow.AddMinutes(-1).ToString('o')
+        finishedAtUtc = $null; hostPid = $PID; hostStartedAtUtc = $testProcess.StartTime.ToUniversalTime().ToString('o')
+        executable = $pwsh; arguments = $legacyArguments; workingDirectory = (Get-Location).Path
+        environment = [ordered]@{ GIT_AUTHOR_NAME = 'not-read-for-fingerprint' }; logPath = (Join-Path $stateRoot "logs\$legacyId.log")
+        exitCode = $null; error = $null
+    }
+    $legacyRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$legacyId.json") -Encoding utf8
+    $legacyDuplicateRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'lifecycle-legacy-duplicate' -Executable $pwsh -Arguments $legacyArguments `
+            -Environment @{ GIT_AUTHOR_NAME = 'ignored-value' } | Out-Null
+    } catch { $legacyDuplicateRejected = $_.Exception.Message -match [regex]::Escape($legacyId) }
+    Assert-True $legacyDuplicateRejected 'Equivalent active schema-v1 records should block new launches.'
+    Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$legacyId.json") -Force
+
     # Duplicate detection happens while the first equivalent helper is active.
     $running = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-running' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
@@ -118,10 +139,23 @@ try {
         logPath = (Join-Path $stateRoot "logs\$orphanId.log"); exitCode = $null; error = $null
     }
     $orphanRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$orphanId.json") -Encoding utf8
+    $staleId = '20000101-000000-lifecycle-stale-start-000001'
+    $staleLaunch = Join-Path $stateRoot "launch\$staleId.json"
+    $staleRecord = [ordered]@{
+        schemaVersion = 2; id = $staleId; name = 'lifecycle-stale-start'; kind = 'test'; status = 'starting'; visible = $false
+        keepTerminalOpen = $false; createdAtUtc = [datetime]::UtcNow.AddMinutes(-1).ToString('o'); startedAtUtc = $null; finishedAtUtc = $null
+        hostPid = $null; hostStartedAtUtc = $null; executable = 'fixture'; argumentCount = 0; environmentNames = @()
+        invocationFingerprint = ('1' * 64); workingDirectory = $testRoot; logPath = (Join-Path $stateRoot "logs\$staleId.log")
+        exitCode = $null; error = $null
+    }
+    $staleRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$staleId.json") -Encoding utf8
+    @{ executable = 'fixture'; arguments = @(); environment = @{} } | ConvertTo-Json | Set-Content -LiteralPath $staleLaunch -Encoding utf8
     $orphanSummary = (& $controller reconcile -StateRoot $stateRoot -Status orphaned | Out-String) | ConvertFrom-Json
     $orphan = @($orphanSummary.jobs | Where-Object id -eq $orphanId)[0]
     Assert-True ($orphan.status -eq 'orphaned') 'Reconcile should mark a missing recorded host orphaned.'
     Assert-True (-not $orphan.processIdentity.matches) 'Orphan inspection should preserve and report identity mismatch.'
+    Assert-True (@($orphanSummary.jobs).id -contains $staleId) 'Reconcile should orphan a stale unclaimed start after its grace period.'
+    Assert-True (-not (Test-Path -LiteralPath $staleLaunch)) 'Orphan reconciliation should remove an unclaimed launch handoff.'
 
     # WhatIf previews exact terminal candidates, then real prune removes them and managed logs only.
     $preview = (& $controller prune -StateRoot $stateRoot -OlderThanDays 0 -WhatIf | Out-String) | ConvertFrom-Json

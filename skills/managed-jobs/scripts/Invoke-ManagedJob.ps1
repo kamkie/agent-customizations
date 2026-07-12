@@ -52,7 +52,25 @@ function Update-ReconciledJob {
     $Job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
     $Job.error = 'Recorded host process is no longer running and no terminal state was recorded.'
     Write-ManagedJob -Path $path -Job $Job
+    $unclaimedLaunch = Join-Path (Join-Path (Get-ManagedJobRoot) 'launch') "$($Job.id).json"
+    if (Test-Path -LiteralPath $unclaimedLaunch) { Remove-Item -LiteralPath $unclaimedLaunch -Force }
     return $Job
+}
+
+function Get-LegacyInvocationFingerprint {
+    param($Job)
+    $required = @('executable', 'arguments', 'workingDirectory')
+    if (@($required | Where-Object { $Job.PSObject.Properties.Name -notcontains $_ }).Count) { return $null }
+    try {
+        $legacyEnvironment = @{}
+        if (($Job.PSObject.Properties.Name -contains 'environment') -and $Job.environment) {
+            foreach ($property in $Job.environment.PSObject.Properties) { $legacyEnvironment[$property.Name] = '' }
+        }
+        return Get-InvocationFingerprint -Executable $Job.executable -Arguments @($Job.arguments) `
+            -WorkingDirectory $Job.workingDirectory -Environment $legacyEnvironment
+    } catch {
+        return $null
+    }
 }
 
 function Select-ManagedJobs {
@@ -105,8 +123,7 @@ switch ($Action) {
             $active = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ } | Where-Object status -in @('starting', 'running'))
             $duplicate = $active | Where-Object {
                 ($_.PSObject.Properties.Name -contains 'invocationFingerprint' -and $_.invocationFingerprint -eq $fingerprint) -or
-                ($_.PSObject.Properties.Name -contains 'arguments' -and
-                    (Get-InvocationFingerprint -Executable $_.executable -Arguments @($_.arguments) -WorkingDirectory $_.workingDirectory -Environment @{}) -eq $fingerprint)
+                (Get-LegacyInvocationFingerprint -Job $_) -eq $fingerprint
             } | Select-Object -First 1
             if ($duplicate) {
                 throw "Equivalent managed job is already active: $($duplicate.id) [$($duplicate.status)] $($duplicate.name)"
@@ -184,13 +201,10 @@ switch ($Action) {
             Start-Sleep -Milliseconds 100
             $job = Read-ManagedJob -Path $jobFile
         } while ($job.status -eq 'starting' -and [datetime]::UtcNow -lt $startupDeadline)
-        if ($job.status -eq 'starting') {
-            if (Test-Path -LiteralPath $launchFile) { Remove-Item -LiteralPath $launchFile -Force }
-            $job.status = 'failed'
-            $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
-            $job.error = 'Managed host did not claim the launch specification within 10 seconds.'
-            Write-ManagedJob -Path $jobFile -Job $job
-        }
+        # A slow host may claim immediately after the final poll. Do not overwrite or
+        # delete its launch handoff from a stale read; reconciliation owns the 30-second
+        # unclaimed-start timeout and cleans the launch file when it marks an orphan.
+        if ($job.status -eq 'starting') { $job = Read-ManagedJob -Path $jobFile }
         Add-ManagedJobIdentity -Job $job | ConvertTo-Json -Depth 12
     }
     'list' {

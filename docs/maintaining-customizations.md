@@ -54,8 +54,8 @@ without opening a reference:
   rules needed on a normal run; and
 - the normal completion, evidence, or handoff expectation.
 
-Move uncommon variants, advanced configuration, specialized recovery,
-troubleshooting, long examples, and detailed rationale into `references/`.
+Use [Author the routing surface](customization-ownership.md#author-the-routing-surface)
+as the canonical rule for what belongs in `SKILL.md` versus `references/`.
 Link each reference at the decision point that requires it. Do not require a
 reference merely to finish setup or construct the common invocation.
 

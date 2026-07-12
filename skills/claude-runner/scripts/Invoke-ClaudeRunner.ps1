@@ -72,7 +72,8 @@ if (-not [string]::IsNullOrWhiteSpace($ExactModel) -and $PSBoundParameters.Conta
 }
 
 $selectedModel = if ([string]::IsNullOrWhiteSpace($ExactModel)) { $ModelAlias } else { $ExactModel }
-$selectedPermissionMode = if ($BypassPermissions) { "bypassPermissions" } else { $PermissionMode }
+$selectedPermissionMode = $PermissionMode
+$displayPermissionMode = if ($BypassPermissions) { "bypassPermissions" } else { $PermissionMode }
 
 function Format-Arg {
     param([string]$Value)
@@ -455,7 +456,7 @@ Write-Host ("[claude-runner] mode: {0}" -f $mode)
 Write-Host ("[claude-runner] session: {0}" -f $effectiveSession)
 Write-Host ("[claude-runner] model: {0}" -f $selectedModel)
 Write-Host ("[claude-runner] effort: {0}" -f $Effort)
-Write-Host ("[claude-runner] permissions: {0}{1}" -f $selectedPermissionMode, $(if ($BypassPermissions) { " (EXPLICIT BYPASS)" } else { "" }))
+Write-Host ("[claude-runner] permissions: {0}{1}" -f $displayPermissionMode, $(if ($BypassPermissions) { " (EXPLICIT BYPASS)" } else { "" }))
 Write-Host ("[claude-runner] log: {0}" -f $LogPath)
 $commandSummary = Format-CommandArgsForDisplay $displayArgs
 if ($ClaudeArgs.Count -gt 0) {

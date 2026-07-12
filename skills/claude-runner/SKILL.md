@@ -26,6 +26,7 @@ Use this skill before running Claude CLI from Codex. Prefer the wrapper because 
 - Do not use `-Bare` for cross-reviews or runs that must load `CLAUDE.md`, skills, plugins, hooks, or project settings; reserve it for deterministic CI/script calls.
 - Treat model, budget, resume, prompt-file, and PR number as runtime controls, not natural-language task text.
 - Keep normal Claude permissions. Use `-BypassPermissions` only when the caller explicitly authorizes bypass; the wrapper makes that mode conspicuous in its output and invocation.
+- Normal permissions can deny mutation-capable tools in non-interactive `-p` runs. For delegated edits, choose a scoped normal mode such as `-PermissionMode acceptEdits` when appropriate, or obtain explicit authority before using bypass.
 - Select a documented moving alias with `-ModelAlias fable|haiku|opus|sonnet`, or an exact full model name with `-ExactModel claude-...`. Do not combine them.
 - Set effort with the typed `-Effort low|medium|high|xhigh|max` parameter. Do not route effort through `-ClaudeArgs`.
 - Preserve the user's task text except for removing routing controls. If it begins with `/`, pass it as Claude task text.

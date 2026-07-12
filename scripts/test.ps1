@@ -42,3 +42,5 @@ try {
         Remove-Item -LiteralPath $confirmed -Recurse -Force
     }
 }
+
+exit 0

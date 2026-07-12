@@ -13,3 +13,9 @@ Treat a request phrased as a question, such as "Can you do X?", as a question ra
 If the user clarifies that an earlier request was only a question, treat that as an authorization reminder, not as a cancellation or interruption. Continue answering the original request and performing any useful read-only investigation unless the user explicitly asks you to stop, cancel, or replace it; only changes or other state-mutating actions remain paused.
 
 When the user asks you to design something, provide ideas and proposals for discussion and iteration only. Do not implement the design or change files or external state until the user explicitly authorizes execution.
+
+## Pull request readiness
+
+Treat review feedback submitted while a pull request is draft as binding. Immediately before marking any draft pull request ready, perform a thread-aware re-fetch of its current head, unresolved review threads, latest reviews, and review decision. If an actionable thread is unresolved, a review is `CHANGES_REQUESTED`, or the head differs from the validated head, keep the pull request draft and address that state first.
+
+Re-fetch the same state immediately after the readiness transition. If feedback or a head change raced the transition, return the pull request to draft and resolve it. Do not rely on an earlier flat comment read or assume draft status prevented reviewers from requesting changes.

@@ -22,3 +22,9 @@ Do not launch long-running work through raw `Start-Process`, `Start-Job`, detach
 Treat a request phrased as a question, such as "Can you do X?", as a question rather than authorization to perform the action. Respond with your interpretation and proposed approach, then ask the user for an explicit instruction such as "go", "do it", "implement it", or "apply it" before making changes or taking the action.
 
 When the user asks you to design something, provide ideas and proposals for discussion and iteration only. Do not implement the design or change files or external state until the user explicitly authorizes execution.
+
+## Pull request readiness
+
+Treat review feedback submitted while a pull request is draft as binding. Immediately before marking any draft pull request ready, perform a thread-aware re-fetch of its current head, unresolved review threads, latest reviews, and review decision. If an actionable thread is unresolved, a review is `CHANGES_REQUESTED`, or the head differs from the validated head, keep the pull request draft and address that state first.
+
+Re-fetch the same state immediately after the readiness transition. If feedback or a head change raced the transition, return the pull request to draft and resolve it. Do not rely on an earlier flat comment read or assume draft status prevented reviewers from requesting changes.

@@ -3,6 +3,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $controller = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\Invoke-ManagedJob.ps1'
+$hostScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Host.ps1'
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Common.ps1')
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('managed-jobs-lifecycle-' + [guid]::NewGuid().ToString('N'))
 $stateRoot = Join-Path $testRoot 'state'
@@ -34,6 +35,7 @@ function Wait-JobStatus {
 try {
     $null = New-Item -ItemType Directory -Path $stateRoot -Force
     $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+    $null = & $controller reconcile -StateRoot $stateRoot
 
     # A copied Claude-only skill remains self-contained because scripts resolve companions locally.
     $claudeSkill = Join-Path $testRoot '.claude\skills\managed-jobs'
@@ -41,6 +43,37 @@ try {
     $claudeController = Join-Path $claudeSkill 'scripts\Invoke-ManagedJob.ps1'
     $claudeSummary = (& $claudeController reconcile -StateRoot (Join-Path $testRoot 'claude-state') | Out-String) | ConvertFrom-Json
     Assert-True ($claudeSummary.total -eq 0) 'Claude-only copied controller should reconcile without Codex files.'
+    $emptyList = @((& $claudeController list -StateRoot (Join-Path $testRoot 'claude-state') -Status running,starting -Json | Out-String) | ConvertFrom-Json)
+    Assert-True ($emptyList.Count -eq 0) 'Filtered JSON list should return an empty array when the registry is empty.'
+    $emptyStatus = @((& $claudeController status -StateRoot (Join-Path $testRoot 'claude-state') -Status running -Json | Out-String) | ConvertFrom-Json)
+    Assert-True ($emptyStatus.Count -eq 0) 'Filtered JSON status should return an empty array when no jobs match.'
+
+    $hiddenKeepOpenRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'invalid-hidden-keep-open' -Executable $pwsh -KeepTerminalOpen | Out-Null
+    } catch { $hiddenKeepOpenRejected = $_.Exception.Message -match 'requires -Visible' }
+    Assert-True $hiddenKeepOpenRejected 'KeepTerminalOpen should require visible execution.'
+
+    # The host must return instead of propagating the child exit when -NoExit is
+    # responsible for keeping a visible terminal open. The durable record retains
+    # the real child result.
+    $keepOpenId = '20000101-000000-lifecycle-keep-open-000001'
+    $keepOpenJobPath = Join-Path $stateRoot "jobs\$keepOpenId.json"
+    $keepOpenLaunchPath = Join-Path $stateRoot "launch\$keepOpenId.json"
+    $keepOpenJob = [ordered]@{
+        schemaVersion = 2; id = $keepOpenId; name = 'lifecycle-keep-open'; kind = 'test'; status = 'starting'; visible = $true
+        keepTerminalOpen = $true; createdAtUtc = [datetime]::UtcNow.ToString('o'); startedAtUtc = $null; finishedAtUtc = $null
+        hostPid = $null; hostStartedAtUtc = $null; executable = $pwsh; argumentCount = 4; environmentNames = @()
+        invocationFingerprint = ('2' * 64); workingDirectory = $testRoot; logPath = (Join-Path $stateRoot "logs\$keepOpenId.log")
+        exitCode = $null; error = $null
+    }
+    $keepOpenLaunch = [ordered]@{ executable = $pwsh; arguments = @('-NoProfile', '-Command', 'exit 17'); environment = @{} }
+    $keepOpenJob | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $keepOpenJobPath -Encoding utf8
+    $keepOpenLaunch | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $keepOpenLaunchPath -Encoding utf8
+    & $pwsh -NoProfile -ExecutionPolicy Bypass -File $hostScript -JobFile $keepOpenJobPath -LaunchFile $keepOpenLaunchPath | Out-Null
+    Assert-True ($LASTEXITCODE -eq 0) 'Keep-open host path should return without propagating the child exit code.'
+    $keepOpenResult = Get-JobStatus -Id $keepOpenId
+    Assert-True ($keepOpenResult.status -eq 'failed' -and $keepOpenResult.exitCode -eq 17) 'Keep-open record should preserve the real child failure.'
 
     # Start, record redaction, structured list/status, logs, and reconcile.
     $completed = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-complete' -Executable $pwsh `
@@ -171,7 +204,7 @@ try {
 
     # WhatIf previews exact terminal candidates, then real prune removes them and managed logs only.
     $preview = (& $controller prune -StateRoot $stateRoot -OlderThanDays 0 -WhatIf | Out-String) | ConvertFrom-Json
-    Assert-True ($preview.preview -and $preview.candidateCount -ge 3 -and $preview.removedCount -eq 0) 'Prune WhatIf should return candidates without deletion.'
+    Assert-True ($preview.preview -and $preview.candidateCount -ge 4 -and $preview.removedCount -eq 0) 'Prune WhatIf should return candidates without deletion.'
     Assert-True (Test-Path -LiteralPath (Join-Path $stateRoot "jobs\$orphanId.json")) 'Preview must preserve candidate records.'
     $pruned = (& $controller prune -StateRoot $stateRoot -OlderThanDays 0 | Out-String) | ConvertFrom-Json
     Assert-True ($pruned.removed -contains $orphanId) 'Prune should remove the orphan candidate after preview.'

@@ -9,6 +9,8 @@ discovered.
 
 ## Visible execution
 
+Use the `$jobs` and `$repo` values resolved by `SKILL.md`:
+
 ```powershell
 & $jobs start -Name api -Executable dotnet -Arguments @('run') -WorkingDirectory $repo -Visible
 ```

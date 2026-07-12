@@ -190,8 +190,7 @@ function Get-ObjectPropertyNames {
         return @()
     }
 
-    $members = Get-Member -InputObject $Value -MemberType NoteProperty, Property, AliasProperty, ScriptProperty
-    return @($members | ForEach-Object { $_.Name })
+    return @($Value.PSObject.Properties.Name)
 }
 
 function Get-ContentText {
@@ -434,9 +433,11 @@ $cmdArgs = @()
 if ($Bare) {
     $cmdArgs += "--bare"
 }
-$cmdArgs += @("--model", $selectedModel, "--effort", $Effort, "--permission-mode", $selectedPermissionMode)
+$cmdArgs += @("--model", $selectedModel, "--effort", $Effort)
 if ($BypassPermissions) {
     $cmdArgs += "--dangerously-skip-permissions"
+} else {
+    $cmdArgs += @("--permission-mode", $selectedPermissionMode)
 }
 if (-not [string]::IsNullOrWhiteSpace($Name)) {
     $cmdArgs += @("--name", $Name)

@@ -141,7 +141,7 @@ exit [int]$env:FAKE_CLAUDE_EXIT
     )
     Assert-True ($bypass.ExitCode -eq 0) "Explicit bypass DryRun failed: $($bypass.Output)"
     Assert-True ($bypass.Output.Contains("permissions: bypassPermissions (EXPLICIT BYPASS)")) "Bypass was not conspicuous in output."
-    Assert-True ($bypass.Output.Contains("--permission-mode default")) "Bypass changed the normal permission-mode control."
+    Assert-True (-not $bypass.Output.Contains("--permission-mode")) "Bypass emitted a contradictory normal permission mode."
     Assert-True ($bypass.Output.Contains("--dangerously-skip-permissions")) "Bypass flag was not explicit in the invocation."
 
     $before = @(Get-ChildItem -Force -Recurse -LiteralPath $target | ForEach-Object FullName)

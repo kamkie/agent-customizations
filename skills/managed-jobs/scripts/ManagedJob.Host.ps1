@@ -1,14 +1,17 @@
 param(
-    [Parameter(Mandatory)][string]$JobFile
+    [Parameter(Mandatory)][string]$JobFile,
+    [Parameter(Mandatory)][string]$LaunchFile
 )
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 
 $job = Read-ManagedJob -Path $JobFile
+$launch = Read-ManagedJob -Path $LaunchFile
+Remove-Item -LiteralPath $LaunchFile -Force
 $hostSnapshot = Get-ProcessSnapshot -ProcessId $PID
 $job.hostPid = $PID
-$job.hostStartedAtUtc = $hostSnapshot.StartTimeUtc
+$job.hostStartedAtUtc = $hostSnapshot.startTimeUtc
 $job.status = 'running'
 $job.startedAtUtc = [datetime]::UtcNow.ToString('o')
 Write-ManagedJob -Path $JobFile -Job $job
@@ -24,20 +27,21 @@ try {
     }
     Set-Location -LiteralPath $job.workingDirectory
 
-    if ($job.environment) {
-        foreach ($property in $job.environment.PSObject.Properties) {
+    if ($launch.environment) {
+        foreach ($property in $launch.environment.PSObject.Properties) {
             [Environment]::SetEnvironmentVariable($property.Name, [string]$property.Value, 'Process')
         }
     }
 
-    $header = "[$([datetime]::Now.ToString('s'))] managed-job $($job.id) starting: $($job.executable) $($job.arguments -join ' ')"
+    # Arguments and environment values are deliberately omitted from durable logs.
+    $header = "[$([datetime]::Now.ToString('s'))] managed-job $($job.id) starting executable $($job.executable)"
     Write-Host $header
     $writer.WriteLine($header)
 
     $previousErrorPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        & $job.executable @($job.arguments) 2>&1 | ForEach-Object {
+        & $launch.executable @($launch.arguments) 2>&1 | ForEach-Object {
             $line = $_.ToString()
             Write-Host $line
             $writer.WriteLine($line)
@@ -72,4 +76,5 @@ try {
     exit 1
 } finally {
     $writer.Dispose()
+    if (Test-Path -LiteralPath $LaunchFile) { Remove-Item -LiteralPath $LaunchFile -Force -ErrorAction SilentlyContinue }
 }

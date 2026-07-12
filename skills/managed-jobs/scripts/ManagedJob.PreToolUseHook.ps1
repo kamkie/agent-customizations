@@ -13,7 +13,7 @@ try {
     }
     if (-not $command) { exit 0 }
 
-    $explicitBypass = $command -match 'codex-managed-jobs:\s*allow-direct'
+    $explicitBypass = $command -match '(?:codex-)?managed-jobs:\s*allow-direct'
     $usesController = $command -match 'Invoke-ManagedJob\.ps1|managed-jobs[\\/]scripts'
     if ($explicitBypass -or $usesController) { exit 0 }
 
@@ -35,7 +35,7 @@ try {
         hookSpecificOutput = [ordered]@{
             hookEventName = 'PreToolUse'
             permissionDecision = 'deny'
-            permissionDecisionReason = "Long-running or detached command must use the managed-jobs skill so its PID, state, and logs survive Codex restarts. If the user explicitly requested unmanaged execution, add the comment marker '# codex-managed-jobs: allow-direct'."
+            permissionDecisionReason = "Long-running or detached command must use the managed-jobs skill so its PID, state, and logs survive agent restarts. If the user explicitly requested unmanaged execution, add the comment marker '# managed-jobs: allow-direct'."
         }
     } | ConvertTo-Json -Depth 6 -Compress
 } catch {

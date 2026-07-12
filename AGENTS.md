@@ -107,15 +107,22 @@ does not have access, stop before PR creation and report the exact blocker.
 - Triage every finding: fix it or answer it on the PR. Commits that implement a
   review finding credit the reviewer with `Co-Authored-By: Claude
   <noreply@anthropic.com>` or `Co-Authored-By: Codex <noreply@openai.com>`.
-- Re-run affected validation after fixes. Mark the PR ready only after the review
-  is recorded and all findings are triaged. CODEOWNERS then requests `kamkie` as
-  the human owner reviewer.
+- Re-run affected validation after fixes. Immediately before marking the PR
+  ready, perform a thread-aware re-fetch of unresolved review threads, latest
+  reviews, review decision, and head SHA. Feedback submitted while the PR is
+  draft is still binding: if any actionable thread is unresolved, any review is
+  `CHANGES_REQUESTED`, or the head differs from the validated head, keep the PR
+  draft and address that state before retrying readiness.
+- After marking the PR ready, re-fetch the same state. If feedback or a head
+  change raced the readiness transition, immediately return the PR to draft and
+  resolve it. Only a stable clean preflight and post-transition check completes
+  readiness. CODEOWNERS then requests `kamkie` as the human owner reviewer.
 
 ### Owner approval, checks, and merge
 
 After a review is recorded, a commit is pushed, or the PR is marked ready,
-re-fetch the PR's head SHA, latest reviews, required checks, draft state,
-mergeability, and blocking-review state.
+re-fetch the PR's head SHA, thread-aware unresolved feedback, latest reviews,
+required checks, draft state, mergeability, and blocking-review state.
 
 - Owner approval is valid only when the latest `kamkie` approval applies to the
   current head SHA. Never manufacture approval with a stored owner credential or

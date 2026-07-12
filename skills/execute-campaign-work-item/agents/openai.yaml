@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execute Campaign Work Item"
+  short_description: "Execute one bounded campaign work item"
+  default_prompt: "Use $execute-campaign-work-item to execute this assigned campaign contract and return an evidence-backed handoff."

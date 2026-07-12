@@ -11,10 +11,12 @@ tools' live configuration directories are deployment targets.
 - `global/AGENTS.md` — personal guidance applied across Codex repositories.
 - `global/CLAUDE.md` — personal guidance applied across Claude Code projects.
 - `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
+- `skills/execute-campaign-work-item` — scoped execution and evidence-backed
+  handoff for one controller-assigned campaign work item.
 - `skills/managed-jobs` — durable supervision for long-running local processes,
   shared by Codex and Claude Code.
 - `skills/orchestrate-work-campaigns` — Codex-specific, visible,
-  evidence-backed coordination of multi-task delivery campaigns.
+  coordinator-only control of multi-task delivery campaigns.
 - `config/manifest.json` — the exact files managed for each supported agent.
 - `docs/customization-ownership.md` — classification, admission, ownership,
   precedence, and authoring rules for proposed customizations.

@@ -5,7 +5,7 @@ Use this template after replacing bracketed fields with live, domain-specific de
 Audit child reports with [handoff-audit-checklist.md](handoff-audit-checklist.md). Treat a terminal handoff as a claim until the controller verifies it against exact live state.
 
 ```text
-You are the persistent controller for [campaign objective] in [repository/project], tracked by [parent item] and [child items].
+Use $orchestrate-work-campaigns as the persistent controller for [campaign objective] in [repository/project], tracked by [parent item] and [child items]. You are the active controller; do not create another controller.
 
 Campaign registration:
 - Controller task: [pending at creation; launcher will supply the returned link/id].
@@ -28,7 +28,7 @@ Operating requirements:
 1. Read and obey all repository, workspace, and tool instructions. Inspect live source, tracker, task, process, and external-system state. Preserve unrelated work.
 2. Act as controller. Maintain a durable ledger with registration, policy, authority, original baseline, accepted-state history, dependency graph, resource locks, task and worktree ownership, decisions, evidence, branches, commits, PRs, exact-head checks and reviews, delivery proof, limitations, and final report.
 3. Do not implement or repair child scopes in the controller checkout. Do not edit, cherry-pick, rebase, commit, merge, or otherwise integrate child work there.
-4. Create a separate user-visible task with an isolated worktree and self-contained prompt for each authorized child and integration/review stage.
+4. Create a separate user-visible task with an isolated worktree and self-contained prompt beginning with `Use $execute-campaign-work-item` for each authorized child and integration/review stage.
 5. Reconcile long-running jobs after restart. Do not create equivalent duplicate tasks or jobs.
 6. Serialize work using [shared resources]. Parallelize only work proven independent and authorized.
 7. Process children initially in this dependency-safe order: [ordered children]. Revalidate and document any reordering.

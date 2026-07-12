@@ -48,17 +48,20 @@ Do not use hidden subagents for work the user expects to inspect or intervene in
 
 ## Define the Child Contract
 
-Every child prompt should include:
+Instantiate every child prompt from [child-contract-template.md](references/child-contract-template.md). Keep every core section, using `none` or `not applicable` with a reason when necessary; remove only optional issue-specific detail. Resolve every remaining placeholder before launch.
 
-- objective, non-goals, and exact issue scope;
-- starting branch/ref or accepted SHA;
-- dependencies and inputs;
-- authorized writes and forbidden external actions;
-- required implementation or investigation steps;
-- evidence and validation matrix;
-- artifact, log, or raw-data locations;
-- required branch/commit/PR behavior;
-- a structured terminal handoff.
+Every child contract should include:
+
+- applicable live policy sources, their consequences, and required recheck points;
+- objective, non-goals, exact issue scope, owned paths, and forbidden paths;
+- exact accepted base ref and SHA, refresh requirements, and any permitted fallback base;
+- dependencies, inputs, worktree and branch ownership, and shared-resource or shared-file locks;
+- authorized writes and external actions, required actor identities, and forbidden actions;
+- required implementation or investigation steps and mandatory collateral documentation;
+- evidence, validation, retry, and contamination rules tied to the exact tested version;
+- artifact, log, raw-data, durable-knowledge, privacy, retention, and cleanup locations;
+- required commit segmentation and branch, draft PR, review, readiness, approval, merge, or delivery behavior;
+- explicit stop conditions and a structured terminal handoff.
 
 Use domain-appropriate outcomes. A useful default is:
 

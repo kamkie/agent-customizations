@@ -23,9 +23,13 @@ if (Test-Path -LiteralPath (Join-Path $repositoryRoot '.git')) {
         throw 'Refusing to install from a dirty checkout. Commit or stash changes, or pass -AllowDirty explicitly.'
     }
 
-    $branch = (& git -C $repositoryRoot branch --show-current).Trim()
+    $branchOutput = @(& git -C $repositoryRoot branch --show-current)
     if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect the current Git branch.' }
-    if ($branch -ne 'main' -and -not $AllowNonMain) {
+    $branch = ($branchOutput -join "`n").Trim()
+    if ([string]::IsNullOrWhiteSpace($branch) -and -not $AllowNonMain) {
+        throw 'Refusing to install from detached HEAD. Use a clean main checkout or pass -AllowNonMain explicitly.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($branch) -and $branch -ne 'main' -and -not $AllowNonMain) {
         throw "Refusing to install from branch '$branch'. Use a clean main checkout or pass -AllowNonMain explicitly."
     }
 }

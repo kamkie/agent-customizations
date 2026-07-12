@@ -13,7 +13,7 @@
 
 - PR review/cross-review: `-ReviewPr <number>` from the correct repository root.
 - Delegated investigation or implementation: `-PromptFile <path>` with one concise task.
-- Resume/follow-up: prefer `-Resume <session-id>`, then `-FromPr <number>` for a PR-linked review, then `-ContinueLatest` only when the working directory identifies the intended session.
+- Resume/follow-up: prefer `-Resume <session-id>`, then `-FromPr <number>` for a PR-linked review, then `-ContinueLatest` only when the working directory identifies the intended session. When combined with `-ReviewPr`, `-FromPr` must name that same PR.
 - Fresh session: use only when no usable prior session exists or the user explicitly asks.
 
 ## Runtime rules
@@ -42,13 +42,17 @@
 Resolve the requested repository rather than hard-coding paths, PR numbers, or session IDs:
 
 ```powershell
-$runner = Join-Path $HOME ".codex\skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1"
+$runner = Join-Path $claudeRunnerSkillDirectory 'scripts\Invoke-ClaudeRunner.ps1'
 $repo = git rev-parse --show-toplevel 2>$null
 if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 $pr = <pr-number>
 ```
 
-Before a paid run, identify the repository, task or PR, model, effort, session/resume source, Claude configuration directory, diagnostic log, permission profile, and optional limits.
+Resolve `$claudeRunnerSkillDirectory` to the loaded skill's directory. Before a
+paid run, confirm Claude Code CLI is installed and authenticated, then identify
+the repository, task or PR, model, effort, session/resume source, Claude
+configuration directory, diagnostic log, permission profile, and optional
+limits.
 
 - Moving model alias: `-ModelAlias fable|haiku|opus|sonnet`.
 - Exact model: `-ExactModel claude-...`. Do not combine it with `-ModelAlias`.
@@ -124,4 +128,7 @@ The deterministic mock harness performs no paid work:
 pwsh ./skills/claude-runner/tests/Invoke-ClaudeRunner.Tests.ps1
 ```
 
-It covers default and bypass permissions, the read-only review profile, diagnostic placement, mutation-free dry-run/self-test, typed model and effort controls, streaming, budgets, interrupted resume, and PR-linked recovery.
+It covers default and bypass permissions, the read-only review profile,
+rejection of bare or cross-PR recovery reviews, diagnostic placement,
+mutation-free dry-run/self-test, typed model and effort controls, streaming,
+budgets, interrupted resume, and PR-linked recovery.

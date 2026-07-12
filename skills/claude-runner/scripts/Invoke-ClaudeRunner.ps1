@@ -86,6 +86,14 @@ if ($ReviewPr -gt 0 -and $PSBoundParameters.ContainsKey("PermissionMode") -and $
     throw "PR reviews require -PermissionMode dontAsk. Omit -PermissionMode to use the review profile automatically."
 }
 
+if (($ReviewPr -gt 0 -or $FromPr -gt 0) -and $Bare) {
+    throw "Do not combine -Bare with -ReviewPr or -FromPr. PR-linked reviews require repository instructions and settings."
+}
+
+if ($ReviewPr -gt 0 -and $FromPr -gt 0 -and $ReviewPr -ne $FromPr) {
+    throw "-FromPr must match -ReviewPr when both are provided."
+}
+
 if (-not [string]::IsNullOrWhiteSpace($ExactModel) -and $PSBoundParameters.ContainsKey("ModelAlias")) {
     throw "Use either -ModelAlias or -ExactModel, not both."
 }

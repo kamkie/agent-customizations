@@ -111,6 +111,26 @@ exit [int]$env:FAKE_CLAUDE_EXIT
     Assert-True ($reviewAllowedTools.ExitCode -ne 0) "PR review silently accepted caller-supplied tools."
     Assert-True ($reviewAllowedTools.Output.Contains("fixed read-only review profile")) "PR review tool rejection was not explicit."
 
+    $reviewBare = Invoke-RunnerProcess @(
+        "-ReviewPr", "17",
+        "-Bare",
+        "-WorkingDirectory", $target,
+        "-ClaudeConfigDirectory", (Join-Path $testRoot "review-bare-config-must-not-exist"),
+        "-DryRun"
+    )
+    Assert-True ($reviewBare.ExitCode -ne 0) "PR review silently accepted bare mode."
+    Assert-True ($reviewBare.Output.Contains("PR-linked reviews require repository instructions")) "Bare review rejection was not explicit."
+
+    $crossPrRecovery = Invoke-RunnerProcess @(
+        "-ReviewPr", "17",
+        "-FromPr", "18",
+        "-WorkingDirectory", $target,
+        "-ClaudeConfigDirectory", (Join-Path $testRoot "cross-pr-config-must-not-exist"),
+        "-DryRun"
+    )
+    Assert-True ($crossPrRecovery.ExitCode -ne 0) "PR review silently resumed another PR's session."
+    Assert-True ($crossPrRecovery.Output.Contains("-FromPr must match -ReviewPr")) "Cross-PR recovery rejection was not explicit."
+
     $hadOriginalClaudeConfig = Test-Path Env:CLAUDE_CONFIG_DIR
     $originalClaudeConfig = $env:CLAUDE_CONFIG_DIR
     try {

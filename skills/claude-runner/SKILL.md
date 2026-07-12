@@ -5,7 +5,7 @@ description: Run Claude Code CLI from Codex with a resume-safe, foreground wrapp
 
 # Claude Runner
 
-Use this skill before running Claude CLI from Codex. Prefer the wrapper because it prints the session id, writes JSONL logs, streams live output, and makes resume mode explicit. The JSONL log and printed session id are the durable handoff; this skill does not provide a job registry, wakeups, or `$cc:*` commands.
+Use this skill before running Claude CLI from Codex. Prefer the wrapper because it prints the session id, writes JSONL logs outside the target repository, streams live output, and makes resume mode explicit. The JSONL log and printed session id are the durable handoff; this skill does not provide a job registry, wakeups, or `$cc:*` commands.
 
 ## Mode
 
@@ -25,6 +25,9 @@ Use this skill before running Claude CLI from Codex. Prefer the wrapper because 
 - Use `-PromptFile` for multiline prompts, XML prompts, or shell-hostile quoting. Keep temporary prompt files outside the repo.
 - Do not use `-Bare` for cross-reviews or runs that must load `CLAUDE.md`, skills, plugins, hooks, or project settings; reserve it for deterministic CI/script calls.
 - Treat model, budget, resume, prompt-file, and PR number as runtime controls, not natural-language task text.
+- Keep normal Claude permissions. Use `-BypassPermissions` only when the caller explicitly authorizes bypass; the wrapper makes that mode conspicuous in its output and invocation.
+- Select a documented moving alias with `-ModelAlias fable|haiku|opus|sonnet`, or an exact full model name with `-ExactModel claude-...`. Do not combine them.
+- Set effort with the typed `-Effort low|medium|high|xhigh|max` parameter. Do not route effort through `-ClaudeArgs`.
 - Preserve the user's task text except for removing routing controls. If it begins with `/`, pass it as Claude task text.
 - Do not convert a failed Claude invocation into Codex doing the delegated work inline. Surface the failure plus the resume command or log path.
 
@@ -39,7 +42,7 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 $pr = <pr-number>
 ```
 
-Before a paid run, know the repo root, PR number or prompt file, model, session/resume source, log path, and optional budget/turn cap.
+Before a paid run, know the repo root, PR number or prompt file, model alias or exact model, effort, session/resume source, log path, and optional budget/turn cap.
 
 ## Wrapper
 
@@ -51,18 +54,20 @@ PR review:
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\.codex\skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1" `
   -WorkingDirectory $repo `
   -ReviewPr $pr `
-  -Model fable `
+  -ModelAlias opus `
+  -Effort medium `
   -MaxBudgetUsd 10
 ```
 
-If Fable is quota-blocked before useful work starts, rerun intentionally with Opus and reuse the printed session id if one exists:
+For an exact model selection, use its full Claude model name. If continuing a prior invocation, resume its printed session id:
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\.codex\skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1" `
   -WorkingDirectory $repo `
   -ReviewPr $pr `
-  -Model opus `
-  -SessionId "<printed-session-id>"
+  -ExactModel claude-opus-4-6 `
+  -Effort medium `
+  -Resume "<printed-session-id>"
 ```
 
 Resume by id:
@@ -71,7 +76,8 @@ Resume by id:
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\.codex\skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1" `
   -WorkingDirectory $repo `
   -ReviewPr $pr `
-  -Model opus `
+  -ModelAlias opus `
+  -Effort medium `
   -Resume "<printed-session-id>"
 ```
 
@@ -81,7 +87,8 @@ Resume a PR-linked session without the id:
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\.codex\skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1" `
   -WorkingDirectory $repo `
   -ReviewPr $pr `
-  -Model opus `
+  -ModelAlias opus `
+  -Effort medium `
   -FromPr $pr
 ```
 
@@ -91,8 +98,20 @@ Custom prompt:
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\.codex\skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1" `
   -WorkingDirectory $repo `
   -PromptFile "$env:TEMP\claude-task.md" `
-  -Model opus `
+  -ModelAlias opus `
+  -Effort high `
   -MaxTurns 8
+```
+
+Explicit permission bypass is exceptional and must be visible at the call site:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\.codex\skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1" `
+  -WorkingDirectory $repo `
+  -ReviewPr $pr `
+  -ModelAlias opus `
+  -Effort medium `
+  -BypassPermissions
 ```
 
 ## Prompting Claude
@@ -127,4 +146,16 @@ When a Claude run times out or the terminal is interrupted:
 3. If exited without the required result, rerun with `-Resume <session-id>`, `-FromPr <pr>`, or `-ContinueLatest`.
 4. Start fresh only if no session was created or the user explicitly asks.
 
-The wrapper writes raw JSONL logs under `.logs` in the working directory by default. Keep the log path when reporting review results or diagnosing failures.
+The wrapper writes raw JSONL logs under an external agent-neutral runtime root by default: `AGENT_RUNNER_HOME` when set, otherwise the platform state root (for example, `LOCALAPPDATA\agent-runners` on Windows). It reports the resolved log path without printing the prompt or passthrough argument values. Raw logs may contain Claude events, so treat them as sensitive runtime records and never commit them.
+
+`-DryRun` resolves and reports the invocation without creating the runtime root, log directory, or log file. `-SelfTest` exercises stream rendering without requiring a working directory and also creates nothing. To override log placement deliberately, use `-RuntimeRoot`, `-LogDir`, or `-LogPath`; a relative `-LogDir` or `-LogPath` is resolved from the working directory.
+
+## Regression Tests
+
+The deterministic test harness uses a temporary mock `claude` command and performs no paid work:
+
+```powershell
+pwsh ./skills/claude-runner/tests/Invoke-ClaudeRunner.Tests.ps1
+```
+
+It covers normal and explicit-bypass permissions, external logs, mutation-free dry-run and self-test behavior, typed effort and model selection, streaming, budgets, interrupted resume, and PR-linked recovery.

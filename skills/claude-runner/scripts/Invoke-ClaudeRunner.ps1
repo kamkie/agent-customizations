@@ -6,11 +6,18 @@ param(
     [string]$PromptFile,
     [int]$ReviewPr,
 
-    [ValidateSet("fable", "opus")]
-    [string]$Model = "fable",
+    [ValidateSet("fable", "haiku", "opus", "sonnet")]
+    [string]$ModelAlias = "fable",
 
-    [ValidateSet("acceptEdits", "auto", "bypassPermissions", "default", "plan")]
-    [string]$PermissionMode = "bypassPermissions",
+    [ValidatePattern("^claude-[A-Za-z0-9][A-Za-z0-9._-]*$")]
+    [string]$ExactModel,
+
+    [ValidateSet("low", "medium", "high", "xhigh", "max")]
+    [string]$Effort = "medium",
+
+    [ValidateSet("acceptEdits", "auto", "default", "dontAsk", "plan")]
+    [string]$PermissionMode = "default",
+    [switch]$BypassPermissions,
 
     [string]$SessionId,
     [string]$Resume,
@@ -19,7 +26,8 @@ param(
     [string]$Name,
 
     [string]$WorkingDirectory = (Get-Location).Path,
-    [string]$LogDir = ".logs",
+    [string]$RuntimeRoot,
+    [string]$LogDir,
     [string]$LogPath,
     [switch]$AppendLog,
 
@@ -39,11 +47,32 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $forbiddenArgs = @("--bg", "--background", "--fork-session", "--no-session-persistence")
+$typedArgs = @(
+    "-p", "--print", "--model", "--effort", "--permission-mode",
+    "--dangerously-skip-permissions", "--allow-dangerously-skip-permissions",
+    "--session-id", "--resume", "--continue", "--from-pr", "--name",
+    "--max-budget-usd", "--max-turns", "--output-format",
+    "--include-partial-messages", "--verbose", "--bare"
+)
 foreach ($arg in $ClaudeArgs) {
     if ($forbiddenArgs -contains $arg) {
         throw "Do not pass $arg through claude-runner. It breaks attached resumable execution."
     }
+    if ($typedArgs -contains $arg) {
+        throw "Use the typed claude-runner parameter for $arg instead of -ClaudeArgs."
+    }
 }
+
+if ($BypassPermissions -and $PSBoundParameters.ContainsKey("PermissionMode")) {
+    throw "Use either -PermissionMode or -BypassPermissions, not both."
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ExactModel) -and $PSBoundParameters.ContainsKey("ModelAlias")) {
+    throw "Use either -ModelAlias or -ExactModel, not both."
+}
+
+$selectedModel = if ([string]::IsNullOrWhiteSpace($ExactModel)) { $ModelAlias } else { $ExactModel }
+$selectedPermissionMode = if ($BypassPermissions) { "bypassPermissions" } else { $PermissionMode }
 
 function Format-Arg {
     param([string]$Value)
@@ -74,6 +103,22 @@ function Format-CommandArgsForDisplay {
     }
 
     return (($displayArgs | ForEach-Object { Format-Arg $_ }) -join " ")
+}
+
+function Get-DefaultRuntimeRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:AGENT_RUNNER_HOME)) {
+        return [System.IO.Path]::GetFullPath($env:AGENT_RUNNER_HOME)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        return Join-Path $env:LOCALAPPDATA "agent-runners"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:XDG_STATE_HOME)) {
+        return Join-Path $env:XDG_STATE_HOME "agent-runners"
+    }
+
+    return Join-Path ([System.IO.Path]::GetTempPath()) "agent-runners"
 }
 
 function Write-FullTextDelta {
@@ -340,7 +385,10 @@ $cmdArgs = @()
 if ($Bare) {
     $cmdArgs += "--bare"
 }
-$cmdArgs += @("--model", $Model, "--permission-mode", $PermissionMode)
+$cmdArgs += @("--model", $selectedModel, "--effort", $Effort, "--permission-mode", $selectedPermissionMode)
+if ($BypassPermissions) {
+    $cmdArgs += "--dangerously-skip-permissions"
+}
 if (-not [string]::IsNullOrWhiteSpace($Name)) {
     $cmdArgs += @("--name", $Name)
 }
@@ -380,10 +428,19 @@ $cmdArgs += @(
 if (-not $NoVerbose) {
     $cmdArgs += "--verbose"
 }
+$displayArgs = @($cmdArgs)
 $cmdArgs += $ClaudeArgs
 
-$resolvedLogDir = Resolve-RunnerPath $resolvedWorkingDirectory $LogDir
-New-Item -ItemType Directory -Force -Path $resolvedLogDir | Out-Null
+$resolvedRuntimeRoot = if ([string]::IsNullOrWhiteSpace($RuntimeRoot)) {
+    Get-DefaultRuntimeRoot
+} else {
+    Resolve-RunnerPath $resolvedWorkingDirectory $RuntimeRoot
+}
+$resolvedLogDir = if ([string]::IsNullOrWhiteSpace($LogDir)) {
+    Join-Path $resolvedRuntimeRoot "claude-runner\logs"
+} else {
+    Resolve-RunnerPath $resolvedWorkingDirectory $LogDir
+}
 
 if ([string]::IsNullOrWhiteSpace($LogPath)) {
     $safeSession = ($effectiveSession -replace "[^A-Za-z0-9_.-]", "-")
@@ -396,12 +453,21 @@ if ([string]::IsNullOrWhiteSpace($LogPath)) {
 Write-Host ("[claude-runner] cwd: {0}" -f $resolvedWorkingDirectory)
 Write-Host ("[claude-runner] mode: {0}" -f $mode)
 Write-Host ("[claude-runner] session: {0}" -f $effectiveSession)
+Write-Host ("[claude-runner] model: {0}" -f $selectedModel)
+Write-Host ("[claude-runner] effort: {0}" -f $Effort)
+Write-Host ("[claude-runner] permissions: {0}{1}" -f $selectedPermissionMode, $(if ($BypassPermissions) { " (EXPLICIT BYPASS)" } else { "" }))
 Write-Host ("[claude-runner] log: {0}" -f $LogPath)
-Write-Host ("[claude-runner] command: claude {0}" -f (Format-CommandArgsForDisplay $cmdArgs))
+$commandSummary = Format-CommandArgsForDisplay $displayArgs
+if ($ClaudeArgs.Count -gt 0) {
+    $commandSummary += " <passthrough:$($ClaudeArgs.Count) args redacted>"
+}
+Write-Host ("[claude-runner] command: claude {0}" -f $commandSummary)
 
 if ($DryRun) {
     exit 0
 }
+
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $LogPath) | Out-Null
 
 $script:LastFullText = ""
 $script:RenderedText = $false

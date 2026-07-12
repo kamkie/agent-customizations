@@ -10,14 +10,32 @@ $errors = [Collections.Generic.List[string]]::new()
 
 $requiredRepositoryFiles = @(
     'AGENTS.md',
+    'CLAUDE.md',
     'README.md',
     'LICENSE',
     'SECURITY.md',
-    'config\manifest.json'
+    'config\manifest.json',
+    '.github\CODEOWNERS'
 )
 foreach ($relativePath in $requiredRepositoryFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $repositoryRoot $relativePath) -PathType Leaf)) {
         $errors.Add("Missing required repository file: $relativePath")
+    }
+}
+
+$claudeRepositoryInstructions = Join-Path $repositoryRoot 'CLAUDE.md'
+if (Test-Path -LiteralPath $claudeRepositoryInstructions -PathType Leaf) {
+    $claudeImport = (Get-Content -LiteralPath $claudeRepositoryInstructions -Raw).Trim()
+    if ($claudeImport -ne '@AGENTS.md') {
+        $errors.Add('Root CLAUDE.md must contain only @AGENTS.md so AGENTS.md remains canonical')
+    }
+}
+
+$codeownersPath = Join-Path $repositoryRoot '.github\CODEOWNERS'
+if (Test-Path -LiteralPath $codeownersPath -PathType Leaf) {
+    $codeowners = Get-Content -LiteralPath $codeownersPath -Raw
+    if ($codeowners -notmatch '(?m)^\*\s+@kamkie\s*$') {
+        $errors.Add('CODEOWNERS must request @kamkie for all repository changes')
     }
 }
 

@@ -6,6 +6,8 @@ tools' live configuration directories are deployment targets.
 
 ## Contents
 
+- `AGENTS.md` with the root `CLAUDE.md` import — repository development and
+  full-delivery policy shared by Codex and Claude Code.
 - `global/AGENTS.md` — personal guidance applied across Codex repositories.
 - `global/CLAUDE.md` — personal guidance applied across Claude Code projects.
 - `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
@@ -42,6 +44,14 @@ activating it.
 - A local Codex and/or Claude Code installation
 
 ## Workflow
+
+An explicit request to implement a repository change defaults to the complete
+branch-to-PR delivery workflow in [`AGENTS.md`](AGENTS.md): validate, commit,
+push, open a bot-authored draft PR, obtain opposite-agent cross-review, triage
+findings, and mark the PR ready for owner review. Current-head owner approval
+then triggers a guarded merge or auto-merge after required checks pass.
+Deployment to live agent homes remains a separate, explicitly authorized
+activation step.
 
 Validate the repository:
 

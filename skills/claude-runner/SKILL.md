@@ -5,7 +5,7 @@ description: Run Claude Code CLI from Codex with a resume-safe, foreground wrapp
 
 # Claude Runner
 
-Use this skill before running Claude CLI from Codex. Prefer the wrapper because it prints the session id, preserves Claude Code's native session transcript, writes a separate diagnostic JSONL log outside the target repository, streams live output, and makes resume mode explicit. The native session id is the resumable handoff; the diagnostic log is troubleshooting evidence, not an importable session. This skill does not provide a job registry, wakeups, or `$cc:*` commands.
+Use this skill to run or resume Claude Code from Codex with explicit runtime controls and durable session handling.
 
 ## Mode
 

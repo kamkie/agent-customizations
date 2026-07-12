@@ -165,6 +165,17 @@ function Write-FullTextDelta {
     $script:LastFullText = $Text
 }
 
+function Get-ObjectPropertyNames {
+    param($Value)
+
+    if ($null -eq $Value) {
+        return @()
+    }
+
+    $members = Get-Member -InputObject $Value -MemberType NoteProperty, Property, AliasProperty, ScriptProperty
+    return @($members | ForEach-Object { $_.Name })
+}
+
 function Get-ContentText {
     param($Content)
 
@@ -174,7 +185,7 @@ function Get-ContentText {
 
     $parts = New-Object System.Collections.Generic.List[string]
     foreach ($item in @($Content)) {
-        $props = $item.PSObject.Properties.Name
+        $props = Get-ObjectPropertyNames $item
         if (($props -contains "type") -and $item.type -ne "text") {
             continue
         }
@@ -202,7 +213,7 @@ function Write-ClaudeStreamLine {
         return
     }
 
-    $props = $event.PSObject.Properties.Name
+    $props = Get-ObjectPropertyNames $event
     if (-not ($props -contains "type")) {
         if ($ShowEvents) {
             Write-Host "[claude-runner] JSON event without type"
@@ -217,12 +228,12 @@ function Write-ClaudeStreamLine {
             }
 
             $inner = $event.event
-            $innerProps = $inner.PSObject.Properties.Name
+            $innerProps = Get-ObjectPropertyNames $inner
             if ($innerProps -contains "type") {
                 switch ($inner.type) {
                     "content_block_delta" {
                         if (($innerProps -contains "delta") -and $inner.delta) {
-                            $deltaProps = $inner.delta.PSObject.Properties.Name
+                            $deltaProps = Get-ObjectPropertyNames $inner.delta
                             if ($deltaProps -contains "text") {
                                 $text = [string]$inner.delta.text
                                 Write-Host -NoNewline $text
@@ -233,7 +244,7 @@ function Write-ClaudeStreamLine {
                         }
                     }
                     "message_start" {
-                        if (($event.PSObject.Properties.Name -contains "session_id") -and -not [string]::IsNullOrWhiteSpace([string]$event.session_id)) {
+                        if (($props -contains "session_id") -and -not [string]::IsNullOrWhiteSpace([string]$event.session_id)) {
                             Write-Host ("[claude-runner] stream session: {0}" -f $event.session_id)
                         } elseif ($ShowEvents) {
                             Write-Host "[claude-runner] message_start"
@@ -248,8 +259,8 @@ function Write-ClaudeStreamLine {
             }
         }
         "content_block_delta" {
-            if (($event.PSObject.Properties.Name -contains "delta") -and $event.delta) {
-                $deltaProps = $event.delta.PSObject.Properties.Name
+            if (($props -contains "delta") -and $event.delta) {
+                $deltaProps = Get-ObjectPropertyNames $event.delta
                 if ($deltaProps -contains "text") {
                     $text = [string]$event.delta.text
                     Write-Host -NoNewline $text
@@ -263,7 +274,7 @@ function Write-ClaudeStreamLine {
         }
         "assistant" {
             if (($props -contains "message") -and $event.message) {
-                $messageProps = $event.message.PSObject.Properties.Name
+                $messageProps = Get-ObjectPropertyNames $event.message
                 if ($messageProps -contains "content") {
                     Write-FullTextDelta (Get-ContentText $event.message.content)
                 }
@@ -352,6 +363,7 @@ if ($SelfTest) {
         '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"stream "}},"session_id":"00000000-0000-0000-0000-000000000000"}',
         '{"type":"content_block_delta","delta":{"type":"text_delta","text":"hello "}}',
         '{"type":"content_block_delta","delta":{"type":"text_delta","text":"from claude-runner"}}',
+        '{"type":"assistant","message":{"content":[null,"scalar",{"type":"text","text":" safe"}]}}',
         '{"type":"result","total_cost_usd":0}'
     ) | ForEach-Object { Write-ClaudeStreamLine $_ }
 

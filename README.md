@@ -16,6 +16,8 @@ tools' live configuration directories are deployment targets.
 - `skills/orchestrate-work-campaigns` — Codex-specific, visible,
   evidence-backed coordination of multi-task delivery campaigns.
 - `config/manifest.json` — the exact files managed for each supported agent.
+- `docs/customization-ownership.md` — classification, admission, ownership,
+  precedence, and authoring rules for proposed customizations.
 - `scripts/verify.ps1` — validates structure and scans managed sources for
   common publication hazards.
 - `scripts/status.ps1` — reports drift between this repository and live agent
@@ -102,6 +104,13 @@ memories, sessions, logs, artifacts, or managed-job records. Those surfaces can
 contain machine-specific paths, private data, or generated state. The hook
 scripts used by `managed-jobs` are versioned with the skill, while machine-local
 hook registration remains outside this baseline.
+
+Before adding guidance, use the [customization ownership and skill-admission
+policy](docs/customization-ownership.md) to decide whether it belongs in global
+guidance, a portable skill, a repository-local contract, or private/local
+material. In particular, generic skills may coordinate repeated workflows and
+discover target policy, but must not carry repository merge rules or private and
+machine-specific state.
 
 ## License
 

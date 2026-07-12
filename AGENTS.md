@@ -8,6 +8,9 @@ Code configuration directories are deployment targets, not editing locations.
 
 - Keep target-specific global guidance in `global/` and each skill inside its
   own `skills/<name>/` directory.
+- Classify new guidance using [`docs/customization-ownership.md`](docs/customization-ownership.md)
+  before adding it. Reusable skills own repeated workflows and discover
+  repository policy; they do not embed repository-specific contracts.
 - Do not import sessions, memories, logs, artifacts, managed-job records,
   credentials, plugin caches, or machine-generated configuration.
 - Keep examples portable. Do not commit usernames, home-directory paths,

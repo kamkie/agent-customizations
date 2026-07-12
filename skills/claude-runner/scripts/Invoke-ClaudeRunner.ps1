@@ -78,6 +78,10 @@ if ($ReviewPr -gt 0 -and $BypassPermissions) {
     throw "Do not combine -ReviewPr with -BypassPermissions. PR reviews use the read-only review profile."
 }
 
+if ($ReviewPr -gt 0 -and $AllowedTools.Count -gt 0) {
+    throw "Do not combine -ReviewPr with -AllowedTools. PR reviews use the fixed read-only review profile."
+}
+
 if ($ReviewPr -gt 0 -and $PSBoundParameters.ContainsKey("PermissionMode") -and $PermissionMode -ne "dontAsk") {
     throw "PR reviews require -PermissionMode dontAsk. Omit -PermissionMode to use the review profile automatically."
 }

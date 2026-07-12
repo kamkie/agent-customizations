@@ -101,6 +101,16 @@ exit [int]$env:FAKE_CLAUDE_EXIT
     )
     Assert-True ($reviewBypass.ExitCode -ne 0) "PR review silently accepted bypass permissions."
 
+    $reviewAllowedTools = Invoke-RunnerProcess @(
+        "-ReviewPr", "17",
+        "-AllowedTools", "Bash(git push *)",
+        "-WorkingDirectory", $target,
+        "-ClaudeConfigDirectory", (Join-Path $testRoot "review-tools-config-must-not-exist"),
+        "-DryRun"
+    )
+    Assert-True ($reviewAllowedTools.ExitCode -ne 0) "PR review silently accepted caller-supplied tools."
+    Assert-True ($reviewAllowedTools.Output.Contains("fixed read-only review profile")) "PR review tool rejection was not explicit."
+
     $hadOriginalClaudeConfig = Test-Path Env:CLAUDE_CONFIG_DIR
     $originalClaudeConfig = $env:CLAUDE_CONFIG_DIR
     try {

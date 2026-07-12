@@ -1,0 +1,29 @@
+# Operating-system and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.tmp
+
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+auth.json
+credentials.json
+*.key
+*.pem
+
+# Codex runtime state: never import these from ~/.codex
+.codex/
+artifacts/
+logs/
+/managed-jobs/
+memories/
+plugins/cache/
+sessions/
+hooks.json
+
+# Disposable repository artifacts
+.tmp/
+coverage/

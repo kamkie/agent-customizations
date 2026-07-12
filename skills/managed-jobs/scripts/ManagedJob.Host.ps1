@@ -7,21 +7,21 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 
 $job = Read-ManagedJob -Path $JobFile
-$launch = Read-ManagedJob -Path $LaunchFile
-Remove-Item -LiteralPath $LaunchFile -Force
-$hostSnapshot = Get-ProcessSnapshot -ProcessId $PID
-$job.hostPid = $PID
-$job.hostStartedAtUtc = $hostSnapshot.startTimeUtc
-$job.status = 'running'
-$job.startedAtUtc = [datetime]::UtcNow.ToString('o')
-Write-ManagedJob -Path $JobFile -Job $job
-
 $logDirectory = Split-Path -Parent $job.logPath
 $null = New-Item -ItemType Directory -Path $logDirectory -Force
 $writer = [IO.StreamWriter]::new($job.logPath, $true, [Text.UTF8Encoding]::new($false))
 $writer.AutoFlush = $true
 
 try {
+    $launch = Read-ManagedJob -Path $LaunchFile
+    Remove-Item -LiteralPath $LaunchFile -Force
+    $hostSnapshot = Get-ProcessSnapshot -ProcessId $PID
+    $job.hostPid = $PID
+    $job.hostStartedAtUtc = $hostSnapshot.startTimeUtc
+    $job.status = 'running'
+    $job.startedAtUtc = [datetime]::UtcNow.ToString('o')
+    Write-ManagedJob -Path $JobFile -Job $job
+
     if (-not (Test-Path -LiteralPath $job.workingDirectory -PathType Container)) {
         throw "Working directory does not exist: $($job.workingDirectory)"
     }

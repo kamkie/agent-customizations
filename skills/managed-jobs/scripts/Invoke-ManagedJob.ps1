@@ -48,13 +48,24 @@ function Update-ReconciledJob {
     }
     if (Test-ManagedProcessIdentity -ProcessId $Job.hostPid -ExpectedStartTimeUtc $Job.hostStartedAtUtc) { return $Job }
     $path = Get-ManagedJobFile -Id $Job.id
-    $Job.status = 'orphaned'
-    $Job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
-    $Job.error = 'Recorded host process is no longer running and no terminal state was recorded.'
-    Write-ManagedJob -Path $path -Job $Job
+    $current = Read-ManagedJob -Path $path
+    if ($current.status -notin @('starting', 'running')) { return $current }
+    if ($current.status -eq 'starting' -and -not $current.hostPid) {
+        $createdAt = if ($current.createdAtUtc -is [datetime]) {
+            $current.createdAtUtc.ToUniversalTime()
+        } else {
+            [datetimeoffset]::Parse([string]$current.createdAtUtc).UtcDateTime
+        }
+        if (([datetime]::UtcNow - $createdAt).TotalSeconds -lt 30) { return $current }
+    }
+    if (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc) { return $current }
+    $current.status = 'orphaned'
+    $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+    $current.error = 'Recorded host process is no longer running and no terminal state was recorded.'
+    Write-ManagedJob -Path $path -Job $current
     $unclaimedLaunch = Join-Path (Join-Path (Get-ManagedJobRoot) 'launch') "$($Job.id).json"
     if (Test-Path -LiteralPath $unclaimedLaunch) { Remove-Item -LiteralPath $unclaimedLaunch -Force }
-    return $Job
+    return $current
 }
 
 function Select-ManagedJobs {

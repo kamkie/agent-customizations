@@ -35,15 +35,22 @@ function Read-ManagedJob {
     # Move-overwrite has a tiny destination gap on Windows. Retry status reads that
     # race an atomic record update rather than surfacing a false missing-record error.
     for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+            if ($attempt -eq 9) { throw "Managed job record not found: $Path" }
+            Start-Sleep -Milliseconds 25
+            continue
+        }
         try {
-            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-                throw "Managed job record not found: $Path"
-            }
-            return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+            $text = Get-Content -LiteralPath $Path -Raw
         } catch {
             if ($attempt -eq 9) { throw }
             Start-Sleep -Milliseconds 25
+            continue
         }
+        if ([string]::IsNullOrWhiteSpace($text)) { throw "Managed job record is empty: $Path" }
+        $job = $text | ConvertFrom-Json
+        if ($null -eq $job) { throw "Managed job record is invalid: $Path" }
+        return $job
     }
 }
 
@@ -120,8 +127,8 @@ function ConvertTo-SafeJobName {
 
 function Assert-SecretSafeInvocation {
     param([string[]]$Arguments, [hashtable]$Environment)
-    $secretName = '(?i)(?:^|_)(?:secret|token|password|passwd|api_?key|private_?key|credential|credentials|auth|auth_token|access_token|refresh_token|cookie)(?:$|_)'
-    $secretOption = '(?i)^--?[^=]*(?:secret|token|password|passwd|pwd|api[_-]?key|private[_-]?key|credential|auth|cookie)(?:=|$)'
+    $secretName = '(?i)(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential|cookie)'
+    $secretOption = '(?i)^--?[^=]*(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential)(?:=|$)'
     foreach ($key in $Environment.Keys) {
         if ([string]$key -match $secretName) {
             throw "Environment key '$key' appears secret-bearing. Configure it in the parent process or a credential store so managed-jobs only inherits it."
@@ -133,7 +140,7 @@ function Assert-SecretSafeInvocation {
             ($index -gt 0 -and [string]$Arguments[$index - 1] -match $secretOption) -or
             $argument -match '(?i)^[a-z][a-z0-9+.-]*://[^/@\s]+:[^/@\s]+@' -or
             $argument -match '(?i)(authorization\s*:\s*(?:bearer|basic)|bearer\s+[a-z0-9._~-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -or
-            $argument -match '(?i)(?:secret|token|password|passwd|pwd|api[_-]?key|private[_-]?key|credential|cookie)\s*[:=]\s*[^\s$]+') {
+            $argument -match '(?i)(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential)\s*[:=]\s*[^\s$]+') {
             throw 'Arguments appear secret-bearing. Use inherited environment configuration, standard input, a response file outside the registry, or the target tool credential store.'
         }
     }
@@ -146,12 +153,14 @@ function Get-InvocationFingerprint {
         [Parameter(Mandatory)][string]$WorkingDirectory,
         [hashtable]$Environment
     )
-    $environmentNames = @($Environment.Keys | ForEach-Object { ([string]$_).ToUpperInvariant() } | Sort-Object)
+    $environmentEntries = @($Environment.Keys | Sort-Object | ForEach-Object {
+        [ordered]@{ name = ([string]$_).ToUpperInvariant(); value = [string]$Environment[$_] }
+    })
     $canonical = [ordered]@{
         executable = $Executable.Trim().ToLowerInvariant()
         arguments = @($Arguments | ForEach-Object { [string]$_ })
         workingDirectory = ([IO.Path]::GetFullPath($WorkingDirectory)).TrimEnd('\').ToLowerInvariant()
-        environmentNames = $environmentNames
+        environment = $environmentEntries
     } | ConvertTo-Json -Depth 5 -Compress
     $bytes = [Text.Encoding]::UTF8.GetBytes($canonical)
     $hash = [Security.Cryptography.SHA256]::HashData($bytes)

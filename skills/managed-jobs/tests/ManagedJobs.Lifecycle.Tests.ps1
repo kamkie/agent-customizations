@@ -70,6 +70,27 @@ try {
         & $controller start -StateRoot $stateRoot -Name rejected -Executable $pwsh -Arguments @('--api-token', 'do-not-store') | Out-Null
     } catch { $argumentSecretRejected = $_.Exception.Message -match 'secret-bearing' }
     Assert-True $argumentSecretRejected 'Secret-like argument options should be rejected.'
+    foreach ($safeArguments in @(@('--cookie', './cookies.txt'), @('--pwd', './dump.sql'), @('--auth', 'basic'))) {
+        $safeAccepted = $true
+        try { Assert-SecretSafeInvocation -Arguments $safeArguments -Environment @{} } catch { $safeAccepted = $false }
+        Assert-True $safeAccepted "Benign option should not be rejected: $($safeArguments -join ' ')"
+    }
+    foreach ($secretKey in @('DBPASSWORD', 'CLIENTSECRET', 'MYAPITOKEN', 'MY-SECRET')) {
+        $secretNameRejected = $false
+        try { Assert-SecretSafeInvocation -Arguments @() -Environment @{ $secretKey = 'do-not-store' } } catch { $secretNameRejected = $true }
+        Assert-True $secretNameRejected "Secret-like environment key should be rejected: $secretKey"
+    }
+    $firstFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments @('-NoProfile') -WorkingDirectory (Get-Location).Path -Environment @{ PORT = '3000' }
+    $secondFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments @('-NoProfile') -WorkingDirectory (Get-Location).Path -Environment @{ PORT = '4000' }
+    Assert-True ($firstFingerprint -ne $secondFingerprint) 'Environment values should distinguish invocation fingerprints.'
+
+    $emptyId = '20000101-000000-lifecycle-empty-000001'
+    $emptyPath = Join-Path $stateRoot "jobs\$emptyId.json"
+    Set-Content -LiteralPath $emptyPath -Value '' -Encoding utf8
+    $emptyRejected = $false
+    try { & $controller status -StateRoot $stateRoot -Id $emptyId | Out-Null } catch { $emptyRejected = $_.Exception.Message -match 'record is empty' }
+    Assert-True $emptyRejected 'Empty records should fail with an explicit error.'
+    Remove-Item -LiteralPath $emptyPath -Force
 
     # A fresh unclaimed starting record remains active during its startup grace period.
     $freshId = '20000101-000000-lifecycle-starting-000001'

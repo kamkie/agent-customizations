@@ -3,6 +3,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $controller = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\Invoke-ManagedJob.ps1'
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Common.ps1')
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('managed-jobs-lifecycle-' + [guid]::NewGuid().ToString('N'))
 $stateRoot = Join-Path $testRoot 'state'
 $activeIds = [Collections.Generic.List[string]]::new()
@@ -43,10 +44,10 @@ try {
 
     # Start, record redaction, structured list/status, logs, and reconcile.
     $completed = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-complete' -Executable $pwsh `
-        -Arguments @('-NoProfile', '-Command', 'Write-Output lifecycle-ok') -Environment @{ LIFECYCLE_MARKER = 'not-recorded' } | Out-String) | ConvertFrom-Json
+        -Arguments @('-NoProfile', '-Command', 'Write-Output lifecycle-ok') -Environment @{ LIFECYCLE_MARKER = 'not-recorded'; GIT_AUTHOR_NAME = 'Lifecycle Test' } | Out-String) | ConvertFrom-Json
     $completed = Wait-JobStatus -Id $completed.id -Expected @('completed')
     $recordText = Get-Content -LiteralPath (Join-Path $stateRoot "jobs\$($completed.id).json") -Raw
-    Assert-True ($recordText -notmatch 'lifecycle-ok|not-recorded') 'Permanent records must omit argument text and environment values.'
+    Assert-True ($recordText -notmatch 'lifecycle-ok|not-recorded|Lifecycle Test') 'Permanent records must omit argument text and environment values.'
     Assert-True ($completed.schemaVersion -eq 2) 'New records should use schema version 2.'
     $logText = (& $controller logs -Id $completed.id -StateRoot $stateRoot -Tail 20 | Out-String)
     Assert-True ($logText -match 'lifecycle-ok') 'Logs should capture child output.'
@@ -70,6 +71,27 @@ try {
     } catch { $argumentSecretRejected = $_.Exception.Message -match 'secret-bearing' }
     Assert-True $argumentSecretRejected 'Secret-like argument options should be rejected.'
 
+    # A fresh unclaimed starting record remains active during its startup grace period.
+    $freshId = '20000101-000000-lifecycle-starting-000001'
+    $freshArguments = @('-NoProfile', '-Command', 'Start-Sleep -Seconds 29')
+    $freshFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments $freshArguments -WorkingDirectory (Get-Location).Path -Environment @{}
+    $freshRecord = [ordered]@{
+        schemaVersion = 2; id = $freshId; name = 'lifecycle-starting'; kind = 'test'; status = 'starting'; visible = $false
+        keepTerminalOpen = $false; createdAtUtc = [datetime]::UtcNow.ToString('o'); startedAtUtc = $null; finishedAtUtc = $null
+        hostPid = $null; hostStartedAtUtc = $null; executable = $pwsh; argumentCount = $freshArguments.Count; environmentNames = @()
+        invocationFingerprint = $freshFingerprint; workingDirectory = (Get-Location).Path; logPath = (Join-Path $stateRoot "logs\$freshId.log")
+        exitCode = $null; error = $null
+    }
+    $freshRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$freshId.json") -Encoding utf8
+    $freshDuplicateRejected = $false
+    $freshError = $null
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'lifecycle-starting-duplicate' -Executable $pwsh -Arguments $freshArguments | Out-Null
+    } catch { $freshError = $_.Exception.Message; $freshDuplicateRejected = $freshError -match [regex]::Escape($freshId) }
+    Assert-True $freshDuplicateRejected "Fresh unclaimed starting records must block equivalent launches. Error: $freshError"
+    Assert-True ((Get-JobStatus -Id $freshId).status -eq 'starting') 'Fresh unclaimed starting record must not reconcile to orphaned.'
+    Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$freshId.json") -Force
+
     # Duplicate detection happens while the first equivalent helper is active.
     $running = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-running' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
@@ -84,7 +106,7 @@ try {
     $stopped = (& $controller stop -StateRoot $stateRoot -Id $running.id | Out-String) | ConvertFrom-Json
     $activeIds.Remove($running.id) | Out-Null
     Assert-True ($stopped.status -eq 'stopped') 'Stop should record a stopped terminal state.'
-    Assert-True (-not $stopped.processIdentity.matches) 'Stopped process identity should no longer match.'
+    Assert-True ($stopped.PSObject.Properties.Name -notcontains 'processIdentity') 'Terminal jobs should not inspect potentially reused PIDs.'
 
     # A missing PID plus recorded start identity reconciles to orphaned without killing anything.
     $orphanId = '20000101-000000-lifecycle-orphan-000001'

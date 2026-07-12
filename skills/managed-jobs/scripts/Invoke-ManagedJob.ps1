@@ -38,6 +38,14 @@ function Get-AllManagedJobs {
 function Update-ReconciledJob {
     param($Job)
     if ($Job.status -notin @('starting', 'running')) { return $Job }
+    if ($Job.status -eq 'starting' -and -not $Job.hostPid) {
+        $createdAt = if ($Job.createdAtUtc -is [datetime]) {
+            $Job.createdAtUtc.ToUniversalTime()
+        } else {
+            [datetimeoffset]::Parse([string]$Job.createdAtUtc).UtcDateTime
+        }
+        if (([datetime]::UtcNow - $createdAt).TotalSeconds -lt 30) { return $Job }
+    }
     if (Test-ManagedProcessIdentity -ProcessId $Job.hostPid -ExpectedStartTimeUtc $Job.hostStartedAtUtc) { return $Job }
     $path = Get-ManagedJobFile -Id $Job.id
     $Job.status = 'orphaned'
@@ -57,7 +65,7 @@ function Add-ManagedJobIdentity {
     param($Job)
     $copy = [ordered]@{}
     foreach ($property in $Job.PSObject.Properties) { $copy[$property.Name] = $property.Value }
-    if ($Job.PSObject.Properties.Name -contains 'hostPid') {
+    if (($Job.PSObject.Properties.Name -contains 'hostPid') -and $Job.status -in @('starting', 'running', 'orphaned')) {
         $copy.processIdentity = Get-ManagedProcessIdentity -Job $Job
     }
     return [pscustomobject]$copy

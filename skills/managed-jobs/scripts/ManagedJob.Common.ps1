@@ -38,10 +38,19 @@ function Get-ManagedJobFile {
 
 function Read-ManagedJob {
     param([Parameter(Mandatory)][string]$Path)
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-        throw "Managed job record not found: $Path"
+    # Move-overwrite has a tiny destination gap on Windows. Retry status reads that
+    # race an atomic record update rather than surfacing a false missing-record error.
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        try {
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+                throw "Managed job record not found: $Path"
+            }
+            return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+        } catch {
+            if ($attempt -eq 9) { throw }
+            Start-Sleep -Milliseconds 25
+        }
     }
-    return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
 
 function Write-ManagedJson {
@@ -117,7 +126,7 @@ function ConvertTo-SafeJobName {
 
 function Assert-SecretSafeInvocation {
     param([string[]]$Arguments, [hashtable]$Environment)
-    $secretName = '(?i)(secret|token|password|passwd|pwd|api[_-]?key|private[_-]?key|credential|auth|cookie)'
+    $secretName = '(?i)(?:^|_)(?:secret|token|password|passwd|api_?key|private_?key|credential|credentials|auth|auth_token|access_token|refresh_token|cookie)(?:$|_)'
     $secretOption = '(?i)^--?[^=]*(?:secret|token|password|passwd|pwd|api[_-]?key|private[_-]?key|credential|auth|cookie)(?:=|$)'
     foreach ($key in $Environment.Keys) {
         if ([string]$key -match $secretName) {

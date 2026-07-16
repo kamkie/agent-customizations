@@ -24,6 +24,7 @@ Implement exactly what the user requested using the smallest coherent diff.
 - Do not add legacy support, compatibility shims, fallbacks, aliases, migrations, feature flags, speculative abstractions, adjacent fixes, cleanup, or unrelated refactors unless explicitly requested.
 - When existing behavior is wrong, replace or delete it. Do not preserve both old and new behavior for existing callers or outdated tests.
 - Update only directly affected tests and run the narrowest relevant checks.
+- Do not add tests that merely assert removed source text, commands, configuration fragments, dependencies, or other implementation details remain absent. Deleting the obsolete implementation is sufficient. Test current observable behavior or a concrete safety invariant; otherwise leave the tests unchanged.
 - Before finishing, inspect the diff and revert every change not required by the request.
 - Do not silently expand scope. Report genuinely necessary extra work instead.
 

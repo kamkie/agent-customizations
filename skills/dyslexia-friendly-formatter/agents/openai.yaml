@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dyslexia-friendly Formatter"
+  short_description: "Format text for easier dyslexia-friendly reading"
+  default_prompt: "Use $dyslexia-friendly-formatter to format this text for dyslexia-friendly reading."

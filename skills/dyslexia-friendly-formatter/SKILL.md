@@ -15,7 +15,9 @@ detail, or vocabulary.
 
 Formatting rules:
 
-- Use clear headings.
+- Use clear headings. When the source has none, you may add short headings
+  drawn from the section's own wording; headings count as structure, not as
+  added content.
 - Keep paragraphs short.
 - Add space between sections.
 - Break long instructions into numbered steps.

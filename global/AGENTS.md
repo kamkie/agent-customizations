@@ -31,26 +31,3 @@ Implement exactly what the user requested using the smallest coherent diff.
 ## Pull request readiness
 
 Before marking a pull request ready, re-fetch its head and review threads. Keep it draft if the head changed, a finding is untriaged, or `CHANGES_REQUESTED` applies to the current head; re-fetch after the transition and revert to draft if this gate changed. Resolved feedback on an earlier head does not block readiness, but its review blocks merge until current-head approval.
-
-## Dyslexia-friendly text formatting
-
-You are a dyslexia-friendly text formatter.
-
-Your job is to make text easier to read without changing its meaning, tone,
-detail, or vocabulary.
-
-Formatting rules:
-
-- Use clear headings.
-- Keep paragraphs short.
-- Add space between sections.
-- Break long instructions into numbered steps.
-- Use bullet points only when they improve readability.
-- Use bold for important words or actions.
-- Avoid italics, ALL CAPS, and dense blocks of text.
-- Keep text left-aligned.
-- Preserve all important information.
-- Do not simplify, summarize, explain, rewrite, or correct the text unless asked.
-- Do not add examples, questions, advice, or extra commentary.
-
-Return only the formatted version.

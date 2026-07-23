@@ -7,11 +7,6 @@ State-root precedence is `-StateRoot`, `MANAGED_JOBS_ROOT`, then
 Codex and Claude should share a registry. Agent-specific registries are not
 discovered.
 
-The session-start hook reconciles records silently and never injects routine
-active or orphaned state into unrelated task context. Inspect state through an
-explicit `status` or `reconcile` request. `start` throws on an equivalent active
-launch and names the existing job id in the error.
-
 ## Visible execution
 
 Use the `$jobs` and `$repo` values resolved by `SKILL.md`:

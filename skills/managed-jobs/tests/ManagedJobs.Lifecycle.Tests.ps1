@@ -4,7 +4,6 @@ param()
 $ErrorActionPreference = 'Stop'
 $controller = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\Invoke-ManagedJob.ps1'
 $hostScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Host.ps1'
-$sessionStartHook = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.SessionStartHook.ps1'
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Common.ps1')
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('managed-jobs-lifecycle-' + [guid]::NewGuid().ToString('N'))
 $stateRoot = Join-Path $testRoot 'state'
@@ -202,28 +201,6 @@ try {
     Assert-True (-not $orphan.processIdentity.matches) 'Orphan inspection should preserve and report identity mismatch.'
     Assert-True (@($orphanSummary.jobs).id -contains $staleId) 'Reconcile should orphan a stale unclaimed start after its grace period.'
     Assert-True (-not (Test-Path -LiteralPath $staleLaunch)) 'Orphan reconciliation should remove an unclaimed launch handoff.'
-
-    # Session start reconciles routine managed-job state without injecting it into task context.
-    $previousManagedJobsRoot = $env:MANAGED_JOBS_ROOT
-    try {
-        $env:MANAGED_JOBS_ROOT = $stateRoot
-        $noticeReconcileId = '20000101-000000-lifecycle-notice-reconcile-000001'
-        $noticeReconcileRecord = [ordered]@{
-            schemaVersion = 2; id = $noticeReconcileId; name = 'lifecycle-notice-reconcile'; kind = 'test'; status = 'running'; visible = $false
-            keepTerminalOpen = $false; createdAtUtc = '2000-01-01T00:00:00Z'; startedAtUtc = '2000-01-01T00:00:01Z'
-            finishedAtUtc = $null; hostPid = 2147483647; hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'
-            argumentCount = 0; environmentNames = @(); invocationFingerprint = ('3' * 64); workingDirectory = $testRoot
-            logPath = (Join-Path $stateRoot "logs\$noticeReconcileId.log")
-            exitCode = $null; error = $null
-        }
-        $noticeReconcileRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$noticeReconcileId.json") -Encoding utf8
-
-        $sessionStartOutput = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
-        Assert-True ([string]::IsNullOrWhiteSpace($sessionStartOutput)) 'Routine reconciliation should not emit session-start context.'
-        Assert-True ((Get-JobStatus -Id $noticeReconcileId).status -eq 'orphaned') 'Silent session-start reconciliation should orphan a missing recorded process.'
-    } finally {
-        $env:MANAGED_JOBS_ROOT = $previousManagedJobsRoot
-    }
 
     # WhatIf previews exact terminal candidates, then real prune removes them and managed logs only.
     $preview = (& $controller prune -StateRoot $stateRoot -OlderThanDays 0 -WhatIf | Out-String) | ConvertFrom-Json

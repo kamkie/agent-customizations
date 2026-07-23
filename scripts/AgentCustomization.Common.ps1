@@ -89,11 +89,14 @@ function Test-FilesEqual {
 function Get-CustomizationHookCommand {
     param(
         [Parameter(Mandatory)][string]$HomePath,
-        [Parameter(Mandatory)]$Entry
+        [Parameter(Mandatory)]$Entry,
+        [switch]$WithoutManagedIdentity
     )
 
     $scriptPath = Join-Path $HomePath ([string]$Entry.script)
-    return 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' + $scriptPath + '"'
+    $command = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' + $scriptPath + '"'
+    if ($WithoutManagedIdentity) { return $command }
+    return $command + ' -ManagedHookId "' + [string]$Entry.id + '"'
 }
 
 function Test-CustomizationHookHandlerIdentity {
@@ -104,10 +107,17 @@ function Test-CustomizationHookHandlerIdentity {
     )
 
     $expectedCommand = Get-CustomizationHookCommand -HomePath $HomePath -Entry $Entry
+    $legacyCommand = Get-CustomizationHookCommand -HomePath $HomePath -Entry $Entry -WithoutManagedIdentity
+    $identitySuffix = ' -ManagedHookId "' + [string]$Entry.id + '"'
     foreach ($field in @('command', 'commandWindows')) {
         $property = $Handler.PSObject.Properties[$field]
         if (-not $property -or [string]::IsNullOrWhiteSpace([string]$property.Value)) { continue }
-        if (([string]$property.Value).Equals($expectedCommand, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+        $command = [string]$property.Value
+        if ($command.Equals($expectedCommand, [StringComparison]::OrdinalIgnoreCase) -or
+            $command.Equals($legacyCommand, [StringComparison]::OrdinalIgnoreCase) -or
+            $command.EndsWith($identitySuffix, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
     }
     return $false
 }

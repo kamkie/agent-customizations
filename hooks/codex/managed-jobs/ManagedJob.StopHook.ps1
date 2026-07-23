@@ -1,3 +1,5 @@
+param([string]$ManagedHookId)
+
 $ErrorActionPreference = 'Stop'
 $payload = $null
 

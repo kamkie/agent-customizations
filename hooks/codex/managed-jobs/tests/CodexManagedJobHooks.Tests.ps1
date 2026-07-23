@@ -55,7 +55,7 @@ try {
     $stopPayload = [ordered]@{
         hook_event_name = 'Stop'; session_id = $sessionId; turn_id = 'turn-1'; cwd = $testRoot; stop_hook_active = $false
     } | ConvertTo-Json -Compress
-    $stopOutput = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String)
+    $stopOutput = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook -ManagedHookId managed-jobs-stop | Out-String)
     Assert-True ([string]::IsNullOrWhiteSpace($stopOutput)) 'Successful Stop cleanup should use the environment when stdin is empty and emit no context.'
     $activeIds.Remove($turnJob.id) | Out-Null
     Assert-True ((Get-JobStatus -Id $turnJob.id).status -eq 'stopped') 'The Stop hook should terminate a turn-owned process tree.'
@@ -70,7 +70,7 @@ try {
     )
     $sessionPayload = [ordered]@{ hook_event_name = 'SessionEnd'; session_id = $sessionId; cwd = $testRoot } | ConvertTo-Json -Compress
     $sessionTimer = [Diagnostics.Stopwatch]::StartNew()
-    $sessionOutput = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionEndHook 2>&1 | Out-String)
+    $sessionOutput = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionEndHook -ManagedHookId managed-jobs-session-end 2>&1 | Out-String)
     $sessionTimer.Stop()
     Assert-True ([string]::IsNullOrWhiteSpace($sessionOutput)) 'Successful SessionEnd cleanup should use the environment when stdin is empty and emit no context.'
     Assert-True ($sessionTimer.Elapsed.TotalSeconds -lt 3) 'SessionEnd should clean several owned jobs within the Codex three-second limit.'

@@ -22,8 +22,25 @@ try {
     $lookalikeStopCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
         (Join-Path $codexSandbox 'hooks\managed-jobs\ManagedJob.StopHook.ps1') +
         '" -UnrelatedMode'
+    $legacyPreToolCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
+        (Join-Path $codexSandbox 'skills\managed-jobs\scripts\ManagedJob.PreToolUseHook.ps1') +
+        '"'
     [ordered]@{
         hooks = [ordered]@{
+            PreToolUse = @(
+                [ordered]@{
+                    matcher = '^Bash$'
+                    hooks = @(
+                        [ordered]@{
+                            type = 'command'
+                            command = $legacyPreToolCommand
+                            commandWindows = $legacyPreToolCommand
+                            timeout = 10
+                            statusMessage = 'Checking long-running process ownership'
+                        }
+                    )
+                }
+            )
             UserPromptSubmit = @(
                 [ordered]@{
                     hooks = @(
@@ -74,6 +91,11 @@ try {
             throw "Codex hook installation did not register $event."
         }
     }
+    $preToolHandlers = @($codexHooks.hooks.PreToolUse | ForEach-Object { $_.hooks })
+    if ($preToolHandlers.Count -ne 1 -or
+        [string]$preToolHandlers[0].command -notmatch 'ManagedHookId "managed-jobs-pre-tool-use"') {
+        throw 'Codex hook installation did not replace the exact legacy PreToolUse command with one marked managed definition.'
+    }
     foreach ($script in @('ManagedJob.StopHook.ps1', 'ManagedJob.SessionEndHook.ps1')) {
         if (-not (Test-Path -LiteralPath (Join-Path $codexSandbox "hooks\managed-jobs\$script") -PathType Leaf)) {
             throw "Codex hook installation did not copy $script."
@@ -116,6 +138,11 @@ try {
     }
 
     $misplacedStopGroup = $repairedHooks.hooks.Stop[0]
+    $legacyManagedStopCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
+        (Join-Path $codexSandbox 'hooks\legacy\ManagedJob.StopHook.ps1') +
+        '" -ManagedHookId "managed-jobs-stop"'
+    $misplacedStopGroup.hooks[0].command = $legacyManagedStopCommand
+    $misplacedStopGroup.hooks[0].commandWindows = $legacyManagedStopCommand
     $repairedHooks.hooks.PSObject.Properties.Remove('Stop')
     $repairedHooks.hooks.SessionEnd = @($repairedHooks.hooks.SessionEnd) + @($misplacedStopGroup)
     $repairedHooks | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $codexHooksPath -Encoding utf8
@@ -135,8 +162,12 @@ try {
     $stopScriptName = 'ManagedJob.StopHook.ps1'
     $wrongEventCommands = @($relocatedHooks.hooks.SessionEnd | ForEach-Object { $_.hooks } |
         ForEach-Object { @($_.command, $_.commandWindows) })
-    if (-not $relocatedHooks.hooks.Stop -or $wrongEventCommands -match [regex]::Escape($stopScriptName)) {
-        throw 'Codex hook repair did not move the managed Stop handler back to the Stop event.'
+    $repairedStopCommand = [string]$relocatedHooks.hooks.Stop[0].hooks[0].command
+    if (-not $relocatedHooks.hooks.Stop -or
+        $wrongEventCommands -match 'ManagedHookId "managed-jobs-stop"' -or
+        $repairedStopCommand -notmatch 'ManagedHookId "managed-jobs-stop"' -or
+        $repairedStopCommand -notmatch [regex]::Escape($stopScriptName)) {
+        throw 'Codex hook repair did not replace the moved legacy managed command with the current Stop handler.'
     }
 
     Add-Content -LiteralPath (Join-Path $claudeSandbox 'CLAUDE.md') -Value "`n# deliberate test drift"

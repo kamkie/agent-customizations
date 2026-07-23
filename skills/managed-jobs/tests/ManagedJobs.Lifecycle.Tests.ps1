@@ -203,30 +203,31 @@ try {
     Assert-True (@($orphanSummary.jobs).id -contains $staleId) 'Reconcile should orphan a stale unclaimed start after its grace period.'
     Assert-True (-not (Test-Path -LiteralPath $staleLaunch)) 'Orphan reconciliation should remove an unclaimed launch handoff.'
 
-    # Session-start context reports a given orphan set once instead of prompting on every resume.
+    # Session start reports changed active jobs once but never injects orphan maintenance into task context.
     $previousManagedJobsRoot = $env:MANAGED_JOBS_ROOT
     try {
         $env:MANAGED_JOBS_ROOT = $stateRoot
+        $noticeActiveId = '20000101-000000-lifecycle-notice-active-000001'
+        $noticeActiveRecord = [ordered]@{
+            schemaVersion = 2; id = $noticeActiveId; name = 'lifecycle-notice-active'; kind = 'test'; status = 'starting'; visible = $false
+            keepTerminalOpen = $false; createdAtUtc = [datetime]::UtcNow.ToString('o'); startedAtUtc = $null; finishedAtUtc = $null
+            hostPid = $null; hostStartedAtUtc = $null; executable = 'fixture'; argumentCount = 0; environmentNames = @()
+            invocationFingerprint = ('3' * 64); workingDirectory = $testRoot; logPath = (Join-Path $stateRoot "logs\$noticeActiveId.log")
+            exitCode = $null; error = $null
+        }
+        $noticeActiveRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$noticeActiveId.json") -Encoding utf8
+
         $firstNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
         $firstNotice = $firstNoticeText | ConvertFrom-Json
-        Assert-True ([string]$firstNotice.hookSpecificOutput.additionalContext -match '2 managed job record\(s\) are orphaned') 'First session-start reconciliation should report the orphan set.'
-        Assert-True ([string]$firstNotice.hookSpecificOutput.additionalContext -match 'not a request to inspect them') 'Orphan context should not instruct the agent to inspect unrelated work.'
+        Assert-True ([string]$firstNotice.hookSpecificOutput.additionalContext -match [regex]::Escape($noticeActiveId)) 'First session-start reconciliation should report the changed active-job set.'
+        Assert-True ([string]$firstNotice.hookSpecificOutput.additionalContext -notmatch 'orphan') 'Session-start context should not mention orphaned records.'
 
         $repeatedNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
-        Assert-True ([string]::IsNullOrWhiteSpace($repeatedNoticeText)) 'An unchanged orphan set should not emit repeated session-start context.'
+        Assert-True ([string]::IsNullOrWhiteSpace($repeatedNoticeText)) 'An unchanged active-job set should not emit repeated session-start context.'
 
-        $secondOrphanId = '20000101-000000-lifecycle-orphan-000002'
-        $secondOrphanRecord = [ordered]@{
-            schemaVersion = 2; id = $secondOrphanId; name = 'lifecycle-orphan-2'; kind = 'test'; status = 'orphaned'; visible = $false
-            keepTerminalOpen = $false; createdAtUtc = '2000-01-01T00:00:00Z'; startedAtUtc = '2000-01-01T00:00:01Z'
-            finishedAtUtc = $null; hostPid = 2147483647; hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'
-            argumentCount = 0; environmentNames = @(); invocationFingerprint = ('3' * 64); workingDirectory = $testRoot
-            logPath = (Join-Path $stateRoot "logs\$secondOrphanId.log"); exitCode = $null; error = $null
-        }
-        $secondOrphanRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$secondOrphanId.json") -Encoding utf8
-        $changedNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
-        $changedNotice = $changedNoticeText | ConvertFrom-Json
-        Assert-True ([string]$changedNotice.hookSpecificOutput.additionalContext -match '3 managed job record\(s\) are orphaned') 'A changed orphan set should emit one new session-start notice.'
+        Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$noticeActiveId.json") -Force
+        $orphanOnlyNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
+        Assert-True ([string]::IsNullOrWhiteSpace($orphanOnlyNoticeText)) 'Orphan-only state should not emit session-start context.'
     } finally {
         $env:MANAGED_JOBS_ROOT = $previousManagedJobsRoot
     }

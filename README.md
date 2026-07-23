@@ -19,7 +19,9 @@ tools' live configuration directories are deployment targets.
   shared by Codex and Claude Code.
 - `skills/orchestrate-work-campaigns` — Codex-specific, visible,
   coordinator-only control of multi-task delivery campaigns.
-- `config/manifest.json` — the exact files managed for each supported agent.
+- `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.
+- `config/manifest.json` — the exact files and Codex hook registrations managed
+  for each supported agent.
 - `docs/customization-ownership.md` — classification, admission, ownership,
   precedence, and authoring rules for proposed customizations.
 - `docs/maintaining-customizations.md` — maintenance rules for agent
@@ -104,13 +106,22 @@ one-off targeting, pass `-CodexHome` or `-ClaudeHome`. The installer creates
 timestamped backups under each target's `customization-backups` directory when
 it replaces existing files.
 
+Codex requires review and trust for new or changed personal hooks. After a
+Codex deployment changes hook definitions, start Codex, open `/hooks`, and
+trust the reviewed definitions. Repository status proves source and
+registration equality; it cannot prove Codex's separate per-definition trust
+state.
+
 ## Scope boundary
 
 The repository does not manage settings, authentication, plugins, caches,
 memories, sessions, logs, artifacts, or managed-job records. Those surfaces can
-contain machine-specific paths, private data, or generated state. The hook
-scripts used by `managed-jobs` are versioned with the skill, while machine-local
-hook registration remains outside this baseline.
+contain machine-specific paths, private data, or generated state. The portable
+managed-job command guard is versioned with the skill, while Codex-specific
+lifecycle hooks live under `hooks/codex`. The installer copies those
+target-specific scripts and merges their reviewed registrations into
+`hooks.json` while preserving unrelated entries; Claude hook integration
+remains separate.
 
 Before adding guidance, use the [customization ownership and skill-admission
 policy](docs/customization-ownership.md) to decide whether it belongs in global

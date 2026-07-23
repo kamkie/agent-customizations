@@ -87,6 +87,34 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
                 throw
             }
         }
+
+        $hookDrift = @($status | Where-Object { $_.Kind -eq 'Hook' -and $_.State -ne 'InSync' })
+        if ($hookDrift.Count -gt 0) {
+            foreach ($entry in @($targetConfig.hooks.entries)) {
+                if ($hookDrift.Name -notcontains [string]$entry.id) { continue }
+                $hookScriptSource = Join-Path $repositoryRoot ([string]$entry.source)
+                $hookScriptTarget = Join-Path $resolvedHome ([string]$entry.script)
+                $hookScriptBackup = Join-Path $backupRoot ([string]$entry.script)
+                $hookScriptDirectory = Split-Path -Parent $hookScriptTarget
+                $null = New-Item -ItemType Directory -Path $hookScriptDirectory -Force
+                if (Test-Path -LiteralPath $hookScriptTarget -PathType Leaf) {
+                    $null = New-Item -ItemType Directory -Path (Split-Path -Parent $hookScriptBackup) -Force
+                    Copy-Item -LiteralPath $hookScriptTarget -Destination $hookScriptBackup -Force
+                }
+                $temporaryHookScript = Join-Path $hookScriptDirectory ('.hook.install-' + [guid]::NewGuid().ToString('N'))
+                Copy-Item -LiteralPath $hookScriptSource -Destination $temporaryHookScript -Force
+                Move-Item -LiteralPath $temporaryHookScript -Destination $hookScriptTarget -Force
+            }
+
+            $hooksTarget = Join-Path $resolvedHome ([string]$targetConfig.hooks.destination)
+            if (Test-Path -LiteralPath $hooksTarget -PathType Leaf) {
+                Copy-Item -LiteralPath $hooksTarget -Destination (Join-Path $backupRoot ([string]$targetConfig.hooks.destination)) -Force
+            }
+            Update-CustomizationHookFile `
+                -HooksPath $hooksTarget `
+                -Entries @($targetConfig.hooks.entries) `
+                -HomePath $resolvedHome
+        }
     }
 
     if ($WhatIfPreference) { continue }
@@ -98,4 +126,7 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
 
     Write-Host "Installed $($targetConfig.displayName) customizations to $resolvedHome"
     Write-Host "Previous files, when present, were backed up under $backupRoot"
+    if ($targetName -eq 'codex' -and $hookDrift.Count -gt 0) {
+        Write-Warning 'Codex skips any new or changed personal hook definition until you start Codex, open /hooks, and trust each definition marked for review.'
+    }
 }

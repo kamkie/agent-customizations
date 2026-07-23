@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
+Set-ManagedJobStateRoot -Path (Split-Path -Parent (Split-Path -Parent $JobFile))
 
 $job = Read-ManagedJob -Path $JobFile
 $keepTerminalOpen = [bool]$job.keepTerminalOpen
@@ -14,6 +15,12 @@ $writer = [IO.StreamWriter]::new($job.logPath, $true, [Text.UTF8Encoding]::new($
 $writer.AutoFlush = $true
 
 try {
+    $containmentHandle = Enable-ManagedJobProcessContainment
+    if ($job.PSObject.Properties.Name -contains 'processContainment') {
+        $job.processContainment = 'windows-job-object-kill-on-close'
+    } else {
+        $job | Add-Member -NotePropertyName processContainment -NotePropertyValue 'windows-job-object-kill-on-close'
+    }
     $launch = Read-ManagedJob -Path $LaunchFile
     Remove-Item -LiteralPath $LaunchFile -Force
     $hostSnapshot = Get-ProcessSnapshot -ProcessId $PID
@@ -57,6 +64,7 @@ try {
     $job.status = if ($exitCode -eq 0) { 'completed' } else { 'failed' }
     $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
     Write-ManagedJob -Path $JobFile -Job $job
+    Unregister-ManagedJobOwnerReference -Job $job
     $footer = "[$([datetime]::Now.ToString('s'))] managed-job $($job.id) finished with exit code $exitCode"
     Write-Host $footer
     $writer.WriteLine($footer)
@@ -71,6 +79,7 @@ try {
         $job.error = $message
         $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
         Write-ManagedJob -Path $JobFile -Job $job
+        Unregister-ManagedJobOwnerReference -Job $job
     } catch {}
     $line = "[$([datetime]::Now.ToString('s'))] managed-job failed: $message"
     Write-Host $line -ForegroundColor Red

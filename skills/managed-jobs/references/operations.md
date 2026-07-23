@@ -74,6 +74,12 @@ only when an owned process tree cannot be stopped safely; the hook names the
 job, PID, and failure. Dead processes and stale records are reconciled without
 injecting context into another conversation.
 
+The Codex registrations follow the current
+[Codex hook contract](https://learn.chatgpt.com/docs/hooks): shell calls match
+`Bash`, `PreToolUse` uses `permissionDecision`, and a `Stop`
+`decision: "block"` continues the turn. `stop_hook_active` bounds cleanup
+failures to one continuation before a clear warning lets the turn end.
+
 ## Identity and prune
 
 ```powershell

@@ -90,8 +90,10 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
 
         $hookDrift = @($status | Where-Object { $_.Kind -eq 'Hook' -and $_.State -ne 'InSync' })
         if ($hookDrift.Count -gt 0) {
-            foreach ($entry in @($targetConfig.hooks.entries)) {
-                if ($hookDrift.Name -notcontains [string]$entry.id) { continue }
+            $hookEntriesToRepair = @($targetConfig.hooks.entries | Where-Object {
+                $hookDrift.Name -contains [string]$_.id
+            })
+            foreach ($entry in $hookEntriesToRepair) {
                 $hookScriptSource = Join-Path $repositoryRoot ([string]$entry.source)
                 $hookScriptTarget = Join-Path $resolvedHome ([string]$entry.script)
                 $hookScriptBackup = Join-Path $backupRoot ([string]$entry.script)
@@ -112,7 +114,7 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
             }
             Update-CustomizationHookFile `
                 -HooksPath $hooksTarget `
-                -Entries @($targetConfig.hooks.entries) `
+                -Entries $hookEntriesToRepair `
                 -HomePath $resolvedHome
         }
     }

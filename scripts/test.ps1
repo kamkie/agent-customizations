@@ -19,6 +19,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
 
     $null = New-Item -ItemType Directory -Path $codexSandbox -Force
+    $lookalikeStopCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
+        (Join-Path $codexSandbox 'hooks\managed-jobs\ManagedJob.StopHook.ps1') +
+        '" -UnrelatedMode'
     [ordered]@{
         hooks = [ordered]@{
             UserPromptSubmit = @(
@@ -29,6 +32,12 @@ try {
                             command = 'unrelated-hook'
                             commandWindows = 'unrelated-hook'
                             timeout = 5
+                        },
+                        [ordered]@{
+                            type = 'command'
+                            command = $lookalikeStopCommand
+                            commandWindows = $lookalikeStopCommand
+                            timeout = 7
                         }
                     )
                 }
@@ -57,6 +66,9 @@ try {
         [string]$codexHooks.hooks.UserPromptSubmit[0].hooks[0].command -ne 'unrelated-hook') {
         throw 'Codex hook installation must preserve unrelated hook entries.'
     }
+    if (@($codexHooks.hooks.UserPromptSubmit[0].hooks).command -notcontains $lookalikeStopCommand) {
+        throw 'Codex hook installation must not claim a different command that merely mentions a managed script path.'
+    }
     foreach ($event in @('PreToolUse', 'Stop', 'SessionEnd')) {
         if (-not $codexHooks.hooks.PSObject.Properties[$event]) {
             throw "Codex hook installation did not register $event."
@@ -74,6 +86,7 @@ try {
         throw 'Codex hook installation must not copy target-specific scripts into Claude.'
     }
 
+    $sessionEndDefinitionBeforeRepair = $codexHooks.hooks.SessionEnd | ConvertTo-Json -Depth 10 -Compress
     $codexHooks.hooks.Stop[0].hooks[0].timeout = 1
     $codexHooks | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $codexHooksPath -Encoding utf8
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
@@ -92,8 +105,14 @@ try {
     if ([int]$repairedHooks.hooks.Stop[0].hooks[0].timeout -ne 15) {
         throw 'Codex hook repair did not restore the reviewed timeout.'
     }
+    if (($repairedHooks.hooks.SessionEnd | ConvertTo-Json -Depth 10 -Compress) -cne $sessionEndDefinitionBeforeRepair) {
+        throw 'Repairing one managed hook must not rewrite an in-sync managed hook definition.'
+    }
     if ([string]$repairedHooks.hooks.UserPromptSubmit[0].hooks[0].command -ne 'unrelated-hook') {
         throw 'Codex hook repair must preserve unrelated hook entries.'
+    }
+    if (@($repairedHooks.hooks.UserPromptSubmit[0].hooks).command -notcontains $lookalikeStopCommand) {
+        throw 'Codex hook repair must preserve lookalike commands that it does not own.'
     }
 
     $misplacedStopGroup = $repairedHooks.hooks.Stop[0]

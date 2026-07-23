@@ -99,20 +99,15 @@ function Get-CustomizationHookCommand {
 function Test-CustomizationHookHandlerIdentity {
     param(
         [Parameter(Mandatory)]$Handler,
-        [Parameter(Mandatory)]$Entry
+        [Parameter(Mandatory)]$Entry,
+        [Parameter(Mandatory)][string]$HomePath
     )
 
-    $relativeWindows = ([string]$Entry.script).Replace('/', '\')
-    $relativeUnix = ([string]$Entry.script).Replace('\', '/')
+    $expectedCommand = Get-CustomizationHookCommand -HomePath $HomePath -Entry $Entry
     foreach ($field in @('command', 'commandWindows')) {
         $property = $Handler.PSObject.Properties[$field]
         if (-not $property -or [string]::IsNullOrWhiteSpace([string]$property.Value)) { continue }
-        $normalizedWindows = ([string]$property.Value).Replace('/', '\')
-        $normalizedUnix = ([string]$property.Value).Replace('\', '/')
-        if ($normalizedWindows.Contains($relativeWindows, [StringComparison]::OrdinalIgnoreCase) -or
-            $normalizedUnix.Contains($relativeUnix, [StringComparison]::OrdinalIgnoreCase)) {
-            return $true
-        }
+        if (([string]$property.Value).Equals($expectedCommand, [StringComparison]::OrdinalIgnoreCase)) { return $true }
     }
     return $false
 }
@@ -162,7 +157,7 @@ function Get-CustomizationHookState {
     foreach ($eventProperty in $config.hooks.PSObject.Properties) {
         foreach ($group in @($eventProperty.Value)) {
             foreach ($handler in @($group.hooks)) {
-                if (-not (Test-CustomizationHookHandlerIdentity -Handler $handler -Entry $Entry)) { continue }
+                if (-not (Test-CustomizationHookHandlerIdentity -Handler $handler -Entry $Entry -HomePath $HomePath)) { continue }
                 $candidateCount++
                 if ($eventProperty.Name -ceq [string]$Entry.event -and
                     (Test-CustomizationHookDefinition -Group $group -Handler $handler -Entry $Entry -HomePath $HomePath)) {
@@ -180,11 +175,12 @@ function Get-CustomizationHookState {
 function Test-CustomizationHookHandlerMapIdentity {
     param(
         [Parameter(Mandatory)][Collections.IDictionary]$Handler,
-        [Parameter(Mandatory)]$Entry
+        [Parameter(Mandatory)]$Entry,
+        [Parameter(Mandatory)][string]$HomePath
     )
 
     $asObject = [pscustomobject]$Handler
-    return Test-CustomizationHookHandlerIdentity -Handler $asObject -Entry $Entry
+    return Test-CustomizationHookHandlerIdentity -Handler $asObject -Entry $Entry -HomePath $HomePath
 }
 
 function Update-CustomizationHookFile {
@@ -220,7 +216,7 @@ function Update-CustomizationHookFile {
                 $remainingHandlers = @(
                     foreach ($handler in @($group['hooks'])) {
                         if ($handler -isnot [Collections.IDictionary] -or
-                            -not (Test-CustomizationHookHandlerMapIdentity -Handler $handler -Entry $entry)) {
+                            -not (Test-CustomizationHookHandlerMapIdentity -Handler $handler -Entry $entry -HomePath $HomePath)) {
                             $handler
                         }
                     }

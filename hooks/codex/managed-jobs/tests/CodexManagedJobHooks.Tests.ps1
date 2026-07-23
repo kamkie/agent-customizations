@@ -52,9 +52,11 @@ try {
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
     $activeIds.Add($turnJob.id)
     $turnJob = Wait-JobRunning -Id $turnJob.id
-    $stopPayload = [ordered]@{ hook_event_name = 'Stop'; session_id = $sessionId; turn_id = 'turn-1'; cwd = $testRoot } | ConvertTo-Json -Compress
-    $stopOutput = ($stopPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String)
-    Assert-True ([string]::IsNullOrWhiteSpace($stopOutput)) 'Successful Stop cleanup should emit no context.'
+    $stopPayload = [ordered]@{
+        hook_event_name = 'Stop'; session_id = $sessionId; turn_id = 'turn-1'; cwd = $testRoot; stop_hook_active = $false
+    } | ConvertTo-Json -Compress
+    $stopOutput = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($stopOutput)) 'Successful Stop cleanup should use the environment when stdin is empty and emit no context.'
     $activeIds.Remove($turnJob.id) | Out-Null
     Assert-True ((Get-JobStatus -Id $turnJob.id).status -eq 'stopped') 'The Stop hook should terminate a turn-owned process tree.'
 
@@ -68,9 +70,9 @@ try {
     )
     $sessionPayload = [ordered]@{ hook_event_name = 'SessionEnd'; session_id = $sessionId; cwd = $testRoot } | ConvertTo-Json -Compress
     $sessionTimer = [Diagnostics.Stopwatch]::StartNew()
-    $sessionOutput = ($sessionPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionEndHook 2>&1 | Out-String)
+    $sessionOutput = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionEndHook 2>&1 | Out-String)
     $sessionTimer.Stop()
-    Assert-True ([string]::IsNullOrWhiteSpace($sessionOutput)) 'Successful SessionEnd cleanup should emit no context.'
+    Assert-True ([string]::IsNullOrWhiteSpace($sessionOutput)) 'Successful SessionEnd cleanup should use the environment when stdin is empty and emit no context.'
     Assert-True ($sessionTimer.Elapsed.TotalSeconds -lt 3) 'SessionEnd should clean several owned jobs within the Codex three-second limit.'
     foreach ($sessionJob in $sessionJobs) {
         $activeIds.Remove($sessionJob.id) | Out-Null
@@ -92,8 +94,22 @@ try {
     Assert-True ($blockedOutput.decision -eq 'block') 'Stop cleanup should ask Codex to continue when an owned process cannot be verified.'
     Assert-True ($blockedOutput.reason -match 'hook-owned-starting') 'Blocked cleanup should clearly name the affected job.'
     Assert-True ($blockedOutput.PSObject.Properties.Name -notcontains 'continue') 'Stop cleanup must not suppress its own continuation decision.'
+    $continuedPayload = [ordered]@{
+        hook_event_name = 'Stop'; session_id = $sessionId; turn_id = 'turn-1'; cwd = $testRoot; stop_hook_active = $true
+    } | ConvertTo-Json -Compress
+    $boundedOutput = ($continuedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String) | ConvertFrom-Json
+    Assert-True ($boundedOutput.systemMessage -match 'will not block the turn again') 'A repeated cleanup failure should warn without creating a Stop-hook loop.'
+    Assert-True ($boundedOutput.PSObject.Properties.Name -notcontains 'decision') 'A repeated cleanup failure should allow the turn to end.'
     Unregister-ManagedJobOwnerReference -Job ([pscustomobject]$unclaimedRecord)
     Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$unclaimedId.json") -Force
+
+    $env:CODEX_HOME = Join-Path $testRoot 'missing-codex-home'
+    $infrastructureFirst = ($stopPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String) | ConvertFrom-Json
+    Assert-True ($infrastructureFirst.decision -eq 'block') 'The first hook infrastructure failure should give Codex one chance to recover.'
+    $infrastructureBounded = ($continuedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String) | ConvertFrom-Json
+    Assert-True ($infrastructureBounded.systemMessage -match 'will not block the turn again') 'A repeated hook infrastructure failure should degrade to one clear warning.'
+    Assert-True ($infrastructureBounded.PSObject.Properties.Name -notcontains 'decision') 'A repeated infrastructure failure must not wedge the turn.'
+    $env:CODEX_HOME = $repositoryRoot
 
     [pscustomobject]@{
         result = 'passed'

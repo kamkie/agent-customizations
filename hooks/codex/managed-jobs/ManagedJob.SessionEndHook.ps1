@@ -2,12 +2,17 @@ $ErrorActionPreference = 'Stop'
 
 try {
     $payloadText = [Console]::In.ReadToEnd()
-    if (-not $payloadText) { exit 0 }
-    $payload = $payloadText | ConvertFrom-Json
+    $payload = if ([string]::IsNullOrWhiteSpace($payloadText)) {
+        $null
+    } else {
+        $payloadText | ConvertFrom-Json
+    }
     $sessionId = if ($env:CODEX_THREAD_ID) {
         [string]$env:CODEX_THREAD_ID
-    } else {
+    } elseif ($payload) {
         [string]$payload.session_id
+    } else {
+        $null
     }
     if ([string]::IsNullOrWhiteSpace($sessionId)) {
         throw 'Codex did not provide a session identifier for process cleanup.'

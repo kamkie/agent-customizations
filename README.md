@@ -121,7 +121,8 @@ managed-job command guard is versioned with the skill, while Codex-specific
 lifecycle hooks live under `hooks/codex`. The installer copies those
 target-specific scripts and merges their reviewed registrations into
 `hooks.json` while preserving unrelated entries; Claude hook integration
-remains separate.
+remains separate. The merge preserves entries semantically but may reformat the
+machine-local JSON file.
 
 Before adding guidance, use the [customization ownership and skill-admission
 policy](docs/customization-ownership.md) to decide whether it belongs in global

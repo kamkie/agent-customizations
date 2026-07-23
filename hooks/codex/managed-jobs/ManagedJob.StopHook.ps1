@@ -1,13 +1,39 @@
 $ErrorActionPreference = 'Stop'
+$payload = $null
+
+function Write-CleanupFailure {
+    param(
+        [Parameter(Mandatory)][string]$Message,
+        [switch]$CanRetry
+    )
+
+    $alreadyContinued = $payload -and
+        $payload.PSObject.Properties.Name -contains 'stop_hook_active' -and
+        [bool]$payload.stop_hook_active
+    if ($CanRetry -and -not $alreadyContinued) {
+        [ordered]@{
+            decision = 'block'
+            reason = $Message
+        } | ConvertTo-Json -Depth 5 -Compress
+        return
+    }
+
+    [ordered]@{
+        systemMessage = "$Message Automatic cleanup will not block the turn again; inspect and stop any affected process manually."
+    } | ConvertTo-Json -Depth 5 -Compress
+}
 
 try {
     $payloadText = [Console]::In.ReadToEnd()
-    if (-not $payloadText) { exit 0 }
-    $payload = $payloadText | ConvertFrom-Json
+    if (-not [string]::IsNullOrWhiteSpace($payloadText)) {
+        $payload = $payloadText | ConvertFrom-Json
+    }
     $sessionId = if ($env:CODEX_THREAD_ID) {
         [string]$env:CODEX_THREAD_ID
-    } else {
+    } elseif ($payload) {
         [string]$payload.session_id
+    } else {
+        $null
     }
     if ([string]::IsNullOrWhiteSpace($sessionId)) {
         throw 'Codex did not provide a session identifier for process cleanup.'
@@ -27,14 +53,8 @@ try {
         "$($_.name) (job $($_.id), PID $($_.hostPid)): $($_.error)"
     })
     $message = "Codex could not stop $($failures.Count) process tree(s) started for this turn: $($details -join ' | '). Resolve them before ending the turn."
-    [ordered]@{
-        decision = 'block'
-        reason = $message
-    } | ConvertTo-Json -Depth 5 -Compress
+    Write-CleanupFailure -Message $message -CanRetry:([bool]$payload)
 } catch {
     $message = "Codex could not verify end-of-turn process cleanup: $($_.Exception.Message)"
-    [ordered]@{
-        decision = 'block'
-        reason = $message
-    } | ConvertTo-Json -Depth 5 -Compress
+    Write-CleanupFailure -Message $message -CanRetry:([bool]$payload)
 }

@@ -24,6 +24,8 @@ $pr = [int]'<requested-pr-number>'
 - Resolve `$claudeRunnerSkillDirectory` to this `SKILL.md` file's directory.
 - To continue, append `-Resume "<session-id>"`; if that id is unavailable for the same PR, append `-FromPr $pr`.
 - Keep normal permissions; bypass only with explicit authorization. `-ReviewPr` is read-only.
+- Never pass `-MaxBudgetUsd` or `-MaxTurns`. Codex must not estimate or impose
+  budget or turn caps on Claude runs.
 - Keep the wrapper attached; use `managed-jobs` when the process must survive a turn or restart.
 - Report the exit status, verdict or findings, printed native session id,
   diagnostic-log path, and exact resume option when further work is needed.

@@ -22,10 +22,10 @@
 - Keep session persistence. Do not pass `--no-session-persistence` or use `--fork-session` to continue prior work.
 - Use `--output-format stream-json --verbose --include-partial-messages` with `-p`; the wrapper supplies these controls.
 - Avoid short timeouts for paid runs. If the runner is alive, wait or read its managed terminal/log.
-- Use `-MaxBudgetUsd` or `-MaxTurns` for hard limits.
+- Never pass `-MaxBudgetUsd` or `-MaxTurns`. Codex must not estimate or impose budget or turn caps on Claude runs.
 - Use `-PromptFile` for multiline, XML, or shell-hostile prompts. Keep temporary prompt files outside the repository.
 - Do not use `-Bare` for cross-reviews or runs that need `CLAUDE.md`, skills, plugins, hooks, or project settings.
-- Pass model, effort, budget, resume source, prompt file, and PR number as typed runtime controls, not task prose or `-ClaudeArgs`.
+- Pass model, effort, resume source, prompt file, and PR number as typed runtime controls, not task prose or `-ClaudeArgs`.
 - Preserve task text except routing controls. Text beginning with `/` remains Claude task text.
 - If Claude fails, report the failure and resume command or diagnostic-log path; do not silently replace the delegated run with Codex work.
 
@@ -51,20 +51,18 @@ $pr = <pr-number>
 Resolve `$claudeRunnerSkillDirectory` to the loaded skill's directory. Before a
 paid run, confirm Claude Code CLI is installed and authenticated, then identify
 the repository, task or PR, model, effort, session/resume source, Claude
-configuration directory, diagnostic log, permission profile, and optional
-limits.
+configuration directory, diagnostic log, and permission profile.
 
 - Moving model alias: `-ModelAlias fable|haiku|opus|sonnet`.
 - Exact model: `-ExactModel claude-...`. Do not combine it with `-ModelAlias`.
 - Effort: `-Effort low|medium|high|xhigh|max`.
-- Limits: `-MaxBudgetUsd <decimal>` and `-MaxTurns <int>`.
 
 ## Invocation examples
 
 PR review:
 
 ```powershell
-& $runner -WorkingDirectory $repo -ReviewPr $pr -ModelAlias opus -Effort medium -MaxBudgetUsd 10
+& $runner -WorkingDirectory $repo -ReviewPr $pr -ModelAlias opus -Effort medium
 ```
 
 Resume by native session id:
@@ -88,7 +86,7 @@ Use an exact model:
 Custom task:
 
 ```powershell
-& $runner -WorkingDirectory $repo -PromptFile "$env:TEMP\claude-task.md" -ModelAlias opus -Effort high -MaxTurns 8
+& $runner -WorkingDirectory $repo -PromptFile "$env:TEMP\claude-task.md" -ModelAlias opus -Effort high
 ```
 
 Exceptional explicit bypass for a non-review task:

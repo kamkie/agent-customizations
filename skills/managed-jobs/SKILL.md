@@ -27,6 +27,8 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 - Default long-lived work to hidden durable execution; record the returned id,
   current status, and log path.
 - Reconcile after restarts and reuse an equivalent active job.
+- Session-start notices stay silent while the active and orphaned job sets are
+  unchanged; changed sets are reported once as background process state.
 - Treat arguments, environment entries, records, and logs as non-secret.
 - Use visible Windows Terminal mode only when the user asks to watch the output.
 - Never replace the controller with direct detached/background process commands.

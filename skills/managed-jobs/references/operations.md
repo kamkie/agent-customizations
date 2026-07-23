@@ -7,6 +7,11 @@ State-root precedence is `-StateRoot`, `MANAGED_JOBS_ROOT`, then
 Codex and Claude should share a registry. Agent-specific registries are not
 discovered.
 
+The session-start hook stores the last reported active and orphaned job sets in
+the state root. It emits context only when the corresponding set changes, and
+orphan context is informational rather than an instruction to inspect unrelated
+work.
+
 ## Visible execution
 
 Use the `$jobs` and `$repo` values resolved by `SKILL.md`:

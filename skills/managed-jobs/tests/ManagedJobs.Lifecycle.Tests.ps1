@@ -4,6 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $controller = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\Invoke-ManagedJob.ps1'
 $hostScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Host.ps1'
+$sessionStartHook = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.SessionStartHook.ps1'
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Common.ps1')
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('managed-jobs-lifecycle-' + [guid]::NewGuid().ToString('N'))
 $stateRoot = Join-Path $testRoot 'state'
@@ -201,6 +202,34 @@ try {
     Assert-True (-not $orphan.processIdentity.matches) 'Orphan inspection should preserve and report identity mismatch.'
     Assert-True (@($orphanSummary.jobs).id -contains $staleId) 'Reconcile should orphan a stale unclaimed start after its grace period.'
     Assert-True (-not (Test-Path -LiteralPath $staleLaunch)) 'Orphan reconciliation should remove an unclaimed launch handoff.'
+
+    # Session-start context reports a given orphan set once instead of prompting on every resume.
+    $previousManagedJobsRoot = $env:MANAGED_JOBS_ROOT
+    try {
+        $env:MANAGED_JOBS_ROOT = $stateRoot
+        $firstNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
+        $firstNotice = $firstNoticeText | ConvertFrom-Json
+        Assert-True ([string]$firstNotice.hookSpecificOutput.additionalContext -match '2 managed job record\(s\) are orphaned') 'First session-start reconciliation should report the orphan set.'
+        Assert-True ([string]$firstNotice.hookSpecificOutput.additionalContext -match 'not a request to inspect them') 'Orphan context should not instruct the agent to inspect unrelated work.'
+
+        $repeatedNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
+        Assert-True ([string]::IsNullOrWhiteSpace($repeatedNoticeText)) 'An unchanged orphan set should not emit repeated session-start context.'
+
+        $secondOrphanId = '20000101-000000-lifecycle-orphan-000002'
+        $secondOrphanRecord = [ordered]@{
+            schemaVersion = 2; id = $secondOrphanId; name = 'lifecycle-orphan-2'; kind = 'test'; status = 'orphaned'; visible = $false
+            keepTerminalOpen = $false; createdAtUtc = '2000-01-01T00:00:00Z'; startedAtUtc = '2000-01-01T00:00:01Z'
+            finishedAtUtc = $null; hostPid = 2147483647; hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'
+            argumentCount = 0; environmentNames = @(); invocationFingerprint = ('3' * 64); workingDirectory = $testRoot
+            logPath = (Join-Path $stateRoot "logs\$secondOrphanId.log"); exitCode = $null; error = $null
+        }
+        $secondOrphanRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$secondOrphanId.json") -Encoding utf8
+        $changedNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
+        $changedNotice = $changedNoticeText | ConvertFrom-Json
+        Assert-True ([string]$changedNotice.hookSpecificOutput.additionalContext -match '3 managed job record\(s\) are orphaned') 'A changed orphan set should emit one new session-start notice.'
+    } finally {
+        $env:MANAGED_JOBS_ROOT = $previousManagedJobsRoot
+    }
 
     # WhatIf previews exact terminal candidates, then real prune removes them and managed logs only.
     $preview = (& $controller prune -StateRoot $stateRoot -OlderThanDays 0 -WhatIf | Out-String) | ConvertFrom-Json

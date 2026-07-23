@@ -4,13 +4,13 @@ $payload = $null
 function Write-CleanupFailure {
     param(
         [Parameter(Mandatory)][string]$Message,
-        [switch]$CanRetry
+        $HookPayload
     )
 
-    $alreadyContinued = $payload -and
-        $payload.PSObject.Properties.Name -contains 'stop_hook_active' -and
-        [bool]$payload.stop_hook_active
-    if ($CanRetry -and -not $alreadyContinued) {
+    $alreadyContinued = $HookPayload -and
+        $HookPayload.PSObject.Properties.Name -contains 'stop_hook_active' -and
+        [bool]$HookPayload.stop_hook_active
+    if ($HookPayload -and -not $alreadyContinued) {
         [ordered]@{
             decision = 'block'
             reason = $Message
@@ -53,8 +53,8 @@ try {
         "$($_.name) (job $($_.id), PID $($_.hostPid)): $($_.error)"
     })
     $message = "Codex could not stop $($failures.Count) process tree(s) started for this turn: $($details -join ' | '). Resolve them before ending the turn."
-    Write-CleanupFailure -Message $message -CanRetry:([bool]$payload)
+    Write-CleanupFailure -Message $message -HookPayload $payload
 } catch {
     $message = "Codex could not verify end-of-turn process cleanup: $($_.Exception.Message)"
-    Write-CleanupFailure -Message $message -CanRetry:([bool]$payload)
+    Write-CleanupFailure -Message $message -HookPayload $payload
 }

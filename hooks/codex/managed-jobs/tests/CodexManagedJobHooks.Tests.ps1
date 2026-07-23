@@ -111,6 +111,13 @@ try {
     Assert-True ($infrastructureBounded.PSObject.Properties.Name -notcontains 'decision') 'A repeated infrastructure failure must not wedge the turn.'
     $env:CODEX_HOME = $repositoryRoot
 
+    Remove-Item Env:CODEX_THREAD_ID -ErrorAction SilentlyContinue
+    $payloadStopOutput = ($stopPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($payloadStopOutput)) 'Stop cleanup should use payload.session_id when CODEX_THREAD_ID is absent.'
+    $payloadSessionOutput = ($sessionPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionEndHook 2>&1 | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($payloadSessionOutput)) 'SessionEnd cleanup should use payload.session_id when CODEX_THREAD_ID is absent.'
+    $env:CODEX_THREAD_ID = $sessionId
+
     [pscustomobject]@{
         result = 'passed'
         assertions = $assertionCount

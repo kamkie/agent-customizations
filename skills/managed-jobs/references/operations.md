@@ -5,7 +5,32 @@
 State-root precedence is `-StateRoot`, `MANAGED_JOBS_ROOT`, then
 `$HOME/.agent-customizations/managed-jobs`. Set the same environment value when
 Codex and Claude should share a registry. Agent-specific registries are not
-discovered.
+discovered. Turn and session lifetimes must use the root visible to Codex
+hooks: set `MANAGED_JOBS_ROOT` before starting Codex when overriding the
+default. The controller rejects a different one-off `-StateRoot` for those
+automatic lifetimes; persistent jobs may use one.
+
+## Process lifetime
+
+Every new record declares one lifetime:
+
+- `Turn`: stop automatically when Codex finishes the current turn.
+- `Session`: allow use across turns, then stop when the Codex session ends.
+- `Persistent`: keep running until explicitly stopped; always hand it off.
+
+`Auto` is the controller default. In the Codex installation, when
+`CODEX_THREAD_ID` is available, `Auto` records Codex ownership and resolves to
+`Turn`. A Claude installation does not adopt inherited Codex ownership; without
+an integrated owner, `Auto` retains the previous `Persistent` behavior.
+Target-specific cleanup hooks must supply an agent and session identifier; they
+never act on unowned or differently owned records.
+
+Turn and session jobs maintain hashed owner references while active. Cleanup
+uses only those references; it does not scan or reconcile unrelated records.
+
+The Windows host assigns itself and its descendants to a kill-on-close Job
+Object before launching the child. If the host exits or crashes, Windows
+terminates descendants that would otherwise escape as live orphan processes.
 
 ## Visible execution
 
@@ -43,6 +68,17 @@ application-native structured logs when stream separation matters.
 
 Structured status includes the expected PID/start time, current snapshot when
 relevant, and identity-match result.
+
+Codex turn and session cleanup is silent when it succeeds. A turn is blocked
+only when an owned process tree cannot be stopped safely; the hook names the
+job, PID, and failure. Dead processes and stale records are reconciled without
+injecting context into another conversation.
+
+The Codex registrations follow the current
+[Codex hook contract](https://learn.chatgpt.com/docs/hooks): shell calls match
+`Bash`, `PreToolUse` uses `permissionDecision`, and a `Stop`
+`decision: "block"` continues the turn. `stop_hook_active` bounds cleanup
+failures to one continuation before a clear warning lets the turn end.
 
 ## Identity and prune
 

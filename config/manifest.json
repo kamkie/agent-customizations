@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "targets": {
     "codex": {
       "displayName": "Codex",
@@ -8,6 +8,34 @@
       "instructions": {
         "source": "global/AGENTS.md",
         "destination": "AGENTS.md"
+      },
+      "hooks": {
+        "destination": "hooks.json",
+        "entries": [
+          {
+            "id": "managed-jobs-pre-tool-use",
+            "event": "PreToolUse",
+            "matcher": "^Bash$",
+            "source": "skills/managed-jobs/scripts/ManagedJob.PreToolUseHook.ps1",
+            "script": "skills/managed-jobs/scripts/ManagedJob.PreToolUseHook.ps1",
+            "timeout": 10,
+            "statusMessage": "Checking long-running process ownership"
+          },
+          {
+            "id": "managed-jobs-stop",
+            "event": "Stop",
+            "source": "hooks/codex/managed-jobs/ManagedJob.StopHook.ps1",
+            "script": "hooks/managed-jobs/ManagedJob.StopHook.ps1",
+            "timeout": 15
+          },
+          {
+            "id": "managed-jobs-session-end",
+            "event": "SessionEnd",
+            "source": "hooks/codex/managed-jobs/ManagedJob.SessionEndHook.ps1",
+            "script": "hooks/managed-jobs/ManagedJob.SessionEndHook.ps1",
+            "timeout": 3
+          }
+        ]
       },
       "skills": [
         "claude-runner",

@@ -42,6 +42,11 @@ if (Test-Path -LiteralPath $codeownersPath -PathType Leaf) {
 $targetNames = @($manifest.targets.PSObject.Properties.Name)
 if ($targetNames.Count -eq 0) { $errors.Add('Manifest declares no targets') }
 $declaredSkills = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$supportedHookEvents = @(
+    'SessionStart', 'SessionEnd', 'SubagentStart', 'SubagentStop',
+    'PreToolUse', 'PostToolUse', 'PermissionRequest',
+    'UserPromptSubmit', 'PreCompact', 'PostCompact', 'Stop'
+)
 foreach ($targetName in $targetNames) {
     $target = $manifest.targets.PSObject.Properties[$targetName].Value
     foreach ($field in @('displayName', 'homeEnvironmentVariable', 'defaultHomeDirectory')) {
@@ -63,6 +68,36 @@ foreach ($targetName in $targetNames) {
 
     foreach ($skillName in @($target.skills)) {
         [void]$declaredSkills.Add([string]$skillName)
+    }
+
+    if ($target.PSObject.Properties.Name -contains 'hooks') {
+        if ([string]::IsNullOrWhiteSpace([string]$target.hooks.destination)) {
+            $errors.Add("Target '$targetName' hooks have no destination")
+        }
+        $hookIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        foreach ($entry in @($target.hooks.entries)) {
+            foreach ($field in @('id', 'event', 'source', 'script', 'timeout')) {
+                if ([string]::IsNullOrWhiteSpace([string]$entry.$field)) {
+                    $errors.Add("Target '$targetName' hook entry has no $field")
+                }
+            }
+            if (-not [string]::IsNullOrWhiteSpace([string]$entry.id) -and -not $hookIds.Add([string]$entry.id)) {
+                $errors.Add("Target '$targetName' has duplicate hook id '$($entry.id)'")
+            }
+            if ([int]$entry.timeout -le 0) {
+                $errors.Add("Target '$targetName' hook '$($entry.id)' must have a positive timeout")
+            }
+            if ([string]$entry.event -notin $supportedHookEvents) {
+                $errors.Add("Target '$targetName' hook '$($entry.id)' has unsupported event '$($entry.event)'")
+            }
+            if ([string]$entry.event -eq 'SessionEnd' -and [int]$entry.timeout -gt 3) {
+                $errors.Add("Target '$targetName' SessionEnd hook '$($entry.id)' exceeds Codex's three-second limit")
+            }
+            $hookScript = Join-Path $repositoryRoot ([string]$entry.source)
+            if (-not (Test-Path -LiteralPath $hookScript -PathType Leaf)) {
+                $errors.Add("Target '$targetName' hook script does not exist: $($entry.script)")
+            }
+        }
     }
 }
 
@@ -93,12 +128,15 @@ foreach ($skillName in $actualSkills) {
 
 $managedRoots = @(
     (Join-Path $repositoryRoot 'global'),
-    (Join-Path $repositoryRoot 'skills')
+    (Join-Path $repositoryRoot 'skills'),
+    (Join-Path $repositoryRoot 'hooks')
 )
 $forbiddenExtensions = @('.jsonl', '.log', '.key', '.pem')
 $hazardPattern = '(?i)(gho_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|C:\\Users\\[^\\\s]+|[A-Z]:\\Projects\\)'
 $managedFiles = @(foreach ($root in $managedRoots) {
-    Get-ChildItem -LiteralPath $root -Recurse -File -Force
+    if (Test-Path -LiteralPath $root -PathType Container) {
+        Get-ChildItem -LiteralPath $root -Recurse -File -Force
+    }
 })
 foreach ($file in $managedFiles) {
     if ($file.Extension -in $forbiddenExtensions) {

@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory)]
-    [ValidateSet('start', 'list', 'status', 'logs', 'stop', 'reconcile', 'prune')]
+    [ValidateSet('start', 'list', 'status', 'logs', 'stop', 'cleanup', 'reconcile', 'prune')]
     [string]$Action,
 
     [string]$Id,
@@ -13,6 +13,12 @@ param(
     [hashtable]$Environment = @{},
     [switch]$Visible,
     [switch]$KeepTerminalOpen,
+    [ValidateSet('Auto', 'Turn', 'Session', 'Persistent')]
+    [string]$Lifetime = 'Auto',
+    [ValidateSet('Turn', 'Session')]
+    [string[]]$CleanupLifetime = @('Turn'),
+    [string]$OwnerAgent,
+    [string]$OwnerSessionId,
     [int]$Tail = 100,
     [switch]$Follow,
     [int]$OlderThanDays = 14,
@@ -24,7 +30,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
+$automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
 Set-ManagedJobStateRoot -Path $StateRoot
+$managedJobHome = [IO.Path]::GetFullPath(
+    (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
+)
+$codexHome = if ($env:CODEX_HOME) {
+    [IO.Path]::GetFullPath($env:CODEX_HOME)
+} else {
+    [IO.Path]::GetFullPath((Join-Path $HOME '.codex'))
+}
+$isCodexInstallation = $managedJobHome.Equals($codexHome, [StringComparison]::OrdinalIgnoreCase)
 
 function Get-AllManagedJobs {
     $jobsDirectory = Join-Path (Get-ManagedJobRoot) 'jobs'
@@ -37,7 +53,10 @@ function Get-AllManagedJobs {
 
 function Update-ReconciledJob {
     param($Job)
-    if ($Job.status -notin @('starting', 'running')) { return $Job }
+    if ($Job.status -notin @('starting', 'running')) {
+        try { Unregister-ManagedJobOwnerReference -Job $Job } catch {}
+        return $Job
+    }
     if ($Job.status -eq 'starting' -and -not $Job.hostPid) {
         $createdAt = if ($Job.createdAtUtc -is [datetime]) {
             $Job.createdAtUtc.ToUniversalTime()
@@ -49,7 +68,10 @@ function Update-ReconciledJob {
     if (Test-ManagedProcessIdentity -ProcessId $Job.hostPid -ExpectedStartTimeUtc $Job.hostStartedAtUtc) { return $Job }
     $path = Get-ManagedJobFile -Id $Job.id
     $current = Read-ManagedJob -Path $path
-    if ($current.status -notin @('starting', 'running')) { return $current }
+    if ($current.status -notin @('starting', 'running')) {
+        try { Unregister-ManagedJobOwnerReference -Job $current } catch {}
+        return $current
+    }
     if ($current.status -eq 'starting' -and -not $current.hostPid) {
         $createdAt = if ($current.createdAtUtc -is [datetime]) {
             $current.createdAtUtc.ToUniversalTime()
@@ -63,6 +85,7 @@ function Update-ReconciledJob {
     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
     $current.error = 'Recorded host process is no longer running and no terminal state was recorded.'
     Write-ManagedJob -Path $path -Job $current
+    Unregister-ManagedJobOwnerReference -Job $current
     $unclaimedLaunch = Join-Path (Join-Path (Get-ManagedJobRoot) 'launch') "$($Job.id).json"
     if (Test-Path -LiteralPath $unclaimedLaunch) { Remove-Item -LiteralPath $unclaimedLaunch -Force }
     return $current
@@ -92,8 +115,42 @@ function Write-JobCollection {
     if ($Json) {
         ConvertTo-Json -InputObject $output -Depth 12
     } else {
-        $output | Select-Object id, name, kind, status, visible, hostPid, createdAtUtc, finishedAtUtc, logPath | Format-Table -AutoSize
+        $output | Select-Object id, name, kind, status, lifetime, visible, hostPid, createdAtUtc, finishedAtUtc, logPath | Format-Table -AutoSize
     }
+}
+
+function Stop-ManagedJobTree {
+    param(
+        [Parameter(Mandatory)]$Job,
+        [Parameter(Mandatory)][string]$Reason
+    )
+
+    $path = Get-ManagedJobFile -Id $Job.id
+    $current = Read-ManagedJob -Path $path
+    if ($current.status -notin @('starting', 'running')) { return $current }
+    if (-not (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc)) {
+        $current = Update-ReconciledJob -Job $current
+        if ($current.status -notin @('starting', 'running')) { return $current }
+        throw "Job $($current.id) has not published a verifiable host process yet."
+    }
+
+    $taskkillOutput = @(& taskkill.exe /PID $current.hostPid /T /F 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        $current = Update-ReconciledJob -Job (Read-ManagedJob -Path $path)
+        if ($current.status -notin @('starting', 'running')) { return $current }
+        throw "Unable to terminate PID $($current.hostPid): $($taskkillOutput -join ' ')"
+    }
+
+    $current = Read-ManagedJob -Path $path
+    if ($current.status -in @('starting', 'running')) {
+        $current.status = 'stopped'
+        $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+        $current.exitCode = $null
+        $current.error = $Reason
+        Write-ManagedJob -Path $path -Job $current
+    }
+    Unregister-ManagedJobOwnerReference -Job $current
+    return $current
 }
 
 switch ($Action) {
@@ -102,6 +159,34 @@ switch ($Action) {
         if (-not $Executable) { throw '-Executable is required for start.' }
         if ($KeepTerminalOpen -and -not $Visible) { throw '-KeepTerminalOpen requires -Visible.' }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
+        $resolvedOwnerAgent = if ($OwnerAgent) {
+            $OwnerAgent.Trim().ToLowerInvariant()
+        } elseif ($isCodexInstallation -and $env:CODEX_THREAD_ID) {
+            'codex'
+        } else {
+            $null
+        }
+        $resolvedOwnerSessionId = if ($OwnerSessionId) {
+            $OwnerSessionId.Trim()
+        } elseif ($isCodexInstallation -and $env:CODEX_THREAD_ID) {
+            $env:CODEX_THREAD_ID.Trim()
+        } else {
+            $null
+        }
+        $resolvedLifetime = if ($Lifetime -eq 'Auto') {
+            if ($resolvedOwnerAgent -and $resolvedOwnerSessionId) { 'turn' } else { 'persistent' }
+        } else {
+            $Lifetime.ToLowerInvariant()
+        }
+        if ($resolvedLifetime -in @('turn', 'session') -and
+            (-not $resolvedOwnerAgent -or -not $resolvedOwnerSessionId)) {
+            throw "Lifetime '$Lifetime' requires -OwnerAgent and -OwnerSessionId, or a Codex invocation with CODEX_THREAD_ID."
+        }
+        $resolvedRoot = [IO.Path]::GetFullPath((Get-ManagedJobRoot))
+        if ($resolvedLifetime -in @('turn', 'session') -and
+            -not $resolvedRoot.Equals($automaticCleanupRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Lifetime '$Lifetime' requires the hook-visible managed-job state root '$automaticCleanupRoot'. Set MANAGED_JOBS_ROOT before starting Codex instead of using a different -StateRoot, or use -Lifetime Persistent."
+        }
         $resolvedDirectory = (Resolve-Path -LiteralPath $WorkingDirectory).Path
         $fingerprint = Get-InvocationFingerprint -Executable $Executable -Arguments $Arguments -WorkingDirectory $resolvedDirectory -Environment $Environment
         $root = Get-ManagedJobRoot
@@ -134,13 +219,17 @@ switch ($Action) {
             $environmentObject = [ordered]@{}
             foreach ($key in $Environment.Keys) { $environmentObject[[string]$key] = [string]$Environment[$key] }
             $job = [ordered]@{
-                schemaVersion = 2
+                schemaVersion = 3
                 id = $jobId
                 name = $Name
                 kind = $Kind
                 status = 'starting'
+                lifetime = $resolvedLifetime
+                ownerAgent = $resolvedOwnerAgent
+                ownerSessionId = $resolvedOwnerSessionId
                 visible = [bool]$Visible
                 keepTerminalOpen = [bool]$KeepTerminalOpen
+                processContainment = 'pending'
                 createdAtUtc = [datetime]::UtcNow.ToString('o')
                 startedAtUtc = $null
                 finishedAtUtc = $null
@@ -161,6 +250,7 @@ switch ($Action) {
                 environment = $environmentObject
             }
             Write-ManagedJob -Path $jobFile -Job $job
+            Register-ManagedJobOwnerReference -Job ([pscustomobject]$job)
             Write-ManagedJson -Path $launchFile -Value $launch
             $hostScript = Join-Path $PSScriptRoot 'ManagedJob.Host.ps1'
 
@@ -185,6 +275,7 @@ switch ($Action) {
                         $failedJob.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                         $failedJob.error = 'Managed host launch failed before startup completed.'
                         Write-ManagedJob -Path $jobFile -Job $failedJob
+                        Unregister-ManagedJobOwnerReference -Job $failedJob
                     }
                 } catch {}
             }
@@ -232,20 +323,119 @@ switch ($Action) {
         if ($job.status -notin @('starting', 'running')) {
             throw "Job $Id is not running; current status is $($job.status)."
         }
-        if (-not (Test-ManagedProcessIdentity -ProcessId $job.hostPid -ExpectedStartTimeUtc $job.hostStartedAtUtc)) {
-            $job = Update-ReconciledJob -Job $job
-            throw "Refusing to stop PID $($job.hostPid): its identity no longer matches the registry. Job marked $($job.status)."
-        }
-        & taskkill.exe /PID $job.hostPid /T /F | Out-Null
-        $job = Read-ManagedJob -Path $path
-        if ($job.status -in @('starting', 'running')) {
-            $job.status = 'stopped'
-            $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
-            $job.exitCode = $null
-            $job.error = 'Stopped through managed-jobs.'
-            Write-ManagedJob -Path $path -Job $job
-        }
+        $job = Stop-ManagedJobTree -Job $job -Reason 'Stopped through managed-jobs.'
         Add-ManagedJobIdentity -Job $job | ConvertTo-Json -Depth 12
+    }
+    'cleanup' {
+        if (-not $OwnerAgent) { throw '-OwnerAgent is required for cleanup.' }
+        if (-not $OwnerSessionId) { throw '-OwnerSessionId is required for cleanup.' }
+        $ownerAgentKey = $OwnerAgent.Trim().ToLowerInvariant()
+        $ownerSessionKey = $OwnerSessionId.Trim()
+        $lifetimes = @($CleanupLifetime | ForEach-Object { $_.ToLowerInvariant() })
+        $ownerIds = @(Get-ManagedJobOwnerReferenceIds `
+            -OwnerAgent $ownerAgentKey `
+            -OwnerSessionId $ownerSessionKey `
+            -Lifetime $lifetimes |
+            Sort-Object -Unique)
+        $owned = @()
+        $stopped = @()
+        $failures = @()
+        foreach ($ownerId in $ownerIds) {
+            try {
+                $job = Read-ManagedJob -Path (Get-ManagedJobFile -Id $ownerId)
+                if ($job.PSObject.Properties.Name -notcontains 'ownerAgent' -or
+                    $job.PSObject.Properties.Name -notcontains 'ownerSessionId' -or
+                    $job.PSObject.Properties.Name -notcontains 'lifetime' -or
+                    [string]$job.ownerAgent -ne $ownerAgentKey -or
+                    [string]$job.ownerSessionId -ne $ownerSessionKey -or
+                    [string]$job.lifetime -notin $lifetimes) {
+                    throw 'The ownership reference does not match the managed-job record.'
+                }
+                $job = Update-ReconciledJob -Job $job
+                if ($job.status -notin @('starting', 'running')) {
+                    Unregister-ManagedJobOwnerReference -Job $job
+                    continue
+                }
+                if (-not (Test-ManagedProcessIdentity -ProcessId $job.hostPid -ExpectedStartTimeUtc $job.hostStartedAtUtc)) {
+                    throw "Job $($job.id) has not published a verifiable host process yet."
+                }
+                if ([string]$job.processContainment -ne 'windows-job-object-kill-on-close') {
+                    throw "Job $($job.id) has not confirmed Windows process-tree containment."
+                }
+                $owned += $job
+            } catch {
+                $failures += [ordered]@{
+                    id = $ownerId
+                    name = $ownerId
+                    hostPid = $null
+                    lifetime = $null
+                    error = $_.Exception.Message
+                }
+            }
+        }
+        $stopError = $null
+        if ($owned.Count -gt 0) {
+            $stopErrors = @()
+            Stop-Process `
+                -Id @($owned | ForEach-Object { [int]$_.hostPid }) `
+                -Force `
+                -ErrorAction SilentlyContinue `
+                -ErrorVariable +stopErrors
+            if ($stopErrors.Count -gt 0) {
+                $stopError = @($stopErrors | ForEach-Object { $_.Exception.Message }) -join ' | '
+            }
+
+            $stopDeadline = [datetime]::UtcNow.AddSeconds(1)
+            do {
+                $stillRunning = @($owned | Where-Object {
+                    Test-ManagedProcessIdentity -ProcessId $_.hostPid -ExpectedStartTimeUtc $_.hostStartedAtUtc
+                })
+                if ($stillRunning.Count -eq 0 -or [datetime]::UtcNow -ge $stopDeadline) { break }
+                Start-Sleep -Milliseconds 25
+            } while ($true)
+        }
+        foreach ($job in $owned) {
+            try {
+                if (Test-ManagedProcessIdentity -ProcessId $job.hostPid -ExpectedStartTimeUtc $job.hostStartedAtUtc) {
+                    $detail = if ($stopError) { ": $stopError" } else { '' }
+                    throw "Unable to terminate PID $($job.hostPid)$detail"
+                }
+                $path = Get-ManagedJobFile -Id $job.id
+                $result = Read-ManagedJob -Path $path
+                if ($result.status -in @('starting', 'running')) {
+                    $result.status = 'stopped'
+                    $result.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                    $result.exitCode = $null
+                    $result.error = "Stopped automatically at the end of its $($result.lifetime) lifetime."
+                    Write-ManagedJob -Path $path -Job $result
+                }
+                Unregister-ManagedJobOwnerReference -Job $result
+                if ($result.status -eq 'stopped') {
+                    $stopped += [ordered]@{
+                        id = $result.id
+                        name = $result.name
+                        hostPid = $result.hostPid
+                        lifetime = $result.lifetime
+                    }
+                }
+            } catch {
+                $failures += [ordered]@{
+                    id = $job.id
+                    name = $job.name
+                    hostPid = $job.hostPid
+                    lifetime = $job.lifetime
+                    error = $_.Exception.Message
+                }
+            }
+        }
+        [ordered]@{
+            ownerAgent = $ownerAgentKey
+            ownerSessionId = $ownerSessionKey
+            lifetimes = $lifetimes
+            matched = $owned.Count
+            stopped = $stopped
+            failures = $failures
+        } | ConvertTo-Json -Depth 8
     }
     'reconcile' {
         $jobs = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ })
@@ -277,6 +467,7 @@ switch ($Action) {
             if ($timestamp -ge $cutoff) { continue }
             $candidates += $job.id
             if ($PSCmdlet.ShouldProcess($job.id, 'Remove terminal managed-job record and its managed log')) {
+                try { Unregister-ManagedJobOwnerReference -Job $job } catch {}
                 $record = Get-ManagedJobFile -Id $job.id
                 $managedLog = Join-Path (Join-Path (Get-ManagedJobRoot) 'logs') "$($job.id).log"
                 if (Test-Path -LiteralPath $managedLog) { Remove-Item -LiteralPath $managedLog -Force }

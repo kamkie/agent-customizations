@@ -1,8 +1,8 @@
 ## Long-running local processes
 
-Use the `managed-jobs` skill for dev servers, watchers, paid CLI agents, background builds, and other processes expected to outlive a Codex turn. Keep ordinary short commands attached to the active tool call.
+Use the `managed-jobs` skill for dev servers, watchers, paid CLI agents, background builds, and other processes expected to outlive the active tool call. Keep ordinary short commands attached to the active tool call.
 
-Default managed jobs to durable hidden execution with persistent logs. Use the optional visible Windows Terminal mode only when the user asks to watch the same live output. Reconcile existing managed jobs after a restart and reuse a matching process or resumable session instead of launching a duplicate.
+Default managed jobs to durable hidden execution with persistent logs. Use the optional visible Windows Terminal mode only when the user asks to watch the same live output. Let Codex use the skill's turn lifetime by default; select session or persistent lifetime only when the process must deliberately survive that boundary. Reconcile surviving managed jobs after a restart and reuse a matching process or resumable session instead of launching a duplicate.
 
 Do not launch long-running work through raw `Start-Process`, `Start-Job`, detached terminal tabs, or background flags unless the user explicitly requests unmanaged execution.
 

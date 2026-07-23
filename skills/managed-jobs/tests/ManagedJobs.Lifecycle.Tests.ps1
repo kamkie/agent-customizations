@@ -9,6 +9,9 @@ $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('managed-jobs-lifecycle-' + [g
 $stateRoot = Join-Path $testRoot 'state'
 $activeIds = [Collections.Generic.List[string]]::new()
 $assertionCount = 0
+$previousCodexHome = $env:CODEX_HOME
+$previousThreadId = $env:CODEX_THREAD_ID
+$previousStateRoot = $env:MANAGED_JOBS_ROOT
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -35,7 +38,18 @@ function Wait-JobStatus {
 try {
     $null = New-Item -ItemType Directory -Path $stateRoot -Force
     $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+    $testSessionId = 'codex-lifecycle-session'
+    $env:CODEX_HOME = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..')).Path
+    $env:CODEX_THREAD_ID = $testSessionId
+    $env:MANAGED_JOBS_ROOT = $stateRoot
     $null = & $controller reconcile -StateRoot $stateRoot
+
+    $alternateRoot = Join-Path $testRoot 'alternate-state'
+    $alternateTurnRejected = $false
+    try {
+        & $controller start -StateRoot $alternateRoot -Name 'invisible-to-hooks' -Executable $pwsh | Out-Null
+    } catch { $alternateTurnRejected = $_.Exception.Message -match 'hook-visible managed-job state root' }
+    Assert-True $alternateTurnRejected 'Automatic lifetimes must reject a state root that Codex cleanup hooks cannot see.'
 
     # A copied Claude-only skill remains self-contained because scripts resolve companions locally.
     $claudeSkill = Join-Path $testRoot '.claude\skills\managed-jobs'
@@ -47,6 +61,9 @@ try {
     Assert-True ($emptyList.Count -eq 0) 'Filtered JSON list should return an empty array when the registry is empty.'
     $emptyStatus = @((& $claudeController status -StateRoot (Join-Path $testRoot 'claude-state') -Status running -Json | Out-String) | ConvertFrom-Json)
     Assert-True ($emptyStatus.Count -eq 0) 'Filtered JSON status should return an empty array when no jobs match.'
+    $claudeAuto = (& $claudeController start -StateRoot (Join-Path $testRoot 'claude-state') -Name 'claude-auto' `
+        -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output claude-auto') | Out-String) | ConvertFrom-Json
+    Assert-True ($claudeAuto.lifetime -eq 'persistent' -and -not $claudeAuto.ownerAgent) 'Claude must not adopt inherited Codex turn ownership.'
 
     $hiddenKeepOpenRejected = $false
     try {
@@ -81,7 +98,12 @@ try {
     $completed = Wait-JobStatus -Id $completed.id -Expected @('completed')
     $recordText = Get-Content -LiteralPath (Join-Path $stateRoot "jobs\$($completed.id).json") -Raw
     Assert-True ($recordText -notmatch 'lifecycle-ok|not-recorded|Lifecycle Test') 'Permanent records must omit argument text and environment values.'
-    Assert-True ($completed.schemaVersion -eq 2) 'New records should use schema version 2.'
+    Assert-True ($completed.schemaVersion -eq 3) 'New records should use schema version 3.'
+    Assert-True ($completed.ownerAgent -eq 'codex' -and $completed.ownerSessionId -eq $testSessionId) 'Codex records should capture their owning session.'
+    Assert-True ($completed.lifetime -eq 'turn') 'Codex Auto lifetime should resolve to turn.'
+    Assert-True ($completed.processContainment -eq 'windows-job-object-kill-on-close') 'Managed hosts should enable Windows process-tree containment.'
+    $completedReferences = @(Get-ManagedJobOwnerReferenceIds -OwnerAgent codex -OwnerSessionId $testSessionId -Lifetime turn)
+    Assert-True ($completedReferences -notcontains $completed.id) 'A completed job should remove its active owner reference.'
     $logText = (& $controller logs -Id $completed.id -StateRoot $stateRoot -Tail 20 | Out-String)
     Assert-True ($logText -match 'lifecycle-ok') 'Logs should capture child output.'
     Assert-True ($logText -notmatch 'Write-Output lifecycle-ok|LIFECYCLE_MARKER|not-recorded') 'Controller log metadata must omit arguments and environment.'
@@ -174,6 +196,105 @@ try {
     Assert-True ($stopped.status -eq 'stopped') 'Stop should record a stopped terminal state.'
     Assert-True ($stopped.PSObject.Properties.Name -notcontains 'processIdentity') 'Terminal jobs should not inspect potentially reused PIDs.'
 
+    # Turn cleanup stops only matching Codex-owned work.
+    $turnOwned = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-turn-owned' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
+    $activeIds.Add($turnOwned.id)
+    $turnOwned = Wait-JobStatus -Id $turnOwned.id -Expected @('running')
+    $turnSummary = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex -OwnerSessionId $testSessionId -CleanupLifetime Turn | Out-String) | ConvertFrom-Json
+    Assert-True ($turnSummary.stopped.id -contains $turnOwned.id) 'Turn cleanup should report the stopped owned process.'
+    $activeIds.Remove($turnOwned.id) | Out-Null
+    Assert-True ((Get-JobStatus -Id $turnOwned.id).status -eq 'stopped') 'The Codex Stop hook should stop a matching turn-owned process tree.'
+    $turnReferences = @(Get-ManagedJobOwnerReferenceIds -OwnerAgent codex -OwnerSessionId $testSessionId -Lifetime turn)
+    Assert-True ($turnReferences -notcontains $turnOwned.id) 'Turn cleanup should remove the stopped job owner reference.'
+
+    $otherOwned = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-other-session' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -Lifetime Turn `
+        -OwnerAgent codex -OwnerSessionId 'another-session' | Out-String) | ConvertFrom-Json
+    $activeIds.Add($otherOwned.id)
+    $otherOwned = Wait-JobStatus -Id $otherOwned.id -Expected @('running')
+    $ignoredSummary = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex -OwnerSessionId $testSessionId -CleanupLifetime Turn | Out-String) | ConvertFrom-Json
+    Assert-True ($ignoredSummary.matched -eq 0) 'Cleanup must ignore a process owned by another session.'
+    Assert-True ((Get-JobStatus -Id $otherOwned.id).status -eq 'running') 'An unrelated session process must remain running.'
+    $null = & $controller stop -StateRoot $stateRoot -Id $otherOwned.id
+    $activeIds.Remove($otherOwned.id) | Out-Null
+
+    $persistent = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-persistent' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -Lifetime Persistent | Out-String) | ConvertFrom-Json
+    $activeIds.Add($persistent.id)
+    $persistent = Wait-JobStatus -Id $persistent.id -Expected @('running')
+    $persistentSummary = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex -OwnerSessionId $testSessionId -CleanupLifetime Turn,Session | Out-String) | ConvertFrom-Json
+    Assert-True ($persistentSummary.matched -eq 0) 'Automatic cleanup must ignore explicitly persistent work.'
+    Assert-True ((Get-JobStatus -Id $persistent.id).status -eq 'running') 'Persistent work should survive automatic cleanup.'
+    $null = & $controller stop -StateRoot $stateRoot -Id $persistent.id
+    $activeIds.Remove($persistent.id) | Out-Null
+
+    $sessionOwned = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-session-owned' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -Lifetime Session | Out-String) | ConvertFrom-Json
+    $activeIds.Add($sessionOwned.id)
+    $sessionOwned = Wait-JobStatus -Id $sessionOwned.id -Expected @('running')
+    $sessionSummary = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex -OwnerSessionId $testSessionId -CleanupLifetime Turn,Session | Out-String) | ConvertFrom-Json
+    Assert-True ($sessionSummary.stopped.id -contains $sessionOwned.id) 'Session cleanup should report the stopped owned process.'
+    $activeIds.Remove($sessionOwned.id) | Out-Null
+    Assert-True ((Get-JobStatus -Id $sessionOwned.id).status -eq 'stopped') 'The Codex SessionEnd hook should stop session-owned work.'
+
+    $unrelatedStaleId = '20000101-000000-lifecycle-unrelated-stale-000001'
+    $unrelatedStaleRecord = [ordered]@{
+        schemaVersion = 3; id = $unrelatedStaleId; name = 'lifecycle-unrelated-stale'; kind = 'test'; status = 'running'
+        lifetime = 'turn'; ownerAgent = 'codex'; ownerSessionId = 'another-session'; visible = $false; keepTerminalOpen = $false
+        processContainment = 'windows-job-object-kill-on-close'; createdAtUtc = '2000-01-01T00:00:00Z'
+        startedAtUtc = '2000-01-01T00:00:01Z'; finishedAtUtc = $null; hostPid = 2147483647
+        hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'; argumentCount = 0; environmentNames = @()
+        invocationFingerprint = ('4' * 64); workingDirectory = $testRoot; logPath = (Join-Path $stateRoot "logs\$unrelatedStaleId.log")
+        exitCode = $null; error = $null
+    }
+    $unrelatedStaleRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$unrelatedStaleId.json") -Encoding utf8
+    Register-ManagedJobOwnerReference -Job ([pscustomobject]$unrelatedStaleRecord)
+    $null = & $controller cleanup -StateRoot $stateRoot -OwnerAgent codex -OwnerSessionId $testSessionId -CleanupLifetime Turn
+    $unrelatedAfterCleanup = Get-Content -LiteralPath (Join-Path $stateRoot "jobs\$unrelatedStaleId.json") -Raw | ConvertFrom-Json
+    Assert-True ($unrelatedAfterCleanup.status -eq 'running') 'Cleanup must not reconcile a stale record owned by another session.'
+    Unregister-ManagedJobOwnerReference -Job $unrelatedAfterCleanup
+    Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$unrelatedStaleId.json") -Force
+
+    $unclaimedId = '20000101-000000-lifecycle-owned-starting-000001'
+    $unclaimedRecord = [ordered]@{
+        schemaVersion = 3; id = $unclaimedId; name = 'lifecycle-owned-starting'; kind = 'test'; status = 'starting'
+        lifetime = 'turn'; ownerAgent = 'codex'; ownerSessionId = $testSessionId; visible = $false; keepTerminalOpen = $false
+        processContainment = 'pending'; createdAtUtc = [datetime]::UtcNow.ToString('o'); startedAtUtc = $null; finishedAtUtc = $null
+        hostPid = $null; hostStartedAtUtc = $null; executable = 'fixture'; argumentCount = 0; environmentNames = @()
+        invocationFingerprint = ('3' * 64); workingDirectory = $testRoot; logPath = (Join-Path $stateRoot "logs\$unclaimedId.log")
+        exitCode = $null; error = $null
+    }
+    $unclaimedRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$unclaimedId.json") -Encoding utf8
+    Register-ManagedJobOwnerReference -Job ([pscustomobject]$unclaimedRecord)
+    $blockedSummary = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex -OwnerSessionId $testSessionId -CleanupLifetime Turn | Out-String) | ConvertFrom-Json
+    Assert-True ($blockedSummary.failures.id -contains $unclaimedId) 'Cleanup should report a matching process that cannot be verified.'
+    Assert-True ($blockedSummary.failures.error -match 'verifiable host process') 'Cleanup failure should explain the missing process identity.'
+    Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$unclaimedId.json") -Force
+
+    # Killing the host alone closes its Windows Job Object and terminates the child.
+    $contained = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-contained-crash' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', 'Write-Output \"child-pid=$PID\"; Start-Sleep -Seconds 30') -Lifetime Persistent | Out-String) | ConvertFrom-Json
+    $activeIds.Add($contained.id)
+    $contained = Wait-JobStatus -Id $contained.id -Expected @('running')
+    $childPid = $null
+    $childDeadline = [datetime]::UtcNow.AddSeconds(10)
+    do {
+        $containedLog = if (Test-Path -LiteralPath $contained.logPath) { Get-Content -LiteralPath $contained.logPath -Raw } else { '' }
+        if ($containedLog -match 'child-pid=(\d+)') { $childPid = [int]$Matches[1] }
+        if (-not $childPid) { Start-Sleep -Milliseconds 100 }
+    } while (-not $childPid -and [datetime]::UtcNow -lt $childDeadline)
+    Assert-True ([bool]$childPid) 'Containment test should observe the child PID.'
+    Stop-Process -Id $contained.hostPid -Force
+    $childExitDeadline = [datetime]::UtcNow.AddSeconds(10)
+    do {
+        $childAlive = $null -ne (Get-ProcessSnapshot -ProcessId $childPid)
+        if ($childAlive) { Start-Sleep -Milliseconds 100 }
+    } while ($childAlive -and [datetime]::UtcNow -lt $childExitDeadline)
+    $activeIds.Remove($contained.id) | Out-Null
+    Assert-True (-not $childAlive) 'Windows containment should terminate descendants when the managed host crashes.'
+    Assert-True ((Get-JobStatus -Id $contained.id).status -eq 'orphaned') 'A crashed contained host should reconcile to an orphaned record without a live child.'
+
     # A missing PID plus recorded start identity reconciles to orphaned without killing anything.
     $orphanId = '20000101-000000-lifecycle-orphan-000001'
     $orphanRecord = [ordered]@{
@@ -218,5 +339,20 @@ try {
     if ($testRoot.StartsWith([IO.Path]::GetTempPath(), [StringComparison]::OrdinalIgnoreCase) -and
         (Split-Path -Leaf $testRoot) -like 'managed-jobs-lifecycle-*') {
         Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $previousThreadId) {
+        Remove-Item Env:CODEX_THREAD_ID -ErrorAction SilentlyContinue
+    } else {
+        $env:CODEX_THREAD_ID = $previousThreadId
+    }
+    if ($null -eq $previousStateRoot) {
+        Remove-Item Env:MANAGED_JOBS_ROOT -ErrorAction SilentlyContinue
+    } else {
+        $env:MANAGED_JOBS_ROOT = $previousStateRoot
+    }
+    if ($null -eq $previousCodexHome) {
+        Remove-Item Env:CODEX_HOME -ErrorAction SilentlyContinue
+    } else {
+        $env:CODEX_HOME = $previousCodexHome
     }
 }

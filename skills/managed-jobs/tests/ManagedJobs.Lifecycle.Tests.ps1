@@ -203,7 +203,7 @@ try {
     Assert-True (@($orphanSummary.jobs).id -contains $staleId) 'Reconcile should orphan a stale unclaimed start after its grace period.'
     Assert-True (-not (Test-Path -LiteralPath $staleLaunch)) 'Orphan reconciliation should remove an unclaimed launch handoff.'
 
-    # Session start reports changed active jobs once but never injects orphan maintenance into task context.
+    # Session start reconciles routine managed-job state without injecting it into task context.
     $previousManagedJobsRoot = $env:MANAGED_JOBS_ROOT
     try {
         $env:MANAGED_JOBS_ROOT = $stateRoot
@@ -217,13 +217,9 @@ try {
         }
         $noticeActiveRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$noticeActiveId.json") -Encoding utf8
 
-        $firstNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
-        $firstNotice = $firstNoticeText | ConvertFrom-Json
-        Assert-True ([string]$firstNotice.hookSpecificOutput.additionalContext -match [regex]::Escape($noticeActiveId)) 'First session-start reconciliation should report the changed active-job set.'
-        Assert-True ([string]$firstNotice.hookSpecificOutput.additionalContext -notmatch 'orphan') 'Session-start context should not mention orphaned records.'
-
-        $repeatedNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
-        Assert-True ([string]::IsNullOrWhiteSpace($repeatedNoticeText)) 'An unchanged active-job set should not emit repeated session-start context.'
+        $activeAndOrphanNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
+        Assert-True ([string]::IsNullOrWhiteSpace($activeAndOrphanNoticeText)) 'Active and orphaned routine state should not emit session-start context.'
+        Assert-True ((Get-JobStatus -Id $noticeActiveId).status -eq 'starting') 'Silent session-start reconciliation should preserve a fresh active record.'
 
         Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$noticeActiveId.json") -Force
         $orphanOnlyNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()

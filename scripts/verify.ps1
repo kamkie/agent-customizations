@@ -74,6 +74,10 @@ foreach ($targetName in $targetNames) {
         if ([string]::IsNullOrWhiteSpace([string]$target.hooks.destination)) {
             $errors.Add("Target '$targetName' hooks have no destination")
         }
+        if ($target.hooks.PSObject.Properties.Name -contains 'handlerFormat' -and
+            [string]$target.hooks.handlerFormat -notin @('codex', 'claude')) {
+            $errors.Add("Target '$targetName' hooks have unsupported handlerFormat '$($target.hooks.handlerFormat)'")
+        }
         $hookIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach ($entry in @($target.hooks.entries)) {
             foreach ($field in @('id', 'event', 'source', 'script', 'timeout')) {

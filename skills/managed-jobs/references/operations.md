@@ -5,23 +5,26 @@
 State-root precedence is `-StateRoot`, `MANAGED_JOBS_ROOT`, then
 `$HOME/.agent-customizations/managed-jobs`. Set the same environment value when
 Codex and Claude should share a registry. Agent-specific registries are not
-discovered. Turn and session lifetimes must use the root visible to Codex
-hooks: set `MANAGED_JOBS_ROOT` before starting Codex when overriding the
-default. The controller rejects a different one-off `-StateRoot` for those
-automatic lifetimes; persistent jobs may use one.
+discovered. Turn and session lifetimes must use the root visible to the
+cleanup hooks: set `MANAGED_JOBS_ROOT` before starting the agent when
+overriding the default. The controller rejects a different one-off
+`-StateRoot` for those automatic lifetimes; persistent jobs may use one.
 
 ## Process lifetime
 
 Every new record declares one lifetime:
 
-- `Turn`: stop automatically when Codex finishes the current turn.
-- `Session`: allow use across turns, then stop when the Codex session ends.
+- `Turn`: stop automatically when the owning agent finishes the current turn.
+- `Session`: allow use across turns, then stop when the owning session ends.
 - `Persistent`: keep running until explicitly stopped; always hand it off.
 
 `Auto` is the controller default. In the Codex installation, when
 `CODEX_THREAD_ID` is available, `Auto` records Codex ownership and resolves to
-`Turn`. A Claude installation does not adopt inherited Codex ownership; without
-an integrated owner, `Auto` retains the previous `Persistent` behavior.
+`Turn`. In the Claude Code installation, when `CLAUDE_CODE_SESSION_ID` is
+available, `Auto` records Claude ownership and resolves to `Turn`. Each
+installation adopts only its own identity, so a Claude launch nested inside
+Codex, or the reverse, never claims the outer agent's session. Without an
+integrated owner, `Auto` retains the previous `Persistent` behavior.
 Target-specific cleanup hooks must supply an agent and session identifier; they
 never act on unowned or differently owned records.
 
@@ -69,9 +72,9 @@ application-native structured logs when stream separation matters.
 Structured status includes the expected PID/start time, current snapshot when
 relevant, and identity-match result.
 
-Codex turn and session cleanup is silent when it succeeds. A turn is blocked
-only when an owned process tree cannot be stopped safely; the hook names the
-job, PID, and failure. Dead processes and stale records are reconciled without
+Turn and session cleanup is silent when it succeeds. A turn is blocked only
+when an owned process tree cannot be stopped safely; the hook names the job,
+PID, and failure. Dead processes and stale records are reconciled without
 injecting context into another conversation.
 
 The Codex registrations follow the current
@@ -79,6 +82,12 @@ The Codex registrations follow the current
 `Bash`, `PreToolUse` uses `permissionDecision`, and a `Stop`
 `decision: "block"` continues the turn. `stop_hook_active` bounds cleanup
 failures to one continuation before a clear warning lets the turn end.
+
+The Claude Code registrations follow the same shapes under the
+[Claude Code hooks contract](https://docs.claude.com/en/docs/claude-code/hooks):
+handlers carry only `type`, `command`, and `timeout`, and the cleanup hooks
+prefer the payload `session_id` over an inherited `CLAUDE_CODE_SESSION_ID` so a
+nested session never cleans its parent's jobs.
 
 ## Identity and prune
 

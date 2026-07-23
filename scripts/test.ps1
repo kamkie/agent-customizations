@@ -17,6 +17,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Repository verification test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\codex\managed-jobs\tests\CodexManagedJobHooks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\claude\managed-jobs\tests\ClaudeManagedJobHooks.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Claude managed-job hook lifecycle test failed.' }
 
     $null = New-Item -ItemType Directory -Path $codexSandbox -Force
     $lookalikeStopCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
@@ -62,6 +64,41 @@ try {
         }
     } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $codexSandbox 'hooks.json') -Encoding utf8
 
+    $null = New-Item -ItemType Directory -Path $claudeSandbox -Force
+    $claudeSettingsPath = Join-Path $claudeSandbox 'settings.json'
+    $claudeLegacyPreToolCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
+        (Join-Path $claudeSandbox 'skills\managed-jobs\scripts\ManagedJob.PreToolUseHook.ps1') +
+        '"'
+    [ordered]@{
+        model = 'opus'
+        permissions = [ordered]@{ allow = @('Read') }
+        hooks = [ordered]@{
+            PreToolUse = @(
+                [ordered]@{
+                    matcher = '^Bash$'
+                    hooks = @(
+                        [ordered]@{
+                            type = 'command'
+                            command = $claudeLegacyPreToolCommand
+                            timeout = 10
+                        }
+                    )
+                }
+            )
+            UserPromptSubmit = @(
+                [ordered]@{
+                    hooks = @(
+                        [ordered]@{
+                            type = 'command'
+                            command = 'claude-unrelated-hook'
+                            timeout = 5
+                        }
+                    )
+                }
+            )
+        }
+    } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $claudeSettingsPath -Encoding utf8
+
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'install.ps1') `
         -Target All `
         -CodexHome $codexSandbox `
@@ -102,10 +139,44 @@ try {
         }
     }
     if (Test-Path -LiteralPath (Join-Path $claudeSandbox 'hooks.json')) {
-        throw 'Codex hook installation must not create Claude hook configuration.'
+        throw 'Claude hook installation must register in settings.json, not a Codex-style hooks.json.'
     }
-    if (Test-Path -LiteralPath (Join-Path $claudeSandbox 'hooks\managed-jobs')) {
-        throw 'Codex hook installation must not copy target-specific scripts into Claude.'
+
+    $claudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
+    if ([string]$claudeSettings.model -ne 'opus' -or
+        @($claudeSettings.permissions.allow) -notcontains 'Read') {
+        throw 'Claude hook installation must preserve unrelated settings keys.'
+    }
+    if (-not $claudeSettings.hooks.UserPromptSubmit -or
+        [string]$claudeSettings.hooks.UserPromptSubmit[0].hooks[0].command -ne 'claude-unrelated-hook') {
+        throw 'Claude hook installation must preserve unrelated hook entries.'
+    }
+    foreach ($event in @('PreToolUse', 'Stop', 'SessionEnd')) {
+        if (-not $claudeSettings.hooks.PSObject.Properties[$event]) {
+            throw "Claude hook installation did not register $event."
+        }
+    }
+    $claudePreToolHandlers = @($claudeSettings.hooks.PreToolUse | ForEach-Object { $_.hooks })
+    if ($claudePreToolHandlers.Count -ne 1 -or
+        [string]$claudePreToolHandlers[0].command -notmatch 'ManagedHookId "managed-jobs-pre-tool-use"') {
+        throw 'Claude hook installation did not replace the exact legacy PreToolUse command with one marked managed definition.'
+    }
+    foreach ($event in @('PreToolUse', 'Stop', 'SessionEnd')) {
+        foreach ($handler in @($claudeSettings.hooks.$event | ForEach-Object { $_.hooks })) {
+            if ($handler.PSObject.Properties['commandWindows'] -or $handler.PSObject.Properties['statusMessage']) {
+                throw 'Claude hook handlers must carry only fields that Claude Code settings accept.'
+            }
+        }
+    }
+    foreach ($script in @('ManagedJob.StopHook.ps1', 'ManagedJob.SessionEndHook.ps1')) {
+        $installedHookScript = Join-Path $claudeSandbox "hooks\managed-jobs\$script"
+        if (-not (Test-Path -LiteralPath $installedHookScript -PathType Leaf)) {
+            throw "Claude hook installation did not copy $script."
+        }
+        $claudeHookSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\hooks\claude\managed-jobs\$script") -Raw
+        if ((Get-Content -LiteralPath $installedHookScript -Raw) -cne $claudeHookSource) {
+            throw "Claude installed $script must come from hooks/claude, not the Codex variant."
+        }
     }
 
     $sessionEndDefinitionBeforeRepair = $codexHooks.hooks.SessionEnd | ConvertTo-Json -Depth 10 -Compress
@@ -168,6 +239,30 @@ try {
         $repairedStopCommand -notmatch 'ManagedHookId "managed-jobs-stop"' -or
         $repairedStopCommand -notmatch [regex]::Escape($stopScriptName)) {
         throw 'Codex hook repair did not replace the moved legacy managed command with the current Stop handler.'
+    }
+
+    $claudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
+    $claudeSettings.hooks.Stop[0].hooks[0].timeout = 1
+    $claudeSettings | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $claudeSettingsPath -Encoding utf8
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
+        -Target Claude `
+        -ClaudeHome $claudeSandbox `
+        -SummaryOnly
+    if ($LASTEXITCODE -ne 1) { throw 'Claude status should detect managed hook drift.' }
+
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'install.ps1') `
+        -Target Claude `
+        -ClaudeHome $claudeSandbox `
+        -AllowDirty `
+        -AllowNonMain
+    if ($LASTEXITCODE -ne 0) { throw 'Claude hook repair installation failed.' }
+    $repairedClaudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
+    if ([int]$repairedClaudeSettings.hooks.Stop[0].hooks[0].timeout -ne 15) {
+        throw 'Claude hook repair did not restore the reviewed timeout.'
+    }
+    if ([string]$repairedClaudeSettings.model -ne 'opus' -or
+        [string]$repairedClaudeSettings.hooks.UserPromptSubmit[0].hooks[0].command -ne 'claude-unrelated-hook') {
+        throw 'Claude hook repair must preserve unrelated settings and hook entries.'
     }
 
     Add-Content -LiteralPath (Join-Path $claudeSandbox 'CLAUDE.md') -Value "`n# deliberate test drift"

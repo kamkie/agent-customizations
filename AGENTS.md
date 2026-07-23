@@ -29,10 +29,10 @@ Code configuration directories are deployment targets, not editing locations.
 - Develop changes on a branch or worktree. Deploy from a clean `main` checkout
   unless the user explicitly authorizes another source.
 
-The manifest and installer own the reviewed Codex managed-jobs hook
-registrations and preserve unrelated entries in the machine-local hook file.
-Other machine-specific hook registration remains outside this repository unless
-a portable, reviewable installation mechanism is added deliberately.
+The manifest and installer own the reviewed Codex and Claude Code managed-jobs
+hook registrations and preserve unrelated entries in each machine-local hook
+file. Other machine-specific hook registration remains outside this repository
+unless a portable, reviewable installation mechanism is added deliberately.
 
 ## Request authority
 

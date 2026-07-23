@@ -207,23 +207,20 @@ try {
     $previousManagedJobsRoot = $env:MANAGED_JOBS_ROOT
     try {
         $env:MANAGED_JOBS_ROOT = $stateRoot
-        $noticeActiveId = '20000101-000000-lifecycle-notice-active-000001'
-        $noticeActiveRecord = [ordered]@{
-            schemaVersion = 2; id = $noticeActiveId; name = 'lifecycle-notice-active'; kind = 'test'; status = 'starting'; visible = $false
-            keepTerminalOpen = $false; createdAtUtc = [datetime]::UtcNow.ToString('o'); startedAtUtc = $null; finishedAtUtc = $null
-            hostPid = $null; hostStartedAtUtc = $null; executable = 'fixture'; argumentCount = 0; environmentNames = @()
-            invocationFingerprint = ('3' * 64); workingDirectory = $testRoot; logPath = (Join-Path $stateRoot "logs\$noticeActiveId.log")
+        $noticeReconcileId = '20000101-000000-lifecycle-notice-reconcile-000001'
+        $noticeReconcileRecord = [ordered]@{
+            schemaVersion = 2; id = $noticeReconcileId; name = 'lifecycle-notice-reconcile'; kind = 'test'; status = 'running'; visible = $false
+            keepTerminalOpen = $false; createdAtUtc = '2000-01-01T00:00:00Z'; startedAtUtc = '2000-01-01T00:00:01Z'
+            finishedAtUtc = $null; hostPid = 2147483647; hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'
+            argumentCount = 0; environmentNames = @(); invocationFingerprint = ('3' * 64); workingDirectory = $testRoot
+            logPath = (Join-Path $stateRoot "logs\$noticeReconcileId.log")
             exitCode = $null; error = $null
         }
-        $noticeActiveRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$noticeActiveId.json") -Encoding utf8
+        $noticeReconcileRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$noticeReconcileId.json") -Encoding utf8
 
-        $activeAndOrphanNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
-        Assert-True ([string]::IsNullOrWhiteSpace($activeAndOrphanNoticeText)) 'Active and orphaned routine state should not emit session-start context.'
-        Assert-True ((Get-JobStatus -Id $noticeActiveId).status -eq 'starting') 'Silent session-start reconciliation should preserve a fresh active record.'
-
-        Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$noticeActiveId.json") -Force
-        $orphanOnlyNoticeText = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
-        Assert-True ([string]::IsNullOrWhiteSpace($orphanOnlyNoticeText)) 'Orphan-only state should not emit session-start context.'
+        $sessionStartOutput = ('' | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook | Out-String).Trim()
+        Assert-True ([string]::IsNullOrWhiteSpace($sessionStartOutput)) 'Routine reconciliation should not emit session-start context.'
+        Assert-True ((Get-JobStatus -Id $noticeReconcileId).status -eq 'orphaned') 'Silent session-start reconciliation should orphan a missing recorded process.'
     } finally {
         $env:MANAGED_JOBS_ROOT = $previousManagedJobsRoot
     }

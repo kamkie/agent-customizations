@@ -33,7 +33,7 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 - Treat arguments, environment entries, records, and logs as non-secret.
 - Use visible Windows Terminal mode only when the user asks to watch the output.
 - Never replace the controller with direct detached/background process commands.
-- Use `claude-runner` for Claude session, resume, budget, and review behavior.
+- Use `claude-runner` for Claude session, resume, and review behavior.
 - Before ending a turn, stop work that is no longer needed. Hand off the id,
   status, lifetime, log path, working directory, and exact status/logs/stop
   commands for any session or persistent job intentionally left running.

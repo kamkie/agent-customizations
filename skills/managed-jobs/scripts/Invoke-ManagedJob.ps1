@@ -35,17 +35,13 @@ Set-ManagedJobStateRoot -Path $StateRoot
 $managedJobHome = [IO.Path]::GetFullPath(
     (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
 )
-$codexHome = if ($env:CODEX_HOME) {
-    [IO.Path]::GetFullPath($env:CODEX_HOME)
-} else {
-    [IO.Path]::GetFullPath((Join-Path $HOME '.codex'))
-}
+$codexHome = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($(
+    if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
+)))
 $isCodexInstallation = $managedJobHome.Equals($codexHome, [StringComparison]::OrdinalIgnoreCase)
-$claudeHome = if ($env:CLAUDE_CONFIG_DIR) {
-    [IO.Path]::GetFullPath($env:CLAUDE_CONFIG_DIR)
-} else {
-    [IO.Path]::GetFullPath((Join-Path $HOME '.claude'))
-}
+$claudeHome = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($(
+    if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
+)))
 $isClaudeInstallation = $managedJobHome.Equals($claudeHome, [StringComparison]::OrdinalIgnoreCase)
 
 function Get-AllManagedJobs {

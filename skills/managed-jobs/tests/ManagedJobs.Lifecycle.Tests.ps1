@@ -72,7 +72,9 @@ try {
     # A Claude installation with its own session identity takes Claude turn
     # ownership even while an inherited CODEX_THREAD_ID is still present.
     $claudeSessionId = 'claude-lifecycle-session'
-    $env:CLAUDE_CONFIG_DIR = Join-Path $testRoot '.claude'
+    # The trailing separator proves installation detection normalizes the
+    # configured home before comparing it.
+    $env:CLAUDE_CONFIG_DIR = (Join-Path $testRoot '.claude') + '\'
     $env:CLAUDE_CODE_SESSION_ID = $claudeSessionId
     $claudeOwned = (& $claudeController start -StateRoot $stateRoot -Name 'claude-owned' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output claude-owned') | Out-String) | ConvertFrom-Json

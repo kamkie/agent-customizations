@@ -151,7 +151,7 @@ try {
         [string]$claudeSettings.hooks.UserPromptSubmit[0].hooks[0].command -ne 'claude-unrelated-hook') {
         throw 'Claude hook installation must preserve unrelated hook entries.'
     }
-    foreach ($event in @('PreToolUse', 'Stop', 'SessionEnd')) {
+    foreach ($event in @('PreToolUse', 'Stop', 'StopFailure', 'SessionEnd')) {
         if (-not $claudeSettings.hooks.PSObject.Properties[$event]) {
             throw "Claude hook installation did not register $event."
         }
@@ -161,7 +161,7 @@ try {
         [string]$claudePreToolHandlers[0].command -notmatch 'ManagedHookId "managed-jobs-pre-tool-use"') {
         throw 'Claude hook installation did not replace the exact legacy PreToolUse command with one marked managed definition.'
     }
-    foreach ($event in @('PreToolUse', 'Stop', 'SessionEnd')) {
+    foreach ($event in @('PreToolUse', 'Stop', 'StopFailure', 'SessionEnd')) {
         foreach ($handler in @($claudeSettings.hooks.$event | ForEach-Object { $_.hooks })) {
             if ($handler.PSObject.Properties['commandWindows'] -or $handler.PSObject.Properties['statusMessage']) {
                 throw 'Claude hook handlers must carry only fields that Claude Code settings accept.'

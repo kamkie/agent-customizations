@@ -87,7 +87,10 @@ The Claude Code registrations follow the same shapes under the
 [Claude Code hooks contract](https://docs.claude.com/en/docs/claude-code/hooks):
 handlers carry only `type`, `command`, and `timeout`, and the cleanup hooks
 prefer the payload `session_id` over an inherited `CLAUDE_CODE_SESSION_ID` so a
-nested session never cleans its parent's jobs.
+nested session never cleans its parent's jobs. Turn cleanup also registers on
+`StopFailure`, the side-effect-only event Claude fires when an API error ends
+the turn; a user interrupt fires neither event, so an interrupted turn's jobs
+are swept at the next turn's `Stop` or at `SessionEnd`.
 
 ## Identity and prune
 

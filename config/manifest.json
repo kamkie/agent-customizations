@@ -73,6 +73,13 @@
             "timeout": 15
           },
           {
+            "id": "managed-jobs-stop-failure",
+            "event": "StopFailure",
+            "source": "hooks/claude/managed-jobs/ManagedJob.StopHook.ps1",
+            "script": "hooks/managed-jobs/ManagedJob.StopHook.ps1",
+            "timeout": 15
+          },
+          {
             "id": "managed-jobs-session-end",
             "event": "SessionEnd",
             "source": "hooks/claude/managed-jobs/ManagedJob.SessionEndHook.ps1",

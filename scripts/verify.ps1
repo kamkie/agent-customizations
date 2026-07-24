@@ -45,7 +45,7 @@ $declaredSkills = [Collections.Generic.HashSet[string]]::new([StringComparer]::O
 $supportedHookEvents = @(
     'SessionStart', 'SessionEnd', 'SubagentStart', 'SubagentStop',
     'PreToolUse', 'PostToolUse', 'PermissionRequest',
-    'UserPromptSubmit', 'PreCompact', 'PostCompact', 'Stop'
+    'UserPromptSubmit', 'PreCompact', 'PostCompact', 'Stop', 'StopFailure'
 )
 foreach ($targetName in $targetNames) {
     $target = $manifest.targets.PSObject.Properties[$targetName].Value

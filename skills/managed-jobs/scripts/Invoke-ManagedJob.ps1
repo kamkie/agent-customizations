@@ -35,12 +35,14 @@ Set-ManagedJobStateRoot -Path $StateRoot
 $managedJobHome = [IO.Path]::GetFullPath(
     (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
 )
-$codexHome = if ($env:CODEX_HOME) {
-    [IO.Path]::GetFullPath($env:CODEX_HOME)
-} else {
-    [IO.Path]::GetFullPath((Join-Path $HOME '.codex'))
-}
+$codexHome = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($(
+    if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
+)))
 $isCodexInstallation = $managedJobHome.Equals($codexHome, [StringComparison]::OrdinalIgnoreCase)
+$claudeHome = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($(
+    if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
+)))
+$isClaudeInstallation = $managedJobHome.Equals($claudeHome, [StringComparison]::OrdinalIgnoreCase)
 
 function Get-AllManagedJobs {
     $jobsDirectory = Join-Path (Get-ManagedJobRoot) 'jobs'
@@ -163,6 +165,8 @@ switch ($Action) {
             $OwnerAgent.Trim().ToLowerInvariant()
         } elseif ($isCodexInstallation -and $env:CODEX_THREAD_ID) {
             'codex'
+        } elseif ($isClaudeInstallation -and $env:CLAUDE_CODE_SESSION_ID) {
+            'claude'
         } else {
             $null
         }
@@ -170,6 +174,8 @@ switch ($Action) {
             $OwnerSessionId.Trim()
         } elseif ($isCodexInstallation -and $env:CODEX_THREAD_ID) {
             $env:CODEX_THREAD_ID.Trim()
+        } elseif ($isClaudeInstallation -and $env:CLAUDE_CODE_SESSION_ID) {
+            $env:CLAUDE_CODE_SESSION_ID.Trim()
         } else {
             $null
         }
@@ -180,12 +186,12 @@ switch ($Action) {
         }
         if ($resolvedLifetime -in @('turn', 'session') -and
             (-not $resolvedOwnerAgent -or -not $resolvedOwnerSessionId)) {
-            throw "Lifetime '$Lifetime' requires -OwnerAgent and -OwnerSessionId, or a Codex invocation with CODEX_THREAD_ID."
+            throw "Lifetime '$Lifetime' requires -OwnerAgent and -OwnerSessionId, or an agent invocation that provides CODEX_THREAD_ID or CLAUDE_CODE_SESSION_ID."
         }
         $resolvedRoot = [IO.Path]::GetFullPath((Get-ManagedJobRoot))
         if ($resolvedLifetime -in @('turn', 'session') -and
             -not $resolvedRoot.Equals($automaticCleanupRoot, [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Lifetime '$Lifetime' requires the hook-visible managed-job state root '$automaticCleanupRoot'. Set MANAGED_JOBS_ROOT before starting Codex instead of using a different -StateRoot, or use -Lifetime Persistent."
+            throw "Lifetime '$Lifetime' requires the hook-visible managed-job state root '$automaticCleanupRoot'. Set MANAGED_JOBS_ROOT before starting the agent instead of using a different -StateRoot, or use -Lifetime Persistent."
         }
         $resolvedDirectory = (Resolve-Path -LiteralPath $WorkingDirectory).Path
         $fingerprint = Get-InvocationFingerprint -Executable $Executable -Arguments $Arguments -WorkingDirectory $resolvedDirectory -Environment $Environment

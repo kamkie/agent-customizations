@@ -115,7 +115,8 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
             Update-CustomizationHookFile `
                 -HooksPath $hooksTarget `
                 -Entries $hookEntriesToRepair `
-                -HomePath $resolvedHome
+                -HomePath $resolvedHome `
+                -Format (Get-CustomizationHookHandlerFormat -Target $targetConfig)
         }
     }
 
@@ -130,5 +131,8 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
     Write-Host "Previous files, when present, were backed up under $backupRoot"
     if ($targetName -eq 'codex' -and $hookDrift.Count -gt 0) {
         Write-Warning 'Codex skips any new or changed personal hook definition until you start Codex, open /hooks, and trust each definition marked for review.'
+    }
+    if ($targetName -eq 'claude' -and $hookDrift.Count -gt 0) {
+        Write-Warning 'Claude Code applies changed hook definitions when a new session starts; sessions already running keep their captured hook snapshot.'
     }
 }

@@ -11,6 +11,8 @@ $activeIds = [Collections.Generic.List[string]]::new()
 $assertionCount = 0
 $previousCodexHome = $env:CODEX_HOME
 $previousThreadId = $env:CODEX_THREAD_ID
+$previousClaudeHome = $env:CLAUDE_CONFIG_DIR
+$previousClaudeSessionId = $env:CLAUDE_CODE_SESSION_ID
 $previousStateRoot = $env:MANAGED_JOBS_ROOT
 
 function Assert-True {
@@ -41,6 +43,8 @@ try {
     $testSessionId = 'codex-lifecycle-session'
     $env:CODEX_HOME = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..')).Path
     $env:CODEX_THREAD_ID = $testSessionId
+    Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue
+    Remove-Item Env:CLAUDE_CODE_SESSION_ID -ErrorAction SilentlyContinue
     $env:MANAGED_JOBS_ROOT = $stateRoot
     $null = & $controller reconcile -StateRoot $stateRoot
 
@@ -64,6 +68,21 @@ try {
     $claudeAuto = (& $claudeController start -StateRoot (Join-Path $testRoot 'claude-state') -Name 'claude-auto' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output claude-auto') | Out-String) | ConvertFrom-Json
     Assert-True ($claudeAuto.lifetime -eq 'persistent' -and -not $claudeAuto.ownerAgent) 'Claude must not adopt inherited Codex turn ownership.'
+
+    # A Claude installation with its own session identity takes Claude turn
+    # ownership even while an inherited CODEX_THREAD_ID is still present.
+    $claudeSessionId = 'claude-lifecycle-session'
+    # The trailing separator proves installation detection normalizes the
+    # configured home before comparing it.
+    $env:CLAUDE_CONFIG_DIR = (Join-Path $testRoot '.claude') + '\'
+    $env:CLAUDE_CODE_SESSION_ID = $claudeSessionId
+    $claudeOwned = (& $claudeController start -StateRoot $stateRoot -Name 'claude-owned' `
+        -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output claude-owned') | Out-String) | ConvertFrom-Json
+    $claudeOwned = Wait-JobStatus -Id $claudeOwned.id -Expected @('completed')
+    Assert-True ($claudeOwned.ownerAgent -eq 'claude' -and $claudeOwned.ownerSessionId -eq $claudeSessionId) 'A Claude installation should record Claude session ownership.'
+    Assert-True ($claudeOwned.lifetime -eq 'turn') 'Claude Auto lifetime should resolve to turn.'
+    # CLAUDE_CODE_SESSION_ID stays set from here on so the Codex-installation
+    # assertions below also prove the Codex identity is preferred there.
 
     $hiddenKeepOpenRejected = $false
     try {
@@ -99,7 +118,7 @@ try {
     $recordText = Get-Content -LiteralPath (Join-Path $stateRoot "jobs\$($completed.id).json") -Raw
     Assert-True ($recordText -notmatch 'lifecycle-ok|not-recorded|Lifecycle Test') 'Permanent records must omit argument text and environment values.'
     Assert-True ($completed.schemaVersion -eq 3) 'New records should use schema version 3.'
-    Assert-True ($completed.ownerAgent -eq 'codex' -and $completed.ownerSessionId -eq $testSessionId) 'Codex records should capture their owning session.'
+    Assert-True ($completed.ownerAgent -eq 'codex' -and $completed.ownerSessionId -eq $testSessionId) 'Codex records should capture their owning session even when a Claude session id is inherited.'
     Assert-True ($completed.lifetime -eq 'turn') 'Codex Auto lifetime should resolve to turn.'
     Assert-True ($completed.processContainment -eq 'windows-job-object-kill-on-close') 'Managed hosts should enable Windows process-tree containment.'
     $completedReferences = @(Get-ManagedJobOwnerReferenceIds -OwnerAgent codex -OwnerSessionId $testSessionId -Lifetime turn)
@@ -354,5 +373,15 @@ try {
         Remove-Item Env:CODEX_HOME -ErrorAction SilentlyContinue
     } else {
         $env:CODEX_HOME = $previousCodexHome
+    }
+    if ($null -eq $previousClaudeHome) {
+        Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue
+    } else {
+        $env:CLAUDE_CONFIG_DIR = $previousClaudeHome
+    }
+    if ($null -eq $previousClaudeSessionId) {
+        Remove-Item Env:CLAUDE_CODE_SESSION_ID -ErrorAction SilentlyContinue
+    } else {
+        $env:CLAUDE_CODE_SESSION_ID = $previousClaudeSessionId
     }
 }

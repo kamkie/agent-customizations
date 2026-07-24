@@ -99,6 +99,16 @@ function Get-CustomizationHookCommand {
     return $command + ' -ManagedHookId "' + [string]$Entry.id + '"'
 }
 
+function Get-CustomizationHookHandlerFormat {
+    param([Parameter(Mandatory)]$Target)
+
+    if ($Target.PSObject.Properties.Name -contains 'hooks' -and
+        $Target.hooks.PSObject.Properties.Name -contains 'handlerFormat') {
+        return [string]$Target.hooks.handlerFormat
+    }
+    return 'codex'
+}
+
 function Test-CustomizationHookHandlerIdentity {
     param(
         [Parameter(Mandatory)]$Handler,
@@ -127,7 +137,8 @@ function Test-CustomizationHookDefinition {
         [Parameter(Mandatory)]$Group,
         [Parameter(Mandatory)]$Handler,
         [Parameter(Mandatory)]$Entry,
-        [Parameter(Mandatory)][string]$HomePath
+        [Parameter(Mandatory)][string]$HomePath,
+        [ValidateSet('codex', 'claude')][string]$Format = 'codex'
     )
 
     $expectedMatcher = if ($Entry.PSObject.Properties.Name -contains 'matcher') { [string]$Entry.matcher } else { '' }
@@ -135,6 +146,22 @@ function Test-CustomizationHookDefinition {
     if ($actualMatcher -cne $expectedMatcher) { return $false }
 
     $expectedCommand = Get-CustomizationHookCommand -HomePath $HomePath -Entry $Entry
+    if ($Format -eq 'claude') {
+        # A managed Claude Code handler is exactly type/command/timeout; any
+        # other field changes Claude's execution semantics or fails its
+        # settings validation, so its presence is drift that repair rewrites.
+        foreach ($property in $Handler.PSObject.Properties) {
+            if ($property.Name -notin @('type', 'command', 'timeout')) { return $false }
+        }
+        $typeProperty = $Handler.PSObject.Properties['type']
+        $commandProperty = $Handler.PSObject.Properties['command']
+        $timeoutProperty = $Handler.PSObject.Properties['timeout']
+        if (-not $typeProperty -or -not $commandProperty -or -not $timeoutProperty) { return $false }
+        return ([string]$typeProperty.Value -ceq 'command' -and
+            [string]$commandProperty.Value -ceq $expectedCommand -and
+            [int]$timeoutProperty.Value -eq [int]$Entry.timeout)
+    }
+
     if ([string]$Handler.type -cne 'command' -or
         [string]$Handler.command -cne $expectedCommand -or
         [string]$Handler.commandWindows -cne $expectedCommand -or
@@ -151,7 +178,8 @@ function Get-CustomizationHookState {
     param(
         [Parameter(Mandatory)][string]$HooksPath,
         [Parameter(Mandatory)]$Entry,
-        [Parameter(Mandatory)][string]$HomePath
+        [Parameter(Mandatory)][string]$HomePath,
+        [ValidateSet('codex', 'claude')][string]$Format = 'codex'
     )
 
     if (-not (Test-Path -LiteralPath $HooksPath -PathType Leaf)) { return 'Missing' }
@@ -170,7 +198,7 @@ function Get-CustomizationHookState {
                 if (-not (Test-CustomizationHookHandlerIdentity -Handler $handler -Entry $Entry -HomePath $HomePath)) { continue }
                 $candidateCount++
                 if ($eventProperty.Name -ceq [string]$Entry.event -and
-                    (Test-CustomizationHookDefinition -Group $group -Handler $handler -Entry $Entry -HomePath $HomePath)) {
+                    (Test-CustomizationHookDefinition -Group $group -Handler $handler -Entry $Entry -HomePath $HomePath -Format $Format)) {
                     $exactCount++
                 }
             }
@@ -197,7 +225,8 @@ function Update-CustomizationHookFile {
     param(
         [Parameter(Mandatory)][string]$HooksPath,
         [Parameter(Mandatory)][object[]]$Entries,
-        [Parameter(Mandatory)][string]$HomePath
+        [Parameter(Mandatory)][string]$HomePath,
+        [ValidateSet('codex', 'claude')][string]$Format = 'codex'
     )
 
     $config = if (Test-Path -LiteralPath $HooksPath -PathType Leaf) {
@@ -247,10 +276,12 @@ function Update-CustomizationHookFile {
         $handler = [ordered]@{
             type = 'command'
             command = $command
-            commandWindows = $command
-            timeout = [int]$entry.timeout
         }
-        if ($entry.PSObject.Properties.Name -contains 'statusMessage') {
+        if ($Format -ne 'claude') {
+            $handler['commandWindows'] = $command
+        }
+        $handler['timeout'] = [int]$entry.timeout
+        if ($Format -ne 'claude' -and $entry.PSObject.Properties.Name -contains 'statusMessage') {
             $handler['statusMessage'] = [string]$entry.statusMessage
         }
         $newGroup = [ordered]@{}
@@ -302,6 +333,7 @@ function Get-CustomizationStatus {
 
     if ($target.PSObject.Properties.Name -contains 'hooks') {
         $hooksPath = Join-Path $HomePath ([string]$target.hooks.destination)
+        $hookFormat = Get-CustomizationHookHandlerFormat -Target $target
         foreach ($entry in @($target.hooks.entries)) {
             $hookSource = Join-Path $repositoryRoot ([string]$entry.source)
             $hookTarget = Join-Path $HomePath ([string]$entry.script)
@@ -310,7 +342,7 @@ function Get-CustomizationStatus {
             } elseif (-not (Test-FilesEqual -Source $hookSource -Target $hookTarget)) {
                 'Different'
             } else {
-                Get-CustomizationHookState -HooksPath $hooksPath -Entry $entry -HomePath $HomePath
+                Get-CustomizationHookState -HooksPath $hooksPath -Entry $entry -HomePath $HomePath -Format $hookFormat
             }
             $results.Add([pscustomobject]@{
                 Target = $TargetName

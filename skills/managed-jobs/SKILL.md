@@ -26,9 +26,10 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 - Keep short commands attached to the active agent tool call.
 - Default long-lived work to hidden supervised execution; record the returned id,
   current status, and log path.
-- On Codex, the default lifetime is the current turn. Use `-Lifetime Session`
-  only when the process must remain available across turns, and use
-  `-Lifetime Persistent` only when it must intentionally survive the session.
+- In a Codex or Claude Code installation, the default lifetime is the current
+  turn. Use `-Lifetime Session` only when the process must remain available
+  across turns, and use `-Lifetime Persistent` only when it must intentionally
+  survive the session.
 - Reconcile after restarts and reuse an equivalent active job.
 - Treat arguments, environment entries, records, and logs as non-secret.
 - Use visible Windows Terminal mode only when the user asks to watch the output.

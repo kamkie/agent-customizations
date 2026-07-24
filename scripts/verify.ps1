@@ -45,7 +45,7 @@ $declaredSkills = [Collections.Generic.HashSet[string]]::new([StringComparer]::O
 $supportedHookEvents = @(
     'SessionStart', 'SessionEnd', 'SubagentStart', 'SubagentStop',
     'PreToolUse', 'PostToolUse', 'PermissionRequest',
-    'UserPromptSubmit', 'PreCompact', 'PostCompact', 'Stop'
+    'UserPromptSubmit', 'PreCompact', 'PostCompact', 'Stop', 'StopFailure'
 )
 foreach ($targetName in $targetNames) {
     $target = $manifest.targets.PSObject.Properties[$targetName].Value
@@ -73,6 +73,10 @@ foreach ($targetName in $targetNames) {
     if ($target.PSObject.Properties.Name -contains 'hooks') {
         if ([string]::IsNullOrWhiteSpace([string]$target.hooks.destination)) {
             $errors.Add("Target '$targetName' hooks have no destination")
+        }
+        if ($target.hooks.PSObject.Properties.Name -contains 'handlerFormat' -and
+            [string]$target.hooks.handlerFormat -notin @('codex', 'claude')) {
+            $errors.Add("Target '$targetName' hooks have unsupported handlerFormat '$($target.hooks.handlerFormat)'")
         }
         $hookIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach ($entry in @($target.hooks.entries)) {

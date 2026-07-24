@@ -20,8 +20,9 @@ tools' live configuration directories are deployment targets.
 - `skills/orchestrate-work-campaigns` — Codex-specific, visible,
   coordinator-only control of multi-task delivery campaigns.
 - `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.
-- `config/manifest.json` — the exact files and Codex hook registrations managed
-  for each supported agent.
+- `hooks/claude` — Claude Code-specific managed-job lifecycle cleanup scripts.
+- `config/manifest.json` — the exact files and hook registrations managed for
+  each supported agent.
 - `docs/customization-ownership.md` — classification, admission, ownership,
   precedence, and authoring rules for proposed customizations.
 - `docs/maintaining-customizations.md` — maintenance rules for agent
@@ -110,19 +111,20 @@ Codex requires review and trust for new or changed personal hooks. After a
 Codex deployment changes hook definitions, start Codex, open `/hooks`, and
 trust the reviewed definitions. Repository status proves source and
 registration equality; it cannot prove Codex's separate per-definition trust
-state.
+state. Claude Code applies changed hook definitions when a new session starts;
+sessions already running keep the hook snapshot captured at startup.
 
 ## Scope boundary
 
 The repository does not manage settings, authentication, plugins, caches,
 memories, sessions, logs, artifacts, or managed-job records. Those surfaces can
 contain machine-specific paths, private data, or generated state. The portable
-managed-job command guard is versioned with the skill, while Codex-specific
-lifecycle hooks live under `hooks/codex`. The installer copies those
-target-specific scripts and merges their reviewed registrations into
-`hooks.json` while preserving unrelated entries; Claude hook integration
-remains separate. The merge preserves entries semantically but may reformat the
-machine-local JSON file.
+managed-job command guard is versioned with the skill, while target-specific
+lifecycle hooks live under `hooks/codex` and `hooks/claude`. The installer
+copies those target-specific scripts and merges their reviewed registrations
+into each target's hook file — `hooks.json` for Codex and `settings.json` for
+Claude Code — while preserving unrelated entries and settings. The merge
+preserves entries semantically but may reformat the machine-local JSON file.
 
 Before adding guidance, use the [customization ownership and skill-admission
 policy](docs/customization-ownership.md) to decide whether it belongs in global

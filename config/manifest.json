@@ -60,7 +60,7 @@
           {
             "id": "managed-jobs-pre-tool-use",
             "event": "PreToolUse",
-            "matcher": "^Bash$",
+            "matcher": "^(Bash|PowerShell)$",
             "source": "skills/managed-jobs/scripts/ManagedJob.PreToolUseHook.ps1",
             "script": "skills/managed-jobs/scripts/ManagedJob.PreToolUseHook.ps1",
             "timeout": 10

@@ -25,6 +25,8 @@ tools' live configuration directories are deployment targets.
   each supported agent.
 - `docs/customization-ownership.md` — classification, admission, ownership,
   precedence, and authoring rules for proposed customizations.
+- `docs/deployment.md` — validation, drift inspection, explicit activation,
+  backups, hook application, and deployment scope.
 - `docs/maintaining-customizations.md` — maintenance rules for agent
   instructions, skill entrypoints, references, and progressive-disclosure
   validation.
@@ -55,15 +57,13 @@ activating it.
 - Git for clean-branch deployment checks
 - A local Codex and/or Claude Code installation
 
-## Workflow
+## Quick start
 
 An explicit request to implement a repository change defaults to the complete
 branch-to-PR delivery workflow in [`AGENTS.md`](AGENTS.md): validate, commit,
 push, open a bot-authored draft PR, obtain opposite-agent cross-review, triage
 findings, and mark the PR ready for owner review. Current-head owner approval
 then triggers a guarded merge or auto-merge after required checks pass.
-Deployment to live agent homes remains a separate, explicitly authorized
-activation step.
 
 Validate the repository:
 
@@ -83,48 +83,17 @@ Compare both live installations:
 pwsh ./scripts/status.ps1
 ```
 
-Compare only one target:
-
-```powershell
-pwsh ./scripts/status.ps1 -Target Claude
-```
-
-Preview a deployment to both targets:
-
-```powershell
-pwsh ./scripts/install.ps1 -WhatIf
-```
-
-Deploy one target from a clean `main` checkout:
-
-```powershell
-pwsh ./scripts/install.ps1 -Target Codex
-pwsh ./scripts/install.ps1 -Target Claude
-```
-
-`CODEX_HOME` and `CLAUDE_CONFIG_DIR` select non-default live directories. For
-one-off targeting, pass `-CodexHome` or `-ClaudeHome`. The installer creates
-timestamped backups under each target's `customization-backups` directory when
-it replaces existing files.
-
-Codex requires review and trust for new or changed personal hooks. After a
-Codex deployment changes hook definitions, start Codex, open `/hooks`, and
-trust the reviewed definitions. Repository status proves source and
-registration equality; it cannot prove Codex's separate per-definition trust
-state. Claude Code applies changed hook definitions when a new session starts;
-sessions already running keep the hook snapshot captured at startup.
+Deployment to live agent homes is a separate, explicitly authorized activation
+step. Do not run `scripts/install.ps1` for validation or status inspection. See
+the [deployment guide](docs/deployment.md) for previews, target selection,
+activation, backups, and post-install hook requirements.
 
 ## Scope boundary
 
-The repository does not manage settings, authentication, plugins, caches,
-memories, sessions, logs, artifacts, or managed-job records. Those surfaces can
-contain machine-specific paths, private data, or generated state. The portable
-managed-job command guard is versioned with the skill, while target-specific
-lifecycle hooks live under `hooks/codex` and `hooks/claude`. The installer
-copies those target-specific scripts and merges their reviewed registrations
-into each target's hook file — `hooks.json` for Codex and `settings.json` for
-Claude Code — while preserving unrelated entries and settings. The merge
-preserves entries semantically but may reformat the machine-local JSON file.
+The manifest defines the reviewed instructions, skills, hook scripts, and hook
+registrations managed for each target. Unrelated machine-local settings and
+runtime state remain outside the repository. See the
+[deployment scope](docs/deployment.md#scope-boundary) for the complete boundary.
 
 Before adding guidance, use the [customization ownership and skill-admission
 policy](docs/customization-ownership.md) to decide whether it belongs in global

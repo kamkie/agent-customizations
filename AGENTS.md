@@ -40,6 +40,11 @@ unless a portable, reviewable installation mechanism is added deliberately.
   change authorizes the complete delivery workflow below unless the user limits
   the requested terminal state. The user does not need to repeat commit, push,
   pull-request, cross-review, or readiness steps.
+- While the temporary bot-unavailable rule below is active, a pull request
+  authored by `kamkie` requires a new explicit `merge PR <number> at <sha>`
+  instruction after readiness. General implementation authority stops at the
+  ready pull request because GitHub cannot record owner approval on a
+  self-authored pull request.
 - A question, investigation, review, or design request remains read-only or
   proposal-only until implementation is explicitly authorized.
 - Repository delivery authority never includes `install.ps1`, deployment to a
@@ -73,32 +78,29 @@ unless a portable, reviewable installation mechanism is added deliberately.
 - Commit intentionally on the agent-owned branch and push it. Report every
   validation command that could not run, why, and the remaining risk.
 
-### Open the draft pull request as the bot
+### Open the draft pull request while the bot is unavailable
 
 `kamkie` is the repository owner, reviewer, approver, and administrator.
-`kamkie-codex-bot` opens Codex-authored pull requests and performs author-side
-mutations for them. Commits and pushes may continue to use the configured Git/SSH
-credentials because PR authorship is determined by the credential that creates
-the PR.
+`kamkie-codex-bot` is temporarily unavailable. Do not attempt to retrieve,
+restore, or use its GitHub CLI credential until this notice is removed.
 
-For PR creation and later author-side mutations, obtain the bot token for the
-individual command, verify the effective login, and remove it immediately:
+Until then, `kamkie` opens Codex-authored pull requests and performs author-side
+mutations and merges. Commits and pushes may continue to use the configured
+Git/SSH credentials because PR authorship is determined by the credential that
+creates the PR.
+
+Before PR creation or an author-side mutation, verify the effective login:
 
 ```powershell
-$env:GH_TOKEN = gh auth token --hostname github.com --user kamkie-codex-bot
-try {
-    if ((gh api user --jq .login) -ne 'kamkie-codex-bot') {
-        throw 'Expected the kamkie-codex-bot GitHub identity.'
-    }
-    gh pr create --draft # supply the task-specific base, head, title, and body
-} finally {
-    Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
+if ((gh api user --jq .login) -ne 'kamkie') {
+    throw 'Expected the kamkie GitHub identity while the bot is unavailable.'
 }
+gh pr create --draft # supply the task-specific base, head, title, and body
 ```
 
-Do not globally switch the active GitHub account, print or persist the token, or
-open a Codex-authored PR as `kamkie`. If the bot credential is unavailable or
-does not have access, stop before PR creation and report the exact blocker.
+Do not print authentication tokens, place them in repository files or process
+arguments, or globally switch the active GitHub account. If the effective login
+is not `kamkie`, stop before the mutation and report the exact blocker.
 
 ### Cross-review before human handoff
 
@@ -118,8 +120,10 @@ does not have access, stop before PR creation and report the exact blocker.
   the current head. Re-fetch after the transition and revert to draft if this
   gate changed.
 - Resolved feedback on an earlier head does not block readiness, but its review
-  remains a merge blocker until current-head approval. CODEOWNERS then requests
-  `kamkie` as the human owner reviewer.
+  remains a merge blocker until current-head approval. For pull requests not
+  authored by `kamkie`, CODEOWNERS then requests `kamkie` as the human owner
+  reviewer. A temporary owner-authored pull request follows the exact-head
+  authorization rule below instead.
 
 ### Owner approval, checks, and merge
 
@@ -127,19 +131,26 @@ After a review is recorded, a commit is pushed, or the PR is marked ready,
 re-fetch the PR's head SHA, thread-aware unresolved feedback, latest reviews,
 required checks, draft state, mergeability, and blocking-review state.
 
-- Owner approval is valid only when the latest `kamkie` approval applies to the
-  current head SHA. Never manufacture approval with a stored owner credential or
-  reuse approval from an earlier commit.
-- When current-head owner approval exists and cross-review, triage, required
-  checks, non-draft state, and clean mergeability all pass, merge immediately as
-  `kamkie-codex-bot` with the repository's merge-commit method and
+- For a pull request not authored by `kamkie`, owner approval is valid only when
+  the latest `kamkie` approval applies to the current head SHA. Never
+  manufacture approval with a stored owner credential or reuse approval from an
+  earlier commit.
+- A pull request authored by `kamkie` during the temporary bot outage cannot
+  receive owner self-approval. After every other gate passes, report the exact
+  current head and leave the pull request unmerged until the user explicitly
+  instructs `merge PR <number> at <sha>`. That exact-head instruction replaces
+  only the unavailable self-review; it does not waive cross-review, triage,
+  checks, readiness, or clean mergeability.
+- When applicable current-head owner authorization exists and cross-review,
+  triage, required checks, non-draft state, and clean mergeability all pass,
+  merge immediately as `kamkie` with the repository's merge-commit method and
   `--match-head-commit <sha>`.
-- If every other gate passes but required checks are still pending, enable
-  guarded auto-merge with `--merge --match-head-commit <sha>` instead of bypassing
-  protection.
-- If approval is absent, a check failed, the head changed, the PR is draft, the
-  merge is not clean, or a blocking review exists, leave the PR unmerged and
-  report that exact state.
+- If every other gate passes but required checks are still pending and
+  applicable current-head owner authorization exists, enable guarded auto-merge
+  with `--merge --match-head-commit <sha>` instead of bypassing protection.
+- If approval or exact-head authorization is absent, a check failed, the head
+  changed, the PR is draft, the merge is not clean, or a blocking review
+  exists, leave the PR unmerged and report that exact state.
 - After merge, fetch `origin/main`, prove the PR result is reachable from it, and
   report the landed commit. Do not claim completion from a stale local ref.
 

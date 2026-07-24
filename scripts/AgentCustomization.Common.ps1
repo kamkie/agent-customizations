@@ -147,16 +147,17 @@ function Test-CustomizationHookDefinition {
 
     $expectedCommand = Get-CustomizationHookCommand -HomePath $HomePath -Entry $Entry
     if ($Format -eq 'claude') {
-        # Claude Code hook handlers carry only type/command/timeout; extra
-        # fields would fail Claude's settings validation, so their presence is
-        # drift that repair must rewrite.
-        foreach ($field in @('commandWindows', 'statusMessage')) {
-            if ($Handler.PSObject.Properties[$field]) { return $false }
+        # A managed Claude Code handler is exactly type/command/timeout; any
+        # other field changes Claude's execution semantics or fails its
+        # settings validation, so its presence is drift that repair rewrites.
+        foreach ($property in $Handler.PSObject.Properties) {
+            if ($property.Name -notin @('type', 'command', 'timeout')) { return $false }
         }
+        $typeProperty = $Handler.PSObject.Properties['type']
         $commandProperty = $Handler.PSObject.Properties['command']
         $timeoutProperty = $Handler.PSObject.Properties['timeout']
-        if (-not $commandProperty -or -not $timeoutProperty) { return $false }
-        return ([string]$Handler.type -ceq 'command' -and
+        if (-not $typeProperty -or -not $commandProperty -or -not $timeoutProperty) { return $false }
+        return ([string]$typeProperty.Value -ceq 'command' -and
             [string]$commandProperty.Value -ceq $expectedCommand -and
             [int]$timeoutProperty.Value -eq [int]$Entry.timeout)
     }

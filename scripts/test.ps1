@@ -243,6 +243,8 @@ try {
 
     $claudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
     $claudeSettings.hooks.Stop[0].hooks[0].timeout = 1
+    $claudeSettings.hooks.SessionEnd[0].hooks[0] |
+        Add-Member -NotePropertyName async -NotePropertyValue $true
     $claudeSettings | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $claudeSettingsPath -Encoding utf8
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
         -Target Claude `
@@ -259,6 +261,9 @@ try {
     $repairedClaudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
     if ([int]$repairedClaudeSettings.hooks.Stop[0].hooks[0].timeout -ne 15) {
         throw 'Claude hook repair did not restore the reviewed timeout.'
+    }
+    if ($repairedClaudeSettings.hooks.SessionEnd[0].hooks[0].PSObject.Properties['async']) {
+        throw 'Claude hook repair must strip execution-changing extra fields from a managed handler.'
     }
     if ([string]$repairedClaudeSettings.model -ne 'opus' -or
         [string]$repairedClaudeSettings.hooks.UserPromptSubmit[0].hooks[0].command -ne 'claude-unrelated-hook') {

@@ -85,9 +85,10 @@ unless a portable, reviewable installation mechanism is added deliberately.
 restore, or use its GitHub CLI credential until this notice is removed.
 
 Until then, `kamkie` opens all agent-authored pull requests and performs
-author-side mutations and merges. Commits and pushes may continue to use the
-configured Git/SSH credentials because PR authorship is determined by the
-credential that creates the PR.
+author-side mutations. It executes merges only after applicable current-head
+authorization. Commits and pushes may continue to use the configured Git/SSH
+credentials because PR authorship is determined by the credential that creates
+the PR.
 
 Before PR creation or an author-side mutation, verify the effective login:
 

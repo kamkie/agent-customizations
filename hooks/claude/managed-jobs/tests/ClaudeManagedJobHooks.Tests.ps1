@@ -127,6 +127,20 @@ try {
     Assert-True ($infrastructureBounded.PSObject.Properties.Name -notcontains 'decision') 'A repeated infrastructure failure must not wedge the turn.'
     $env:CLAUDE_CONFIG_DIR = $repositoryRoot
 
+    $launchGuard = Join-Path $repositoryRoot 'skills\managed-jobs\scripts\ManagedJob.PreToolUseHook.ps1'
+    $backgroundPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+        tool_input = [ordered]@{ command = 'python -m http.server'; run_in_background = $true }
+    } | ConvertTo-Json -Compress
+    $backgroundDecision = ($backgroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'The launch guard should deny a natively backgrounded command.'
+    $foregroundPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = 'git status' }
+    } | ConvertTo-Json -Compress
+    $foregroundOutput = ($foregroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($foregroundOutput)) 'The launch guard should stay silent for an ordinary foreground command.'
+
     Remove-Item Env:CLAUDE_CODE_SESSION_ID -ErrorAction SilentlyContinue
     $payloadStopOutput = ($stopPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String)
     Assert-True ([string]::IsNullOrWhiteSpace($payloadStopOutput)) 'Stop cleanup should use payload.session_id when CLAUDE_CODE_SESSION_ID is absent.'

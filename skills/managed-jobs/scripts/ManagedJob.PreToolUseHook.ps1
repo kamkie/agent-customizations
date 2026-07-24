@@ -19,6 +19,10 @@ try {
     $usesController = $command -match 'Invoke-ManagedJob\.ps1|managed-jobs[\\/]scripts'
     if ($explicitBypass -or $usesController) { exit 0 }
 
+    $backgroundRequested = $payload.tool_input -isnot [string] -and
+        $payload.tool_input.PSObject.Properties['run_in_background'] -and
+        [bool]$payload.tool_input.run_in_background
+
     $patterns = @(
         '(?i)\bStart-Job\b',
         '(?i)\bStart-Process\b.*(?:-WindowStyle\s+Hidden|\bwt(?:\.exe)?\b)',
@@ -31,7 +35,7 @@ try {
         '(?i)(?:--background|--bg)\b'
     )
     $matched = $patterns | Where-Object { $command -match $_ } | Select-Object -First 1
-    if (-not $matched) { exit 0 }
+    if (-not $matched -and -not $backgroundRequested) { exit 0 }
 
     [ordered]@{
         hookSpecificOutput = [ordered]@{

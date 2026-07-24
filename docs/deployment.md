@@ -75,7 +75,8 @@ pwsh ./scripts/install.ps1 -Target Claude -ClaudeHome <path> -WhatIf
 ```
 
 The installer runs repository verification and its clean-`main` safeguards
-before producing a preview.
+before producing a preview. `-WhatIf` does not bypass those safeguards, so run
+previews from a clean, current `main` checkout.
 
 ## Activate reviewed changes
 

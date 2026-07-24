@@ -84,10 +84,10 @@ unless a portable, reviewable installation mechanism is added deliberately.
 `kamkie-codex-bot` is temporarily unavailable. Do not attempt to retrieve,
 restore, or use its GitHub CLI credential until this notice is removed.
 
-Until then, `kamkie` opens Codex-authored pull requests and performs author-side
-mutations and merges. Commits and pushes may continue to use the configured
-Git/SSH credentials because PR authorship is determined by the credential that
-creates the PR.
+Until then, `kamkie` opens all agent-authored pull requests and performs
+author-side mutations and merges. Commits and pushes may continue to use the
+configured Git/SSH credentials because PR authorship is determined by the
+credential that creates the PR.
 
 Before PR creation or an author-side mutation, verify the effective login:
 

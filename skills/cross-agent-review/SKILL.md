@@ -119,8 +119,16 @@ function Assert-PullRequestHead {
 
 Assert-PullRequestHead -Number $pr -ExpectedHead $reviewHead
 & $runner -WorkingDirectory $repo -ReviewPr $pr -ModelAlias opus -Effort medium
+$runnerExit = $LASTEXITCODE
+if ($runnerExit -ne 0) { throw "The reviewer exited with $runnerExit. No review was produced; this round does not count." }
 Assert-PullRequestHead -Number $pr -ExpectedHead $reviewHead
 ```
+
+Capture `$LASTEXITCODE` on the line directly after the runner. A called script
+returning nonzero does not stop its caller, and the next native command
+overwrites the value — so a reviewer that timed out, crashed, or failed
+authentication would otherwise pass the head assertion and be recorded as a
+completed round.
 
 Never add `-BypassPermissions` to a review. Read `claude-runner`'s own `SKILL.md`
 only for session resumption and recovery after an interrupted run.
@@ -195,10 +203,12 @@ Rounds are bounded at three and are not automatic.
 
 1. A next round happens only when this round produced at least one confirmed
    finding **and** the fixes actually changed the diff. If nothing changed, stop.
-   When that stop leaves an unresolved disagreement — a plausible or
-   false-positive finding the reviewer has not accepted — escalate it to the user
-   immediately. It cannot reach the two-round escalation in rule 4, because
-   without a diff there is no next round to carry it into.
+   Escalate every finding that stop leaves unresolved to the user immediately:
+   plausible and false-positive findings the reviewer has not accepted, and
+   **confirmed findings you did not fix**, including ones you ruled out of scope.
+   None of them can reach the two-round escalation in rule 4, because without a
+   diff there is no next round to carry them into. A verified defect must never
+   pass silently just because fixing it belonged to another change.
 2. Both sides vote. Ask for the reviewer's vote inside the review that already
    runs, so it costs nothing extra. Not every reviewer contract has a field for
    it: when no usable vote comes back, record the absence rather than inventing

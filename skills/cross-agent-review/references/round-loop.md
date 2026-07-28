@@ -43,18 +43,23 @@ Small or low-risk changes finish in one round. Round 3 is an escape hatch.
 
 ### What resets the counter
 
-Only the user resets it, and not every message from the user is a reset.
-Questions, corrections, approvals, and scope clarifications continue the current
-count. Changes an agent starts on its own initiative always continue it,
-including a restructure of the agent's own work.
+The counter resets in exactly two cases:
 
-**When it is unclear whether a request resets the counter, ask the user. Never
-resolve that ambiguity in your own favour.**
+1. The user explicitly asks for another round or a new review budget.
+2. You ask the user directly whether the budget resets, and they say yes.
 
-That last rule is the one doing the work. An implementer short of rounds must not
-be able to relabel ordinary feedback as new work and grant itself three more;
-leaving the judgment with the user removes the incentive entirely, without making
-the user recite a formula to get a reset.
+**Every other message continues the current count** — questions, corrections,
+approvals, scope clarifications, and requested rewrites alike. Changes an agent
+starts on its own initiative always continue it.
+
+The implementer has no discretion here, deliberately. An earlier version reset
+whenever the request was "obviously" new work, which left the decision with the
+party that benefits from it: an implementer at the ceiling could call a requested
+rewrite an obvious reset and take three more rounds without ever asking. Since
+the ceiling exists to bound that party, it cannot also be enforced by them.
+
+If you think a reset is warranted and the user has not said so, ask. Asking costs
+one sentence; a self-granted reset makes the ceiling unenforceable.
 
 ## Escalate instead of swallowing
 

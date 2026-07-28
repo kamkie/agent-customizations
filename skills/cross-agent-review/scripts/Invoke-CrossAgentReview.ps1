@@ -68,22 +68,31 @@ $Base = ''
 $ModelAlias = 'opus'
 $Effort = 'medium'
 
+# Only these exact spellings are options. An earlier version normalised tokens
+# by deleting every internal hyphen, which made undocumented spellings such as
+# --b-a-s-e equivalent to --base: PowerShell then ran the review against a range
+# the caller never named while the shell rejected the same token. Match
+# literally; a hashtable lookup is case-insensitive, nothing else is tolerated.
+$optionNames = @{
+    '-Direction'   = 'direction'; '--direction'   = 'direction'
+    '-FocusFile'   = 'focusfile'; '--focus-file'  = 'focusfile'
+    '-Base'        = 'base';      '--base'        = 'base'
+    '-ModelAlias'  = 'modelalias'; '--model-alias' = 'modelalias'
+    '-Effort'      = 'effort';    '--effort'      = 'effort'
+}
+
 $index = 0
 while ($index -lt $args.Count) {
     $token = [string]$args[$index]
-    $name = ($token -replace '^-{1,2}', '').ToLowerInvariant() -replace '-', ''
 
     if ($token -in @('-?', '-h', '--help')) { Show-Usage; exit 2 }
-    if ($token -notmatch '^-{1,2}[A-Za-z]') { Exit-Invalid "Unknown argument: $token" }
-    if ($name -notin @('direction', 'focusfile', 'base', 'modelalias', 'effort')) {
-        Exit-Invalid "Unknown argument: $token"
-    }
+    if (-not $optionNames.ContainsKey($token)) { Exit-Invalid "Unknown argument: $token" }
     # Validate arity before consuming the value, so a trailing option reports
     # usage instead of silently binding nothing.
     if ($index + 1 -ge $args.Count) { Exit-Invalid "Option $token requires a value." }
 
     $value = [string]$args[$index + 1]
-    switch ($name) {
+    switch ($optionNames[$token]) {
         'direction'  { $Direction = $value }
         'focusfile'  { $FocusFile = $value }
         'base'       { $Base = $value }

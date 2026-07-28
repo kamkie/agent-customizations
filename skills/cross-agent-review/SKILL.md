@@ -16,8 +16,10 @@ to the runtime that already exists for it.
 1. Read the active repository's `AGENTS.md`, `CLAUDE.md`, or equivalent
    checked-in instructions. Repository policy outranks this skill and owns
    validation commands, branch naming, commit trailers, and pull-request gates.
-2. If `HEAD` is on the default branch, create an agent-owned branch first
-   (`claude/<short-task-slug>` or `codex/<short-task-slug>`).
+2. If `HEAD` is on the default branch, create an agent-owned branch first, using
+   the naming convention the active repository or higher-precedence guidance
+   defines. Do not invent a prefix, and do not review directly on the default
+   branch.
 3. Commit every change in scope. Review always runs on committed state; nothing
    uncommitted is reviewable.
 4. Record the round's base and head.

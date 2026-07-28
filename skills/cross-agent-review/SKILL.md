@@ -134,10 +134,16 @@ both sides of the invocation and discard the round on any mismatch.
 Two consequences to handle rather than ignore:
 
 - `-ReviewPr` reviews the whole pull request, not the incremental range, so this
-  direction re-reads earlier rounds' code. Carrying unresolved findings forward
-  still matters, but the diff itself will not hide them.
+  direction re-reads earlier rounds' code. The diff itself will not hide an
+  unresolved finding.
 - `-ReviewPr` cannot post to the pull request. Record the result yourself when
   the repository expects the review on the PR.
+- **This mode takes no supplementary prompt.** It sends a fixed review request,
+  so neither the carry-forward text nor the `ANOTHER ROUND` request reaches the
+  reviewer. On this path, do not claim a two-sided vote and do not expect a
+  disputed finding to be retested: an unresolved disagreement goes straight to
+  the user as a decision, in the round it appears. Reporting the missing vote is
+  not enough, because no later round can supply it.
 
 Reviewing a branch that has no pull request is the uncommon path: build a
 read-only `-PromptFile` run from

@@ -113,6 +113,19 @@ Never "fix" a false positive. Fix all confirmed findings. Fix plausible ones onl
 when the fix is small, safe, and obviously harmless. Findings outside the
 change's scope get reported, not fixed.
 
+### Carry unresolved findings forward
+
+Keep a list of findings you did not fix — every plausible one you left alone and
+every one you called a false positive. Later rounds review only the fixes, so an
+unfixed finding disappears from the diff and the reviewer cannot raise it again.
+Without this list a disputed finding is silently dropped after one round instead
+of surviving to the escalation rule below.
+
+Restate each unresolved finding in the next round's focus text, with your reason
+for not fixing it, and ask the reviewer to accept or contest that reasoning. A
+finding is resolved when it is fixed, when the reviewer accepts your reasoning,
+or when it is escalated to the user.
+
 ## Commit fixes with reviewer credit
 
 One commit per finding, so the next round can review the repairs in isolation.
@@ -140,7 +153,9 @@ Rounds are bounded at three and are not automatic.
 3. **The implementer decides.** If the reviewer voted to continue and the
    implementer stops, the report must state that disagreement explicitly.
 4. A finding that survives two rounds of disagreement is escalated to the user as
-   a decision, not re-litigated in a third round.
+   a decision, not re-litigated in a third round. This only works when unresolved
+   findings are carried forward as above; an incremental diff alone cannot
+   surface them a second time.
 
 Small or low-risk changes finish in one round. Use round 3 as an escape hatch,
 not a default.

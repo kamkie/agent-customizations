@@ -58,8 +58,10 @@ A round whose head moved reviewed a different change than the one you are about
 to triage. Discard it and rerun rather than triaging findings against code the
 reviewer did not see.
 
-Round 1 reviews `$reviewBase..$reviewHead`. Every later round sets `$reviewBase`
-to the head the previous round reviewed, so the reviewer sees only the fixes.
+Round 1 reviews `$reviewBase..$reviewHead`. On a reviewer that takes an explicit
+range, every later round sets `$reviewBase` to the head the previous round
+reviewed, so the reviewer sees only the fixes. A reviewer that only takes a pull
+request re-reads the whole change each round instead; both are handled below.
 
 ## Run one round
 
@@ -76,16 +78,15 @@ $claudeHome = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join
 $companion = Get-ChildItem -Path (Join-Path $claudeHome 'plugins') -Filter 'codex-companion.mjs' -Recurse -File -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $companion) { throw 'Install and authenticate the codex plugin before a cross-agent review.' }
-node $companion.FullName adversarial-review --wait --scope branch --base $reviewBase '<what this change is meant to do>'
+$focus = @(
+    '<what this change is meant to do, in one sentence>',
+    '<each unresolved finding carried forward, with the reason you did not fix it>',
+    'Finish with one line: ANOTHER ROUND: yes or no, plus one sentence of justification.'
+) -join [Environment]::NewLine
+node $companion.FullName adversarial-review --wait --scope branch --base $reviewBase $focus
 ```
 
-Build the focus text from three parts: the change's intent in one sentence, every
-unresolved finding carried forward from an earlier round, and this literal
-request:
-
-```text
-Finish with one line: ANOTHER ROUND: yes or no, plus one sentence of justification.
-```
+Drop the second element in round 1; there is nothing carried forward yet.
 
 The reviewer returns `verdict`, `summary`, `findings[]` with `severity`, `file`,
 `line_start`, `line_end`, `confidence`, and `recommendation`, plus `next_steps`.

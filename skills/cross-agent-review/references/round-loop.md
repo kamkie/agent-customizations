@@ -43,14 +43,18 @@ Small or low-risk changes finish in one round. Round 3 is an escape hatch.
 
 ### What resets the counter
 
-Only the user resets it. Rounds accumulate across every change an agent makes on
-its own initiative, including a restructure of its own work. When the user asks
-for a different shape, the counter starts over, because that is new work rather
-than another repair of the same work.
+Only the user resets it, and not every message from the user is a reset.
+Questions, corrections, approvals, and scope clarifications continue the current
+count. Changes an agent starts on its own initiative always continue it,
+including a restructure of the agent's own work.
 
-An agent must never reset its own budget by reworking what it already wrote.
-That loophole would make the ceiling meaningless: any implementer short of rounds
-could buy three more by rewriting instead of repairing.
+**When it is unclear whether a request resets the counter, ask the user. Never
+resolve that ambiguity in your own favour.**
+
+That last rule is the one doing the work. An implementer short of rounds must not
+be able to relabel ordinary feedback as new work and grant itself three more;
+leaving the judgment with the user removes the incentive entirely, without making
+the user recite a formula to get a reset.
 
 ## Escalate instead of swallowing
 

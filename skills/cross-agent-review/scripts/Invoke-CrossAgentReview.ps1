@@ -14,25 +14,27 @@ calling agent.
 
 Exit codes: 0 reviewed, 1 round failed, 2 invalid invocation.
 
-Positional binding is disabled on purpose. With it enabled an unlabelled
-trailing SHA bound silently to -Base and the round completed against a range the
-caller never asked for. Known parity gap: a named parameter given no value fails
-in PowerShell's binder, which runs before this script, so that one case exits 1
-where the shell implementation exits 2.
+Arguments are parsed by hand rather than through a param() block, matching
+invoke-cross-agent-review.sh token for token. PowerShell's parameter binder runs
+before any script code, so with binding enabled `-?` printed syntax help to
+stdout and exited 0 - claiming a completed review that never ran and breaking
+the machine-readable stdout contract. Binding also accepted an unlabelled
+trailing SHA into -Base, reviewing a range the caller never asked for.
+
+Both long and PowerShell-style spellings are accepted: -Direction and
+--direction are equivalent.
 #>
-[CmdletBinding(PositionalBinding = $false)]
-param(
-    [string]$Direction,
-    [string]$FocusFile,
-    [string]$Base,
-    [string]$ModelAlias = 'opus',
-    [string]$Effort = 'medium',
-    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
-)
 
 $ErrorActionPreference = 'Stop'
 
-function Exit-Invalid { param([string]$Message) Write-Error $Message -ErrorAction Continue; exit 2 }
+function Show-Usage {
+    @'
+Usage: Invoke-CrossAgentReview.ps1 -Direction <to-codex|to-claude> -FocusFile <path>
+                                   [-Base <ref>] [-ModelAlias <alias>] [-Effort <level>]
+'@ | ForEach-Object { [Console]::Error.WriteLine($_) }
+}
+
+function Exit-Invalid { param([string]$Message) Write-Error $Message -ErrorAction Continue; Show-Usage; exit 2 }
 function Exit-Failed { param([string]$Message) Write-Error $Message -ErrorAction Continue; exit 1 }
 
 function Assert-Dependency {
@@ -60,8 +62,38 @@ function Assert-PullRequestHead {
 }
 
 # --- invocation validation (exit 2), matching invoke-cross-agent-review.sh ----
-if ($Rest -and $Rest.Count -gt 0) { Exit-Invalid "Unknown argument: $($Rest[0])" }
-$Direction = "$Direction".ToLowerInvariant()
+$Direction = ''
+$FocusFile = ''
+$Base = ''
+$ModelAlias = 'opus'
+$Effort = 'medium'
+
+$index = 0
+while ($index -lt $args.Count) {
+    $token = [string]$args[$index]
+    $name = ($token -replace '^-{1,2}', '').ToLowerInvariant() -replace '-', ''
+
+    if ($token -in @('-?', '-h', '--help')) { Show-Usage; exit 2 }
+    if ($token -notmatch '^-{1,2}[A-Za-z]') { Exit-Invalid "Unknown argument: $token" }
+    if ($name -notin @('direction', 'focusfile', 'base', 'modelalias', 'effort')) {
+        Exit-Invalid "Unknown argument: $token"
+    }
+    # Validate arity before consuming the value, so a trailing option reports
+    # usage instead of silently binding nothing.
+    if ($index + 1 -ge $args.Count) { Exit-Invalid "Option $token requires a value." }
+
+    $value = [string]$args[$index + 1]
+    switch ($name) {
+        'direction'  { $Direction = $value }
+        'focusfile'  { $FocusFile = $value }
+        'base'       { $Base = $value }
+        'modelalias' { $ModelAlias = $value }
+        'effort'     { $Effort = $value }
+    }
+    $index += 2
+}
+
+$Direction = $Direction.ToLowerInvariant()
 if ($Direction -notin @('to-codex', 'to-claude')) { Exit-Invalid 'Direction must be to-codex or to-claude.' }
 if ([string]::IsNullOrWhiteSpace($FocusFile)) { Exit-Invalid 'A focus file is required.' }
 if (-not (Test-Path -LiteralPath $FocusFile -PathType Leaf)) { Exit-Invalid "Focus file not found: $FocusFile" }

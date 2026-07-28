@@ -43,17 +43,26 @@ bash "$skill/scripts/invoke-cross-agent-review.sh" \
 
 - `-Direction`/`--direction`: `to-codex` when Claude implements, `to-claude` when
   Codex implements.
+- **Drop the second line in round 1** — nothing is carried forward yet. Sending
+  the placeholder as literal text produces a bogus prompt.
 - Omit the base in round 1. In every later round pass `-Base`/`--base` with the
   head the previous round reviewed, so the reviewer sees only the fixes.
 - `to-claude` requires an open pull request and reviews the whole PR. It takes no
   supplementary prompt, so the focus file does not reach that reviewer — see the
-  escalation rule in the reference below.
+  escalation rule in the reference below. It also cannot post to the pull
+  request: record the result yourself when the repository expects review
+  evidence on the PR.
 - Keep the focus file outside the repository.
 
 The script pins the range, verifies the reviewed head on both sides of the
 invocation, and fails the round if the reviewer exits nonzero or the head moved.
-A failed round is not a review; do not count it. It prints JSON with the
-`base`, `head`, and `pullRequest` it actually reviewed.
+A failed round is not a review; do not count it.
+
+Reviewer output goes to **stderr**; stdout is exactly one JSON object with the
+`base`, `head`, and `pullRequest` actually reviewed. On the `to-codex` contract
+the round vote has no schema field, so read `ANOTHER ROUND` from the reviewer's
+`summary` or `next_steps` text — and when it is absent or unparseable, record no
+vote rather than inferring one from the verdict.
 
 ## Then judge
 

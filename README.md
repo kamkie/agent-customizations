@@ -11,6 +11,8 @@ tools' live configuration directories are deployment targets.
 - `global/AGENTS.md` — personal guidance applied across Codex repositories.
 - `global/CLAUDE.md` — personal guidance applied across Claude Code projects.
 - `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
+- `skills/cross-agent-review` — opposite-engine adversarial review with triage,
+  credited fix commits, and bounded rounds, shared by Codex and Claude Code.
 - `skills/dyslexia-friendly-formatter` — format text for dyslexia-friendly
   reading without changing its content.
 - `skills/execute-campaign-work-item` — scoped execution and evidence-backed

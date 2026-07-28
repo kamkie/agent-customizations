@@ -95,21 +95,32 @@ decided without it.
 
 ### Codex implementing, Claude reviewing
 
-Use the `claude-runner` skill; read its `SKILL.md` for the runner path, session
-handling, and recovery rules.
+This direction runs through the `claude-runner` skill and requires an open pull
+request: `-ReviewPr` is the read-only reviewer mode.
 
 ```powershell
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
+$runner = Join-Path $codexHome 'skills/claude-runner/scripts/Invoke-ClaudeRunner.ps1'
+if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) { throw 'Install the claude-runner skill before a cross-agent review.' }
+$pr = [int](gh pr view --json number --jq .number)
+if ($LASTEXITCODE -ne 0 -or $pr -le 0) { throw 'Open the pull request first; -ReviewPr reviews a PR, not a bare branch.' }
 & $runner -WorkingDirectory $repo -ReviewPr $pr -ModelAlias opus -Effort medium
 ```
 
-`-ReviewPr` is read-only and needs an open pull request. When the branch has no
-pull request yet, either open the draft pull request first or run a read-only
-review with `-PromptFile` built from
-[the reviewer stance](references/reviewer-stance.md). Never add
-`-BypassPermissions` for a review.
+Never add `-BypassPermissions` to a review. Read `claude-runner`'s own `SKILL.md`
+only for session resumption and recovery after an interrupted run.
 
-`-ReviewPr` cannot post to the pull request, so record the result yourself when
-the repository expects the review on the PR.
+Two consequences to handle rather than ignore:
+
+- `-ReviewPr` reviews the whole pull request, not the incremental range, so this
+  direction re-reads earlier rounds' code. Carrying unresolved findings forward
+  still matters, but the diff itself will not hide them.
+- `-ReviewPr` cannot post to the pull request. Record the result yourself when
+  the repository expects the review on the PR.
+
+Reviewing a branch that has no pull request is the uncommon path: build a
+read-only `-PromptFile` run from
+[the reviewer stance](references/reviewer-stance.md).
 
 ## Triage every finding yourself
 

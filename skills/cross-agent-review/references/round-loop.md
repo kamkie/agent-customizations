@@ -41,6 +41,17 @@ Rounds are bounded at three and never automatic.
 
 Small or low-risk changes finish in one round. Round 3 is an escape hatch.
 
+### What resets the counter
+
+Only the user resets it. Rounds accumulate across every change an agent makes on
+its own initiative, including a restructure of its own work. When the user asks
+for a different shape, the counter starts over, because that is new work rather
+than another repair of the same work.
+
+An agent must never reset its own budget by reworking what it already wrote.
+That loophole would make the ceiling meaningless: any implementer short of rounds
+could buy three more by rewriting instead of repairing.
+
 ## Escalate instead of swallowing
 
 | Situation | Why the loop cannot resolve it | Required action |

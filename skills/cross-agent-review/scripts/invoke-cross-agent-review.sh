@@ -38,13 +38,31 @@ assert_dependency() {
 }
 
 json_escape() {
-    local s="$1"
+    # Escapes every character JSON forbids raw, not just the common ones:
+    # unescaped C0 controls are legal in Unix paths and make stdout unparseable.
+    local s="$1" out="" i c code len
     s="${s//\\/\\\\}"
     s="${s//\"/\\\"}"
-    s="${s//$'\n'/\\n}"
-    s="${s//$'\r'/\\r}"
-    s="${s//$'\t'/\\t}"
-    printf '%s' "$s"
+    len=${#s}
+    for (( i = 0; i < len; i++ )); do
+        c="${s:i:1}"
+        case "$c" in
+            $'\b') out+='\b' ;;
+            $'\f') out+='\f' ;;
+            $'\n') out+='\n' ;;
+            $'\r') out+='\r' ;;
+            $'\t') out+='\t' ;;
+            *)
+                printf -v code '%d' "'$c"
+                if [ "$code" -lt 32 ] && [ "$code" -ge 0 ]; then
+                    printf -v out '%s\\u%04x' "$out" "$code"
+                else
+                    out+="$c"
+                fi
+                ;;
+        esac
+    done
+    printf '%s' "$out"
 }
 
 direction=""

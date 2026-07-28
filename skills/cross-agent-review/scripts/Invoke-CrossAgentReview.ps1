@@ -13,14 +13,21 @@ reviewed. Judgment - triage, fixes, and the round decision - stays with the
 calling agent.
 
 Exit codes: 0 reviewed, 1 round failed, 2 invalid invocation.
+
+Positional binding is disabled on purpose. With it enabled an unlabelled
+trailing SHA bound silently to -Base and the round completed against a range the
+caller never asked for. Known parity gap: a named parameter given no value fails
+in PowerShell's binder, which runs before this script, so that one case exits 1
+where the shell implementation exits 2.
 #>
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [string]$Direction,
     [string]$FocusFile,
     [string]$Base,
     [string]$ModelAlias = 'opus',
-    [string]$Effort = 'medium'
+    [string]$Effort = 'medium',
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -53,6 +60,7 @@ function Assert-PullRequestHead {
 }
 
 # --- invocation validation (exit 2), matching invoke-cross-agent-review.sh ----
+if ($Rest -and $Rest.Count -gt 0) { Exit-Invalid "Unknown argument: $($Rest[0])" }
 $Direction = "$Direction".ToLowerInvariant()
 if ($Direction -notin @('to-codex', 'to-claude')) { Exit-Invalid 'Direction must be to-codex or to-claude.' }
 if ([string]::IsNullOrWhiteSpace($FocusFile)) { Exit-Invalid 'A focus file is required.' }
@@ -108,7 +116,7 @@ if ($Direction -eq 'to-codex') {
         Exit-Failed "The installed codex plugin has no reviewer script at $companion."
     }
 
-    & node $companion adversarial-review --wait --scope branch --base $reviewBase $focus 2>&1 |
+    & node $companion adversarial-review --wait --scope branch --base $reviewBase $focus *>&1 |
         ForEach-Object { [Console]::Error.WriteLine([string]$_) }
     $reviewerExit = $LASTEXITCODE
 } else {
@@ -127,7 +135,7 @@ if ($Direction -eq 'to-codex') {
     # The reviewer reads the pull request's remote head, so a local HEAD check
     # alone would miss unpushed repairs or another actor's push.
     Assert-PullRequestHead -Number $pullRequest -ExpectedHead $reviewHead
-    & $runner -WorkingDirectory $repo -ReviewPr $pullRequest -ModelAlias $ModelAlias -Effort $Effort 2>&1 |
+    & $runner -WorkingDirectory $repo -ReviewPr $pullRequest -ModelAlias $ModelAlias -Effort $Effort *>&1 |
         ForEach-Object { [Console]::Error.WriteLine([string]$_) }
     $reviewerExit = $LASTEXITCODE
 }

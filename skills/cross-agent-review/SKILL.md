@@ -194,8 +194,11 @@ them from the repository's instructions; do not assume a build system.
 Rounds are bounded at three and are not automatic.
 
 1. A next round happens only when this round produced at least one confirmed
-   finding **and** the fixes actually changed the diff. If nothing changed,
-   stop — re-reviewing an unchanged diff returns the same findings.
+   finding **and** the fixes actually changed the diff. If nothing changed, stop.
+   When that stop leaves an unresolved disagreement — a plausible or
+   false-positive finding the reviewer has not accepted — escalate it to the user
+   immediately. It cannot reach the two-round escalation in rule 4, because
+   without a diff there is no next round to carry it into.
 2. Both sides vote. Ask for the reviewer's vote inside the review that already
    runs, so it costs nothing extra. Not every reviewer contract has a field for
    it: when no usable vote comes back, record the absence rather than inventing

@@ -77,10 +77,21 @@ if (-not $companion) { throw 'Install and authenticate the codex plugin before a
 node $companion.FullName adversarial-review --wait --scope branch --base $reviewBase '<what this change is meant to do>'
 ```
 
-Replace `<what this change is meant to do>` with the change's intent in one
-sentence. The reviewer returns `verdict`, `summary`, `findings[]` with
-`severity`, `file`, `line_start`, `line_end`, `confidence`, and `recommendation`,
-plus `next_steps`.
+Build the focus text from three parts: the change's intent in one sentence, every
+unresolved finding carried forward from an earlier round, and this literal
+request:
+
+```text
+Finish with one line: ANOTHER ROUND: yes or no, plus one sentence of justification.
+```
+
+The reviewer returns `verdict`, `summary`, `findings[]` with `severity`, `file`,
+`line_start`, `line_end`, `confidence`, and `recommendation`, plus `next_steps`.
+That schema has **no field for the round vote**, so the vote can only arrive as
+free text inside `summary` or `next_steps`. Read it from there. When it is
+missing or unparseable, treat the round as having **no reviewer vote** — never
+infer one from the verdict — and record in the report that the implementer
+decided without it.
 
 ### Codex implementing, Claude reviewing
 
@@ -147,9 +158,10 @@ Rounds are bounded at three and are not automatic.
 1. A next round happens only when this round produced at least one confirmed
    finding **and** the fixes actually changed the diff. If nothing changed,
    stop — re-reviewing an unchanged diff returns the same findings.
-2. Both sides vote. The reviewer's vote comes back with its findings, so it
-   costs nothing extra; ask for it in the same invocation. The implementer votes
-   on whether the fixes warrant another look.
+2. Both sides vote. Ask for the reviewer's vote inside the review that already
+   runs, so it costs nothing extra. Not every reviewer contract has a field for
+   it: when no usable vote comes back, record the absence rather than inventing
+   one. The implementer votes on whether the fixes warrant another look.
 3. **The implementer decides.** If the reviewer voted to continue and the
    implementer stops, the report must state that disagreement explicitly.
 4. A finding that survives two rounds of disagreement is escalated to the user as

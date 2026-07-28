@@ -213,6 +213,20 @@ Rounds are bounded at three and are not automatic.
 Small or low-risk changes finish in one round. Use round 3 as an escape hatch,
 not a default.
 
+### Commits that land after the last review block the handoff
+
+Fixes made in the final round are not themselves reviewed. Naming them in the
+report is not sufficient: a regression introduced by the last repair would ship
+having been merely mentioned.
+
+When any commit lands after the last completed review, the change is not
+review-complete. Do not mark it ready, done, or reviewed. Escalate to the user
+with the exact unreviewed commits and let them accept the risk explicitly.
+
+This keeps the round ceiling hard. The loop still stops at three; it just stops
+as *blocked* rather than as *finished* when the last word belonged to an
+unreviewed repair.
+
 ## Report
 
 Finish with:

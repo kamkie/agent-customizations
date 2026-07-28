@@ -107,11 +107,29 @@ $runner = Join-Path $codexHome 'skills/claude-runner/scripts/Invoke-ClaudeRunner
 if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) { throw 'Install the claude-runner skill before a cross-agent review.' }
 $pr = [int](gh pr view --json number --jq .number)
 if ($LASTEXITCODE -ne 0 -or $pr -le 0) { throw 'Open the pull request first; -ReviewPr reviews a PR, not a bare branch.' }
+
+function Assert-PullRequestHead {
+    param([Parameter(Mandatory)][int]$Number, [Parameter(Mandatory)][string]$ExpectedHead)
+    $prHead = gh pr view $Number --json headRefOid --jq .headRefOid
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($prHead)) { throw 'Cannot read the pull request head.' }
+    if ($prHead.Trim() -ne $ExpectedHead) {
+        throw "The pull request points at $($prHead.Trim()), not the reviewed head $ExpectedHead. Push the reviewed head, or rerun this round against the pull request's head."
+    }
+}
+
+Assert-PullRequestHead -Number $pr -ExpectedHead $reviewHead
 & $runner -WorkingDirectory $repo -ReviewPr $pr -ModelAlias opus -Effort medium
+Assert-PullRequestHead -Number $pr -ExpectedHead $reviewHead
 ```
 
 Never add `-BypassPermissions` to a review. Read `claude-runner`'s own `SKILL.md`
 only for session resumption and recovery after an interrupted run.
+
+The local `HEAD` check is not sufficient here. `-ReviewPr` reads the pull
+request's **remote** head, so unpushed repairs or another actor's push would let
+the reviewer inspect a different commit while the local check still passes —
+recording opposite-engine review for code nobody reviewed. Check `headRefOid` on
+both sides of the invocation and discard the round on any mismatch.
 
 Two consequences to handle rather than ignore:
 

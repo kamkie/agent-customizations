@@ -22,19 +22,42 @@ to the runtime that already exists for it.
    uncommitted is reviewable.
 4. Record the round's base and head.
 
+Resolve the range explicitly. Never let a failed Git call become an empty
+argument: an empty `--base` value silently shifts every argument after it, so the
+focus text becomes the base ref and the review runs against the wrong range.
+
 ```powershell
-$repo = git rev-parse --show-toplevel
-if ([string]::IsNullOrWhiteSpace($repo)) { throw 'Run from inside the target repository.' }
-$defaultBranch = (git symbolic-ref --quiet --short refs/remotes/origin/HEAD) -replace '^origin/', ''
-if ([string]::IsNullOrWhiteSpace($defaultBranch)) { $defaultBranch = 'main' }
-$reviewBase = git merge-base "origin/$defaultBranch" HEAD
-$reviewHead = git rev-parse HEAD
+function Get-CheckedGitValue {
+    param([Parameter(Mandatory)][string[]]$GitArguments, [Parameter(Mandatory)][string]$FailureMessage)
+    $value = & git @GitArguments
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($value)) { throw $FailureMessage }
+    return $value.Trim()
+}
+
+$repo = Get-CheckedGitValue @('rev-parse', '--show-toplevel') 'Run from inside the target repository.'
+$defaultRef = Get-CheckedGitValue @('symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD') `
+    'Cannot resolve the default branch. Pass it explicitly instead of guessing a name.'
+$defaultBranch = $defaultRef -replace '^origin/', ''
+$reviewBase = Get-CheckedGitValue @('merge-base', "origin/$defaultBranch", 'HEAD') `
+    "No merge base between origin/$defaultBranch and HEAD."
+$reviewHead = Get-CheckedGitValue @('rev-parse', 'HEAD') 'Cannot resolve HEAD.'
 if ($reviewBase -eq $reviewHead) { throw 'Nothing committed to review on this branch.' }
 ```
 
-Carry `$reviewBase` and `$reviewHead` across rounds: round 1 reviews
-`$reviewBase..$reviewHead`; every later round sets `$reviewBase` to the head the
-previous round reviewed, so the reviewer sees only the fixes.
+`$reviewBase` and `$reviewHead` are the round's contract. Pass both to the
+reviewer, and confirm `HEAD` still equals `$reviewHead` when the round returns:
+
+```powershell
+$currentHead = Get-CheckedGitValue @('rev-parse', 'HEAD') 'Cannot resolve HEAD.'
+if ($currentHead -ne $reviewHead) { throw 'HEAD moved during the review. Rerun this round against the new head.' }
+```
+
+A round whose head moved reviewed a different change than the one you are about
+to triage. Discard it and rerun rather than triaging findings against code the
+reviewer did not see.
+
+Round 1 reviews `$reviewBase..$reviewHead`. Every later round sets `$reviewBase`
+to the head the previous round reviewed, so the reviewer sees only the fixes.
 
 ## Run one round
 

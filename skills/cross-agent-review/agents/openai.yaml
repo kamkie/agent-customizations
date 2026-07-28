@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cross-agent Review"
+  short_description: "Adversarial review by the opposite engine, with triage and bounded rounds"
+  default_prompt: "Use $cross-agent-review to have the opposite engine review this committed change, then triage and fix the findings."

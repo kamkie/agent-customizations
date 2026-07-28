@@ -39,6 +39,7 @@
       },
       "skills": [
         "claude-runner",
+        "cross-agent-review",
         "dyslexia-friendly-formatter",
         "execute-campaign-work-item",
         "managed-jobs",
@@ -89,6 +90,7 @@
         ]
       },
       "skills": [
+        "cross-agent-review",
         "dyslexia-friendly-formatter",
         "managed-jobs"
       ]

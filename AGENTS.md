@@ -110,6 +110,10 @@ is not `kamkie`, stop before the mutation and report the exact blocker.
   at medium effort and `/review <PR number>` from the authoring checkout. A
   Claude-authored PR receives Codex review by branch name without moving the work
   out of its assigned checkout.
+- The `cross-agent-review` skill owns the executable loop for that review:
+  commit-before-review, per-finding triage, credited fix commits, and the bounded
+  round decision. This section stays authoritative for who reviews whom and for
+  the readiness and merge gates below.
 - Ensure the review result is recorded on the PR. If the reviewer returns
   findings without posting them, add a concise PR comment naming the reviewer,
   findings, and triage decision.

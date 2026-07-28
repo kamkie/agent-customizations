@@ -168,5 +168,12 @@ Finish with:
    action (fixed/skipped/escalated) | fix commit.
 2. How many rounds ran and why the loop stopped: clean round, no diff change,
    ceiling reached, or unresolved disagreement.
-3. Any reviewer-versus-implementer vote disagreement, stated plainly.
-4. Validation commands that ran, and any that could not run and why.
+3. Whether any commit landed after the last review. Fixes made in the final
+   round are not themselves reviewed, so a bounded loop can hand off repair code
+   no opposite engine inspected. Name those commits and say plainly that they
+   are unreviewed. Do not paper over this by claiming the change is fully
+   reviewed.
+4. Any reviewer-versus-implementer vote disagreement, and any round where the
+   reviewer returned no usable vote.
+5. Every unresolved finding, with its classification and the reason it was left.
+6. Validation commands that ran, and any that could not run and why.

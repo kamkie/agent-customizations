@@ -37,6 +37,27 @@ function Wait-JobStatus {
     throw "Timed out waiting for $Id to reach $($Expected -join ','); last status was $($job.status)."
 }
 
+function Wait-LoggedProcessId {
+    param([string]$LogPath, [string]$Pattern, [int]$Seconds = 10)
+    $deadline = [datetime]::UtcNow.AddSeconds($Seconds)
+    do {
+        $log = if (Test-Path -LiteralPath $LogPath) { Get-Content -LiteralPath $LogPath -Raw } else { '' }
+        if ($log -match $Pattern) { return [int]$Matches[1] }
+        Start-Sleep -Milliseconds 100
+    } while ([datetime]::UtcNow -lt $deadline)
+    throw "Timed out waiting for process id pattern '$Pattern' in $LogPath."
+}
+
+function Wait-ProcessExit {
+    param([int]$TargetProcessId, [int]$Seconds = 10)
+    $deadline = [datetime]::UtcNow.AddSeconds($Seconds)
+    do {
+        if ($null -eq (Get-ProcessSnapshot -ProcessId $TargetProcessId)) { return $true }
+        Start-Sleep -Milliseconds 100
+    } while ([datetime]::UtcNow -lt $deadline)
+    return $false
+}
+
 try {
     $null = New-Item -ItemType Directory -Path $stateRoot -Force
     $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
@@ -201,29 +222,33 @@ try {
 
     # Duplicate detection happens while the first equivalent helper is active.
     $running = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-running' -Executable $pwsh `
-        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
+        -Arguments @('-NoProfile', '-Command', 'Write-Output "explicit-stop-child-pid=$PID"; Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
     $activeIds.Add($running.id)
     $running = Wait-JobStatus -Id $running.id -Expected @('running')
+    $explicitStopChildPid = Wait-LoggedProcessId -LogPath $running.logPath -Pattern 'explicit-stop-child-pid=(\d+)'
     $duplicateRejected = $false
     try {
         & $controller start -StateRoot $stateRoot -Name 'lifecycle-duplicate' -Executable $pwsh `
-            -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-Null
+            -Arguments @('-NoProfile', '-Command', 'Write-Output "explicit-stop-child-pid=$PID"; Start-Sleep -Seconds 30') | Out-Null
     } catch { $duplicateRejected = $_.Exception.Message -match [regex]::Escape($running.id) }
     Assert-True $duplicateRejected 'Equivalent active launch should be rejected with the existing id.'
     $stopped = (& $controller stop -StateRoot $stateRoot -Id $running.id | Out-String) | ConvertFrom-Json
     $activeIds.Remove($running.id) | Out-Null
     Assert-True ($stopped.status -eq 'stopped') 'Stop should record a stopped terminal state.'
     Assert-True ($stopped.PSObject.Properties.Name -notcontains 'processIdentity') 'Terminal jobs should not inspect potentially reused PIDs.'
+    Assert-True (Wait-ProcessExit -TargetProcessId $explicitStopChildPid) 'Explicit stop should terminate the managed child through Job Object containment.'
 
     # Turn cleanup stops only matching Codex-owned work.
     $turnOwned = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-turn-owned' -Executable $pwsh `
-        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
+        -Arguments @('-NoProfile', '-Command', 'Write-Output "cleanup-child-pid=$PID"; Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
     $activeIds.Add($turnOwned.id)
     $turnOwned = Wait-JobStatus -Id $turnOwned.id -Expected @('running')
+    $cleanupChildPid = Wait-LoggedProcessId -LogPath $turnOwned.logPath -Pattern 'cleanup-child-pid=(\d+)'
     $turnSummary = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex -OwnerSessionId $testSessionId -CleanupLifetime Turn | Out-String) | ConvertFrom-Json
     Assert-True ($turnSummary.stopped.id -contains $turnOwned.id) 'Turn cleanup should report the stopped owned process.'
     $activeIds.Remove($turnOwned.id) | Out-Null
     Assert-True ((Get-JobStatus -Id $turnOwned.id).status -eq 'stopped') 'The Codex Stop hook should stop a matching turn-owned process tree.'
+    Assert-True (Wait-ProcessExit -TargetProcessId $cleanupChildPid) 'Automatic cleanup should terminate the managed child through Job Object containment.'
     $turnReferences = @(Get-ManagedJobOwnerReferenceIds -OwnerAgent codex -OwnerSessionId $testSessionId -Lifetime turn)
     Assert-True ($turnReferences -notcontains $turnOwned.id) 'Turn cleanup should remove the stopped job owner reference.'
 
@@ -296,22 +321,10 @@ try {
         -Arguments @('-NoProfile', '-Command', 'Write-Output \"child-pid=$PID\"; Start-Sleep -Seconds 30') -Lifetime Persistent | Out-String) | ConvertFrom-Json
     $activeIds.Add($contained.id)
     $contained = Wait-JobStatus -Id $contained.id -Expected @('running')
-    $childPid = $null
-    $childDeadline = [datetime]::UtcNow.AddSeconds(10)
-    do {
-        $containedLog = if (Test-Path -LiteralPath $contained.logPath) { Get-Content -LiteralPath $contained.logPath -Raw } else { '' }
-        if ($containedLog -match 'child-pid=(\d+)') { $childPid = [int]$Matches[1] }
-        if (-not $childPid) { Start-Sleep -Milliseconds 100 }
-    } while (-not $childPid -and [datetime]::UtcNow -lt $childDeadline)
-    Assert-True ([bool]$childPid) 'Containment test should observe the child PID.'
+    $childPid = Wait-LoggedProcessId -LogPath $contained.logPath -Pattern 'child-pid=(\d+)'
     Stop-Process -Id $contained.hostPid -Force
-    $childExitDeadline = [datetime]::UtcNow.AddSeconds(10)
-    do {
-        $childAlive = $null -ne (Get-ProcessSnapshot -ProcessId $childPid)
-        if ($childAlive) { Start-Sleep -Milliseconds 100 }
-    } while ($childAlive -and [datetime]::UtcNow -lt $childExitDeadline)
     $activeIds.Remove($contained.id) | Out-Null
-    Assert-True (-not $childAlive) 'Windows containment should terminate descendants when the managed host crashes.'
+    Assert-True (Wait-ProcessExit -TargetProcessId $childPid) 'Windows containment should terminate descendants when the managed host crashes.'
     Assert-True ((Get-JobStatus -Id $contained.id).status -eq 'orphaned') 'A crashed contained host should reconcile to an orphaned record without a live child.'
 
     # A missing PID plus recorded start identity reconciles to orphaned without killing anything.

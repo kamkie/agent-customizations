@@ -121,78 +121,100 @@ function Write-JobCollection {
     }
 }
 
-function Stop-ManagedJobTree {
-    param(
-        [Parameter(Mandatory)]$Job,
-        [Parameter(Mandatory)][string]$Reason
-    )
+function Stop-ManagedJobTrees {
+    param([Parameter(Mandatory)][object[]]$Request)
 
-    $outcome = [ordered]@{
-        matched = $false
-        job = $Job
-        error = $null
-    }
-    try {
-        $path = Get-ManagedJobFile -Id $Job.id
-        $current = Read-ManagedJob -Path $path
-        $outcome.job = $current
-        if ($current.status -notin @('starting', 'running')) {
-            try { Unregister-ManagedJobOwnerReference -Job $current } catch {}
-            return [pscustomobject]$outcome
+    $outcomes = [Collections.Generic.List[object]]::new()
+    $targets = [Collections.Generic.List[object]]::new()
+    foreach ($item in @($Request)) {
+        $job = $item.job
+        $outcome = [pscustomobject][ordered]@{
+            matched = $false
+            job = $job
+            error = $null
         }
-        if (-not (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc)) {
-            $current = Update-ReconciledJob -Job $current
+        $outcomes.Add($outcome) | Out-Null
+        try {
+            $path = Get-ManagedJobFile -Id $job.id
+            $current = Read-ManagedJob -Path $path
             $outcome.job = $current
             if ($current.status -notin @('starting', 'running')) {
-                return [pscustomobject]$outcome
+                try { Unregister-ManagedJobOwnerReference -Job $current } catch {}
+                continue
             }
-            throw "Job $($current.id) has not published a verifiable host process yet."
-        }
-        if ($current.PSObject.Properties.Name -notcontains 'processContainment' -or
-            [string]$current.processContainment -ne 'windows-job-object-kill-on-close') {
-            throw "Job $($current.id) has not confirmed Windows process-tree containment."
-        }
-        $outcome.matched = $true
+            if (-not (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc)) {
+                $current = Update-ReconciledJob -Job $current
+                $outcome.job = $current
+                if ($current.status -notin @('starting', 'running')) { continue }
+                throw "Job $($current.id) has not published a verifiable host process yet."
+            }
+            if ($current.PSObject.Properties.Name -notcontains 'processContainment' -or
+                [string]$current.processContainment -ne 'windows-job-object-kill-on-close') {
+                throw "Job $($current.id) has not confirmed Windows process-tree containment."
+            }
+            $outcome.matched = $true
 
-        $stopErrors = @()
-        Stop-Process `
-            -Id ([int]$current.hostPid) `
-            -Force `
-            -ErrorAction SilentlyContinue `
-            -ErrorVariable +stopErrors
+            $stopErrors = @()
+            Stop-Process `
+                -Id ([int]$current.hostPid) `
+                -Force `
+                -ErrorAction SilentlyContinue `
+                -ErrorVariable +stopErrors
+            $targets.Add([pscustomobject][ordered]@{
+                outcome = $outcome
+                path = $path
+                reason = [string]$item.reason
+                hostPid = $current.hostPid
+                hostStartedAtUtc = $current.hostStartedAtUtc
+                stopErrors = @($stopErrors)
+            }) | Out-Null
+        } catch {
+            $outcome.error = $_.Exception.Message
+            try { $outcome.job = Read-ManagedJob -Path (Get-ManagedJobFile -Id $job.id) } catch {}
+        }
+    }
 
+    if ($targets.Count -gt 0) {
         $stopDeadline = [datetime]::UtcNow.AddSeconds(1)
         do {
-            $stillRunning = Test-ManagedProcessIdentity `
-                -ProcessId $current.hostPid `
-                -ExpectedStartTimeUtc $current.hostStartedAtUtc
-            if (-not $stillRunning -or [datetime]::UtcNow -ge $stopDeadline) { break }
+            $stillRunning = @($targets | Where-Object {
+                Test-ManagedProcessIdentity `
+                    -ProcessId $_.hostPid `
+                    -ExpectedStartTimeUtc $_.hostStartedAtUtc
+            })
+            if ($stillRunning.Count -eq 0 -or [datetime]::UtcNow -ge $stopDeadline) { break }
             Start-Sleep -Milliseconds 25
         } while ($true)
-        if ($stillRunning) {
-            $detail = if ($stopErrors.Count -gt 0) {
-                ': ' + (@($stopErrors | ForEach-Object { $_.Exception.Message }) -join ' | ')
-            } else {
-                ''
-            }
-            throw "Unable to terminate PID $($current.hostPid)$detail"
-        }
 
-        $current = Read-ManagedJob -Path $path
-        if ($current.status -in @('starting', 'running')) {
-            $current.status = 'stopped'
-            $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
-            $current.exitCode = $null
-            $current.error = $Reason
-            Write-ManagedJob -Path $path -Job $current
+        foreach ($target in $targets) {
+            try {
+                if (Test-ManagedProcessIdentity `
+                    -ProcessId $target.hostPid `
+                    -ExpectedStartTimeUtc $target.hostStartedAtUtc) {
+                    $detail = if ($target.stopErrors.Count -gt 0) {
+                        ': ' + (@($target.stopErrors | ForEach-Object { $_.Exception.Message }) -join ' | ')
+                    } else {
+                        ''
+                    }
+                    throw "Unable to terminate PID $($target.hostPid)$detail"
+                }
+                $current = Read-ManagedJob -Path $target.path
+                if ($current.status -in @('starting', 'running')) {
+                    $current.status = 'stopped'
+                    $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                    $current.exitCode = $null
+                    $current.error = $target.reason
+                    Write-ManagedJob -Path $target.path -Job $current
+                }
+                Unregister-ManagedJobOwnerReference -Job $current
+                $target.outcome.job = $current
+            } catch {
+                $target.outcome.error = $_.Exception.Message
+                try { $target.outcome.job = Read-ManagedJob -Path $target.path } catch {}
+            }
         }
-        Unregister-ManagedJobOwnerReference -Job $current
-        $outcome.job = $current
-    } catch {
-        $outcome.error = $_.Exception.Message
-        try { $outcome.job = Read-ManagedJob -Path (Get-ManagedJobFile -Id $Job.id) } catch {}
     }
-    return [pscustomobject]$outcome
+    return @($outcomes)
 }
 
 switch ($Action) {
@@ -369,7 +391,11 @@ switch ($Action) {
         if ($job.status -notin @('starting', 'running')) {
             throw "Job $Id is not running; current status is $($job.status)."
         }
-        $termination = Stop-ManagedJobTree -Job $job -Reason 'Stopped through managed-jobs.'
+        $terminationRequest = [pscustomobject]@{
+            job = $job
+            reason = 'Stopped through managed-jobs.'
+        }
+        $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
         if ($termination.error) { throw [string]$termination.error }
         $job = $termination.job
         Add-ManagedJobIdentity -Job $job | ConvertTo-Json -Depth 12
@@ -388,6 +414,7 @@ switch ($Action) {
         $matched = 0
         $stopped = @()
         $failures = @()
+        $terminationRequests = @()
         foreach ($ownerId in $ownerIds) {
             try {
                 $job = Read-ManagedJob -Path (Get-ManagedJobFile -Id $ownerId)
@@ -410,9 +437,18 @@ switch ($Action) {
                 continue
             }
 
-            $termination = Stop-ManagedJobTree `
-                -Job $job `
-                -Reason "Stopped automatically at the end of its $($job.lifetime) lifetime."
+            $terminationRequests += [pscustomobject]@{
+                job = $job
+                reason = "Stopped automatically at the end of its $($job.lifetime) lifetime."
+            }
+        }
+        $terminations = if ($terminationRequests.Count -gt 0) {
+            @(Stop-ManagedJobTrees -Request $terminationRequests)
+        } else {
+            @()
+        }
+        foreach ($termination in $terminations) {
+            $job = $termination.job
             if ($termination.matched) { $matched++ }
             if ($termination.error) {
                 $failures += [ordered]@{

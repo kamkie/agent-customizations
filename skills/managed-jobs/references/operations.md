@@ -99,7 +99,8 @@ are swept at the next turn's `Stop` or at `SessionEnd`.
 & $jobs prune -OlderThanDays 14 -Status completed,failed,stopped,orphaned
 ```
 
-Stop verifies PID and creation time before terminating the process tree. Never
-stop a process whose identity does not match the record. Preview pruning first;
-prune excludes active and invalid records and removes only managed records and
-logs.
+Stop verifies PID, creation time, and confirmed Job Object containment before
+terminating the managed host. Closing the host's kill-on-close Job Object stops
+its descendants. Never stop a process whose identity does not match the record.
+Preview pruning first; prune excludes active and invalid records and removes
+only managed records and logs.

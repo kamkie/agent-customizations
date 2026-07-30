@@ -18,7 +18,7 @@ Use these instruction-level work modes without relying on a harness or product P
 
 An explicit mode lasts for the current objective and its follow-ups, then expires when that objective completes. Without an explicit mode, infer `investigation`, `design`, `quick`, or `careful` from the request. Modes control working style, not authorization.
 
-Announce the active mode when it materially affects behavior. Report meaningful phase transitions rather than individual commands. Use measurable labels such as `Phase 2/4 — Validate` only when the total is genuinely known, and never invent percentages. Progress updates in `autonomous` mode never pause execution; `quick` work may omit intermediate tracing when prompt completion is practical.
+Announce the active mode when it materially affects behavior. Report meaningful phase transitions rather than individual commands. Use measurable labels such as `Phase 2/4 — Validate` only when the total is genuinely known, and never invent percentages. Progress updates in `autonomous` mode never pause execution; `quick` work may omit intermediate tracing when immediate completion is practical.
 
 Use these flows when they help trace substantial work:
 

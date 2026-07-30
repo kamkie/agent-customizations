@@ -34,6 +34,25 @@ Implement exactly what the user requested using the smallest coherent diff.
 - Before finishing, inspect the diff and revert every change not required by the request.
 - Do not silently expand scope. Report genuinely necessary extra work instead.
 
-## Pull request readiness
+## Pull request handoff and cleanup
 
-Before marking a pull request ready, re-fetch its head and review threads. Keep it draft if the head changed, a finding is untriaged, or `CHANGES_REQUESTED` applies to the current head; re-fetch after the transition and revert to draft if this gate changed. Resolved feedback on an earlier head does not block readiness, but its review blocks merge until current-head approval.
+When an agent-authored pull request has received opposite-agent review, ensure
+the result is recorded and every finding is fixed or answered. Unless the user
+or repository requires the pull request to remain draft, mark it ready before
+human handoff once required checks for the current head pass, mergeability is
+clean, and no blocking review remains.
+
+Immediately before marking a pull request ready, re-fetch its head and review
+threads. Keep it draft if the head changed, a finding is untriaged, or
+`CHANGES_REQUESTED` applies to the current head; re-fetch after the transition
+and return it to draft if this gate changed. Resolved feedback on an earlier
+head does not block readiness, but its review blocks merge until current-head
+approval.
+
+After merge, fetch the remote default branch and prove the merged result is
+reachable from it before cleanup. Stop task-specific processes and remove
+task-created temporary artifacts. Remove an agent-created worktree and its local
+branch only when the worktree is clean and the branch is merged. Do not remove a
+primary or user-owned worktree, dirty worktree, unmerged branch, or remote branch
+without explicit user or repository authority. Report cleanup that was skipped
+and why.

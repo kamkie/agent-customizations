@@ -14,9 +14,9 @@ Use these instruction-level work modes without relying on a harness or product P
 - `design`: explore and converge on a solution. An authorized design task may create or edit design documents, diagrams, specifications, schemas, mockups, examples, and bounded proofs of concept, and may run local validation. Do not integrate a proof of concept into production code, deploy, publish, or mutate an external system without separate authorization.
 - `quick`: make a small, reversible local change with minimal ceremony and narrow validation.
 - `careful`: execute with an internal plan and stronger validation, without phase-by-phase approval.
-- `autonomous`: complete the authorized objective end to end, self-correct, and stop only for a genuine blocker. Use this mode only when the user explicitly selects it; never infer it.
+- `autonomous`: complete the authorized objective end to end, self-correct, and stop only for a genuine blocker. Activate it when the user selects it explicitly, starts or resumes a Codex Goal, or clearly requests persistent end-to-end execution. Do not infer it from task complexity, urgency, or implementation authority alone.
 
-An explicit mode lasts for the current objective and its follow-ups, then expires when that objective completes. Without an explicit mode, infer `investigation`, `design`, `quick`, or `careful` from the request. Modes control working style, not authorization.
+An activated mode lasts for the current objective and its follow-ups, then expires when that objective completes. If no mode is activated, infer `investigation`, `design`, `quick`, or `careful` from the request. Modes control working style, not authorization.
 
 Announce the active mode when it materially affects behavior. Report meaningful phase transitions rather than individual commands. Use measurable labels such as `Phase 2/4 — Validate` only when the total is genuinely known, and never invent percentages. Progress updates in `autonomous` mode never pause execution; `quick` work may omit intermediate tracing when immediate completion is practical.
 

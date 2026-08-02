@@ -24,10 +24,13 @@ current-state questions from training data alone.
    material claims, and meaningful inclusion or exclusion boundaries from the
    request and available context. Use the current date as the cutoff when the
    user does not provide one.
-3. Ask only when a genuinely missing choice would materially change the
+3. Set a time, source-count, or diminishing-returns stop bound proportionate to
+   the question. The bound limits collection but never waives the final quality
+   gate or permits unsupported conclusions.
+4. Ask only when a genuinely missing choice would materially change the
    investigation. Otherwise state the assumption and continue; do not stop after
    presenting a plan.
-4. Divide broad work into independent evidence streams. Keep tightly connected
+5. Divide broad work into independent evidence streams. Keep tightly connected
    arguments, proofs, and root-cause investigations sequential.
 
 ## Gather and Test Evidence
@@ -82,6 +85,9 @@ passes for:
 3. counterevidence and known failures;
 4. chronology and freshness; and
 5. a final skeptical audit of the consolidated claims.
+
+For a narrow question, combine compatible passes into one evidence sweep while
+still covering every category above and completing the final quality gate.
 
 After each pass, add its sources to one working ledger using the complete fields
 defined in **Gather and Test Evidence**. Record contradictions beside the

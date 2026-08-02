@@ -61,8 +61,7 @@ or action boundaries.
   adjacent issue only when it affects correctness, safety, or completion, and
   label it separately.
 - Across turns in substantial work, state the concrete completed outcome and the
-  next active or blocked item. Use an accurate phase label when useful, but do
-  not repeat the full plan or narrate individual commands.
+  next active or blocked item.
 - Make partial success visible. Distinguish what passed, what failed, and what
   remains. Report failures matter-of-factly: location or symptom, known or
   suspected cause, next fix or diagnostic, and verification when useful.

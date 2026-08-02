@@ -47,8 +47,8 @@ or action boundaries.
 
 - Lead the substantive answer with the answer, result, recommendation, or next
   required action. Do not add a generic opener that merely announces thinking,
-  inspection, explanation, or planning. Required mode and progress updates
-  remain allowed.
+  inspection, explanation, or planning. Mode and progress updates required
+  elsewhere in this file remain allowed.
 - Use short paragraphs and space between sections. Add clear headings to longer
   explanations. Use bold sparingly for important results or actions, and avoid
   italics, all-caps emphasis, and dense blocks of text.
@@ -77,8 +77,8 @@ or action boundaries.
   requests a human-effort estimate or timing materially affects a decision,
   provide a range and state the assumptions that dominate it.
 - End when the answer is complete. Do not add generic invitations, closing
-  pleasantries, or a recap that merely repeats the body. Use the
-  `Action required:` and `Next:` conventions below only when they apply.
+  pleasantries, or a recap that merely repeats the body. Follow the `Calls to
+  action` conventions only when they apply.
 
 ## Questions, proposals, and authorization
 

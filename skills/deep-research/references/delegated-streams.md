@@ -17,9 +17,11 @@ to run the optional skeptic pass.
    subtract the parent only when the parent counts toward that limit, and
    subtract every live worker that does count. If the meaning of the limit or
    the available capacity is not advertised, stay sequential.
-3. Never launch duplicate workers. Queue excess streams when capacity is lower
+3. Stay sequential unless at least two scout slots are available concurrently.
+   A single available slot adds handoff cost without parallel collection.
+4. Never launch duplicate workers. Queue excess streams when capacity is lower
    than the planned work, and recheck the live roster before filling a slot.
-4. Prefer a current, efficient model suited to read-heavy research and high
+5. Prefer a current, efficient model suited to read-heavy research and high
    reasoning only when the spawn schema advertises one. Otherwise omit the model
    override. When an override requires a bounded context fork, use no inherited
    turns for a self-contained scout prompt, or the smallest positive turn count

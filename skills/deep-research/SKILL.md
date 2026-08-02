@@ -49,6 +49,9 @@ do not answer current-state questions from training data alone.
 - Record, in working context, each source's title, author or organization,
   publication or update date, event date when different, URL, exact supported
   claim, relevant methodology, and limitations.
+- Keep that ledger complete for the full investigation. If working context
+  cannot retain it, narrow the scope or report the retention limitation; do not
+  create a scratch file or research artifact without user authorization.
 - Verify versions, geography, units, sample size, benchmark configuration,
   hardware, pricing basis, and usage limits whenever they affect comparison.
   Treat incomparable setups as incomparable.

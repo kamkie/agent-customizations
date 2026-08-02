@@ -11,9 +11,11 @@ authorizes an artifact, repository change, or external action.
 
 This skill supports Codex and requires live search plus source-opening tools for
 current or externally verifiable claims. Delegation is permitted only when
-active instructions allow it and is never required. If live web access is
-unavailable, report the limitation and the claims that could not be verified;
-do not answer current-state questions from training data alone.
+active instructions allow it and is never required. Treat live web access as
+unavailable when the required search or source-opening tool is absent, or when
+an access or service error persists after one reasonable retry. Report that
+limitation and the claims that could not be verified; do not answer
+current-state questions from training data alone.
 
 ## Establish the Research Contract
 

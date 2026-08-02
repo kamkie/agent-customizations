@@ -4,7 +4,9 @@ Use this branch only after `SKILL.md` determines that parallel evidence
 collection is permitted and materially useful. The parent remains responsible
 for authorization, source auditing, synthesis, and the final answer. Respect any
 explicit time, token, or cost constraint when sizing scouts and deciding whether
-to run the optional skeptic pass.
+to run the optional skeptic pass. Treat delegation as a latency and evidence-
+independence optimization, not a token-saving shortcut: the parent still opens
+the sources behind every material claim it accepts.
 
 ## Discover and Use Capacity
 

@@ -99,6 +99,9 @@ five-pass sequence is the complete normal action path; it requires no reference.
 
 Before answering, verify that:
 
+- the working ledger still contains a complete entry for every accepted source
+  and material claim; re-open or re-research missing evidence, or report the
+  retention gap when it cannot be reconstructed within the research bound;
 - every material number, date, comparison, quotation, and current-state claim
   has direct support;
 - each citation supports the exact nearby claim and was opened during the

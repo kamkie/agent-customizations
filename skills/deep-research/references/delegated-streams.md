@@ -62,7 +62,10 @@ cross-stream conclusion. Return:
 ## Converge and Audit
 
 1. Wait for every requested scout, then audit returned sources and claims before
-   accepting them into the consolidated evidence.
+   accepting them into the consolidated evidence. The parent must open the
+   underlying source for every material number, quotation, date, and
+   current-state claim it carries into synthesis. Exclude a claim when its
+   source cannot be opened or does not directly support it.
 2. If a scout keeps expanding scope, ask it to conclude with current evidence.
    If it remains stalled, interrupt it and treat unreturned evidence as a gap
    rather than silently accepting or replacing it.

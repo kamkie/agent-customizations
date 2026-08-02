@@ -2,7 +2,9 @@
 
 Use this branch only after `SKILL.md` determines that parallel evidence
 collection is permitted and materially useful. The parent remains responsible
-for authorization, source auditing, synthesis, and the final answer.
+for authorization, source auditing, synthesis, and the final answer. Respect any
+explicit time, token, or cost constraint when sizing scouts and deciding whether
+to run the optional skeptic pass.
 
 ## Discover and Use Capacity
 
@@ -73,9 +75,10 @@ cross-stream conclusion. Return:
    bounded parent wait. Treat a scout that does not return within that bound as
    a gap rather than silently accepting or automatically replacing its work.
 3. For consequential or publication-quality work, give the consolidated
-   evidence to one independent skeptic. Prefer the strongest currently
-   supported model and a high or maximum supported effort; provide the evidence
-   and quality criteria without revealing the intended conclusion.
+   evidence to one independent skeptic when the active cost constraints allow
+   it. Prefer the strongest currently supported model and a high or maximum
+   supported effort; provide the evidence and quality criteria without revealing
+   the intended conclusion.
 4. Repair unsupported, stale, or contradictory claims with targeted research.
    The parent performs final synthesis unless the user explicitly requests a
    different ownership model.

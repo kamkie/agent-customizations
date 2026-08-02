@@ -10,9 +10,10 @@ underlying evidence. Keep the investigation read-only unless the user separately
 authorizes an artifact, repository change, or external action.
 
 This skill supports Codex and requires live search plus source-opening tools for
-current or externally verifiable claims. Agent delegation is optional. If live
-web access is unavailable, report the limitation and the claims that could not
-be verified; do not answer current-state questions from training data alone.
+current or externally verifiable claims. Delegation is permitted only when
+active instructions allow it and is never required. If live web access is
+unavailable, report the limitation and the claims that could not be verified;
+do not answer current-state questions from training data alone.
 
 ## Establish the Research Contract
 
@@ -54,75 +55,13 @@ be verified; do not answer current-state questions from training data alone.
 
 ## Delegate Independent Streams
 
-Delegate when the investigation has at least three genuinely independent
-evidence streams and active instructions allow agent delegation. Use the
-sequential path when delegation would fragment one coherent argument.
-
-1. Read the active runtime instructions and the agent-spawn tool schema for the
-   advertised concurrency limit, model overrides, and context-fork options. Use
-   the runtime's agent-list operation to count live workers before every launch.
-   Available slots equal the advertised limit minus the parent and live workers.
-   If capacity is not advertised, stay sequential. Never launch duplicate
-   workers; queue excess streams when capacity is lower than the planned work.
-2. Assign each scout one bounded question with explicit inclusion and exclusion
-   criteria, the research cutoff, source priorities, and a stop condition. Tell
-   it to return once the evidence contract is satisfied or to report the
-   unresolved gap when authoritative evidence remains unavailable. Require:
-   - scope handled;
-   - findings without a final cross-stream conclusion;
-   - an evidence ledger with source title, author or organization, publication
-     or update date, event date when different, URL, exact supported claim,
-     relevant methodology, and limitations;
-   - contradictions; and
-   - remaining gaps.
-3. Prefer a current, efficient model suited to read-heavy research and high
-   reasoning when the spawn schema advertises one. Otherwise omit the model
-   override. When an override requires a bounded context fork, use no inherited
-   turns for a self-contained scout prompt, or the smallest positive turn count
-   that contains required task context.
-4. Wait for every requested scout, then audit the returned sources and claims
-   before accepting them into the consolidated evidence. If a scout keeps
-   expanding scope, ask it to conclude with current evidence; if it remains
-   stalled, interrupt it and treat unreturned evidence as a gap rather than
-   silently accepting or replacing it.
-5. For consequential or publication-quality work, give the consolidated
-   evidence to one independent skeptic. Prefer the strongest currently
-   supported model and a high or maximum supported effort; provide the evidence
-   and quality criteria without revealing the intended conclusion.
-6. Repair unsupported, stale, or contradictory claims with targeted research.
-   The parent agent performs the final synthesis unless the user explicitly
-   requests a different ownership model.
-
-Do not create an on-disk ledger, task hierarchy, or progress artifact merely to
-represent the workflow. Create a research artifact only when the user requests
-one.
-
-Use this complete prompt for each scout after replacing every bracketed field
-with a resolved value from the research contract:
-
-```text
-Research one independent evidence stream for a larger investigation.
-
-Parent question: [the exact overall question]
-Your bounded question: [one independently answerable subquestion]
-Research cutoff: [YYYY-MM-DD]
-In scope: [included products, versions, dates, geographies, or evidence]
-Out of scope: [explicit exclusions and work owned by other scouts]
-Source priority: [preferred primary sources, then acceptable independent sources]
-Stop condition: [the evidence needed to answer the bounded question, plus a
-time, source-count, or diminishing-returns bound]
-
-Keep the work read-only. Return once the stop condition is met, or report the
-authoritative evidence that remains unavailable. Do not make the final
-cross-stream conclusion. Return:
-1. scope handled;
-2. findings;
-3. an evidence ledger containing source title, author or organization,
-   publication or update date, event date when different, URL, exact supported
-   claim, relevant methodology, and limitations;
-4. contradictions; and
-5. remaining gaps.
-```
+Delegation is permitted when the investigation has at least three genuinely
+independent evidence streams, active instructions allow agent delegation, and
+parallel collection materially improves the work. Before launching any scout,
+read [delegated-streams.md](references/delegated-streams.md) for capacity
+discovery, the complete scout contract, convergence handling, and the optional
+skeptic pass. Stay sequential when delegation would fragment one coherent
+argument or when the runtime does not advertise capacity.
 
 ## Run the Sequential Path
 
@@ -135,8 +74,13 @@ passes for:
 4. chronology and freshness; and
 5. a final skeptical audit of the consolidated claims.
 
-Keep one coherent working evidence set and revisit earlier conclusions whenever
-later evidence conflicts with them.
+After each pass, add its sources to one working ledger using the complete fields
+defined in **Gather and Test Evidence**: title, author or organization,
+publication or update date, event date when different, URL, exact supported
+claim, relevant methodology, and limitations. Record contradictions beside the
+affected claims, revisit earlier conclusions when later evidence conflicts with
+them, and complete every item in the final quality gate before answering. This
+five-pass sequence is the complete normal action path; it requires no reference.
 
 ## Apply the Final Quality Gate
 

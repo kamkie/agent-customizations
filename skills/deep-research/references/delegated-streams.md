@@ -8,6 +8,10 @@ to run the optional skeptic pass. Treat delegation as a latency optimization
 that strengthens evidence independence, not a token-saving shortcut: the parent
 still opens the sources behind every material claim it accepts.
 
+Both delegation thresholds must hold: three independent evidence streams make
+the workload worth considering, and at least two concurrent scout slots make
+parallel collection worthwhile.
+
 ## Discover and Use Capacity
 
 1. Read the active runtime instructions and the agent-spawn tool schema for the

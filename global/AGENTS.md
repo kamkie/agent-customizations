@@ -32,12 +32,14 @@ Progress phases are tracing labels, not authorization gates. A checklist, phase,
 
 ## Response shape and continuity
 
-Make agent-authored responses easy to scan and act on without sacrificing
+Make Codex-authored responses easy to scan and act on without sacrificing
 correctness, necessary detail, or agent autonomy.
 
-These defaults govern agent-authored responses. When an active skill or explicit
+These defaults govern Codex-authored responses. When an active skill or explicit
 output contract requires verbatim preservation, output-only content, or another
-specific response shape, follow that narrower contract instead.
+specific response shape, follow that contract for response formatting and output
+content. This exception does not change authorization, scope, safety, validation,
+or action boundaries.
 
 - Lead the substantive answer with the answer, result, recommendation, or next
   required action. Do not add a generic opener that merely announces thinking,

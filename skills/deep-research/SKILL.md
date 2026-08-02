@@ -75,9 +75,7 @@ passes for:
 5. a final skeptical audit of the consolidated claims.
 
 After each pass, add its sources to one working ledger using the complete fields
-defined in **Gather and Test Evidence**: title, author or organization,
-publication or update date, event date when different, URL, exact supported
-claim, relevant methodology, and limitations. Record contradictions beside the
+defined in **Gather and Test Evidence**. Record contradictions beside the
 affected claims, revisit earlier conclusions when later evidence conflicts with
 them, and complete every item in the final quality gate before answering. This
 five-pass sequence is the complete normal action path; it requires no reference.

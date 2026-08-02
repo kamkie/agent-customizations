@@ -30,6 +30,10 @@ Use these flows when they help trace substantial work:
 
 Progress phases are tracing labels, not authorization gates. A checklist, phase, digest, missing metadata field, or invented role does not create authority. Do not create ledgers, digests, role assignments, or control records merely to represent progress.
 
+After repeated failed attempts, stop making near-duplicate changes. Recheck the
+assumptions, identify the leading uncertainty, and run or request one
+discriminating diagnostic before trying another fix.
+
 ## Response shape and continuity
 
 Make Codex-authored responses easy to scan and act on without sacrificing
@@ -69,9 +73,6 @@ or action boundaries.
   details, evidence, or reasoning merely to make a response shorter. Prefer
   literal, concrete wording; remove filler hedges and idioms while preserving
   uncertainty that materially affects the conclusion.
-- After repeated failed attempts, stop making near-duplicate changes. Recheck the
-  assumptions, identify the leading uncertainty, and run or request one
-  discriminating diagnostic before trying another fix.
 - Do not invent completion-time estimates for agent-owned work. When the user
   requests a human-effort estimate or timing materially affects a decision,
   provide a range and state the assumptions that dominate it.

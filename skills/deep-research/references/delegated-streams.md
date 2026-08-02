@@ -8,7 +8,8 @@ for authorization, source auditing, synthesis, and the final answer.
 
 1. Read the active runtime instructions and the agent-spawn tool schema for the
    advertised concurrency limit, what that limit counts, model overrides, and
-   context-fork options.
+   context-fork options. Also discover whether the runtime exposes progress,
+   mid-flight messaging, and interruption operations.
 2. Use the runtime's agent-list operation to count live workers before every
    launch. Derive available slots from what the advertised limit counts:
    subtract the parent only when the parent counts toward that limit, and
@@ -61,14 +62,16 @@ cross-stream conclusion. Return:
 
 ## Converge and Audit
 
-1. Wait for every requested scout, then audit returned sources and claims before
-   accepting them into the consolidated evidence. The parent must open the
-   underlying source for every material number, quotation, date, and
-   current-state claim it carries into synthesis. Exclude a claim when its
+1. Collect every scout result returned within its bound, then audit its sources
+   and claims before accepting them into the consolidated evidence. The parent
+   must open the underlying source for every material number, quotation, date,
+   and current-state claim it carries into synthesis. Exclude a claim when its
    source cannot be opened or does not directly support it.
-2. If a scout keeps expanding scope, ask it to conclude with current evidence.
-   If it remains stalled, interrupt it and treat unreturned evidence as a gap
-   rather than silently accepting or replacing it.
+2. When the runtime advertises messaging and interruption, ask a scout that
+   keeps expanding scope to conclude with current evidence, then interrupt it if
+   it remains stalled. Otherwise rely on the scout's stop condition and a
+   bounded parent wait. Treat a scout that does not return within that bound as
+   a gap rather than silently accepting or automatically replacing its work.
 3. For consequential or publication-quality work, give the consolidated
    evidence to one independent skeptic. Prefer the strongest currently
    supported model and a high or maximum supported effort; provide the evidence

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deep Research"
+  short_description: "Rigorous current research with evidence audits"
+  default_prompt: "Use $deep-research to investigate this question with current primary sources and audit every material claim."

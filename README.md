@@ -13,6 +13,8 @@ tools' live configuration directories are deployment targets.
 - `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
 - `skills/cross-agent-review` — opposite-engine adversarial review with triage,
   credited fix commits, and bounded rounds, shared by Codex and Claude Code.
+- `skills/deep-research` — Codex-specific, evidence-driven research with
+  independent source collection, contradiction checks, and citation auditing.
 - `skills/dyslexia-friendly-formatter` — format text for dyslexia-friendly
   reading without changing its content.
 - `skills/execute-campaign-work-item` — scoped execution and evidence-backed

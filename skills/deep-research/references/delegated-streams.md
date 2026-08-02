@@ -4,9 +4,9 @@ Use this branch only after `SKILL.md` determines that parallel evidence
 collection is permitted and materially useful. The parent remains responsible
 for authorization, source auditing, synthesis, and the final answer. Respect any
 explicit time, token, or cost constraint when sizing scouts and deciding whether
-to run the optional skeptic pass. Treat delegation as a latency and evidence-
-independence optimization, not a token-saving shortcut: the parent still opens
-the sources behind every material claim it accepts.
+to run the optional skeptic pass. Treat delegation as a latency optimization
+that strengthens evidence independence, not a token-saving shortcut: the parent
+still opens the sources behind every material claim it accepts.
 
 ## Discover and Use Capacity
 
@@ -23,9 +23,10 @@ the sources behind every material claim it accepts.
    A single available slot adds handoff cost without parallel collection.
 4. Never launch duplicate workers. Queue excess streams when capacity is lower
    than the planned work, and recheck the live roster before filling a slot.
-5. Prefer a current, efficient model suited to read-heavy research and high
-   reasoning only when the spawn schema advertises one. Otherwise omit the model
-   override. When an override requires a bounded context fork, use no inherited
+5. Use the runtime's default model and effort for scouts unless the user, active
+   instructions, or runtime metadata explicitly identifies a supported override
+   for read-heavy research. Never guess between unranked advertised models or
+   efforts. When an override requires a bounded context fork, use no inherited
    turns for a self-contained scout prompt, or the smallest positive turn count
    that contains required task context.
 
@@ -85,9 +86,10 @@ cross-stream conclusion. Return:
    a gap rather than silently accepting or automatically replacing its work.
 3. For consequential or publication-quality work, give the consolidated
    evidence to one independent skeptic when the active cost constraints allow
-   it. Prefer the strongest currently supported model and a high or maximum
-   supported effort; provide the evidence and quality criteria without revealing
-   the intended conclusion.
+   it. Override the runtime default only when the user, active instructions, or
+   runtime metadata explicitly ranks a supported model or effort for skeptical
+   review; never guess between unranked choices. Provide the evidence and quality
+   criteria without revealing the intended conclusion.
 4. Repair unsupported, stale, or contradictory claims with targeted research.
    The parent performs final synthesis unless the user explicitly requests a
    different ownership model.

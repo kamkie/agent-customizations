@@ -1,6 +1,6 @@
 ---
 name: deep-research
-description: Investigate difficult, current, or consequential questions through scoped multi-source research, primary-source verification, independent evidence streams, contradiction checks, and citation auditing. Use for technical investigations, product or vendor comparisons, benchmark analysis, literature reviews, current-state assessments, and decision memos. Do not use for simple lookups, routine codebase investigation, implementation work, or requests that only reformat or summarize supplied material.
+description: Investigate difficult, current, or consequential questions through scoped multi-source research, primary-source verification, independent evidence streams, contradiction checks, and citation auditing. Use for technical investigations, product or vendor comparisons, benchmark analysis, literature reviews, current-state assessments, and decision memos. Do not use for simple lookups, routine codebase investigation, implementation work, delivery campaigns or task hierarchies owned by orchestrate-work-campaigns, or requests that only reformat or summarize supplied material.
 ---
 
 # Deep Research
@@ -8,6 +8,11 @@ description: Investigate difficult, current, or consequential questions through 
 Produce a defensible answer whose important claims can be checked against the
 underlying evidence. Keep the investigation read-only unless the user separately
 authorizes an artifact, repository change, or external action.
+
+This skill supports Codex and requires live search plus source-opening tools for
+current or externally verifiable claims. Agent delegation is optional. If live
+web access is unavailable, report the limitation and the claims that could not
+be verified; do not answer current-state questions from training data alone.
 
 ## Establish the Research Contract
 
@@ -53,22 +58,28 @@ Delegate when the investigation has at least three genuinely independent
 evidence streams and active instructions allow agent delegation. Use the
 sequential path when delegation would fragment one coherent argument.
 
-1. Discover the current agent capacity and supported model settings. Never
-   assume a fixed thread count or launch duplicate workers. Queue excess streams
-   when capacity is lower than the planned work.
+1. Read the active runtime instructions and the agent-spawn tool schema for the
+   advertised concurrency limit, model overrides, and context-fork options. Use
+   the runtime's agent-list operation to count live workers before every launch.
+   Available slots equal the advertised limit minus the parent and live workers.
+   If capacity is not advertised, stay sequential. Never launch duplicate
+   workers; queue excess streams when capacity is lower than the planned work.
 2. Assign each scout one bounded question with explicit inclusion and exclusion
    criteria, the research cutoff, source priorities, and a stop condition. Tell
    it to return once the evidence contract is satisfied or to report the
    unresolved gap when authoritative evidence remains unavailable. Require:
    - scope handled;
    - findings without a final cross-stream conclusion;
-   - an evidence ledger with claim, URL, date, methodology, and limitations;
+   - an evidence ledger with source title, author or organization, publication
+     or update date, event date when different, URL, exact supported claim,
+     relevant methodology, and limitations;
    - contradictions; and
    - remaining gaps.
 3. Prefer a current, efficient model suited to read-heavy research and high
-   reasoning when the runtime advertises one. Use explicit model names only
-   after confirming availability, and use a bounded context fork when an
-   override requires it.
+   reasoning when the spawn schema advertises one. Otherwise omit the model
+   override. When an override requires a bounded context fork, use no inherited
+   turns for a self-contained scout prompt, or the smallest positive turn count
+   that contains required task context.
 4. Wait for every requested scout, then audit the returned sources and claims
    before accepting them into the consolidated evidence. If a scout keeps
    expanding scope, ask it to conclude with current evidence; if it remains
@@ -85,6 +96,33 @@ sequential path when delegation would fragment one coherent argument.
 Do not create an on-disk ledger, task hierarchy, or progress artifact merely to
 represent the workflow. Create a research artifact only when the user requests
 one.
+
+Use this complete prompt for each scout after replacing every bracketed field
+with a resolved value from the research contract:
+
+```text
+Research one independent evidence stream for a larger investigation.
+
+Parent question: [the exact overall question]
+Your bounded question: [one independently answerable subquestion]
+Research cutoff: [YYYY-MM-DD]
+In scope: [included products, versions, dates, geographies, or evidence]
+Out of scope: [explicit exclusions and work owned by other scouts]
+Source priority: [preferred primary sources, then acceptable independent sources]
+Stop condition: [the evidence needed to answer the bounded question, plus a
+time, source-count, or diminishing-returns bound]
+
+Keep the work read-only. Return once the stop condition is met, or report the
+authoritative evidence that remains unavailable. Do not make the final
+cross-stream conclusion. Return:
+1. scope handled;
+2. findings;
+3. an evidence ledger containing source title, author or organization,
+   publication or update date, event date when different, URL, exact supported
+   claim, relevant methodology, and limitations;
+4. contradictions; and
+5. remaining gaps.
+```
 
 ## Run the Sequential Path
 

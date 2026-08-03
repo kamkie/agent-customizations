@@ -134,6 +134,52 @@ try {
     } | ConvertTo-Json -Compress
     $backgroundDecision = ($backgroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'The launch guard should deny a natively backgrounded command.'
+    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'foreground') 'The deny reason should rule out the foreground-with-timeout fallback.'
+    $detachedPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = "Start-Process pwsh -ArgumentList '-File','engine.ps1'" }
+    } | ConvertTo-Json -Compress
+    $detachedDecision = ($detachedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($detachedDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'The launch guard should deny a bare Start-Process detach, which opens an unmanaged console window.'
+    $allowedDetachPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = "Start-Process notepad # managed-jobs: allow-direct" }
+    } | ConvertTo-Json -Compress
+    $allowedDetachOutput = ($allowedDetachPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($allowedDetachOutput)) 'The explicit allow-direct marker should still bypass the launch guard.'
+    $compoundPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' list; Start-Process pwsh" }
+    } | ConvertTo-Json -Compress
+    $compoundDecision = ($compoundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($compoundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A controller mention must not exempt a compound command that also detaches directly.'
+    $controllerPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' start -Name api -Executable dotnet" }
+    } | ConvertTo-Json -Compress
+    $controllerOutput = ($controllerPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($controllerOutput)) 'A pure controller invocation should stay exempt from the launch guard.'
+    $retryPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+        tool_input = [ordered]@{ command = 'python -m http.server' }
+    } | ConvertTo-Json -Compress
+    $retryDecision = ($retryPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($retryDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A foreground retry of a recently denied launch should be denied.'
+    Assert-True ($retryDecision.hookSpecificOutput.permissionDecisionReason -match 'recently denied') 'The retry denial should explain that the command was recently denied.'
+    $controllerBackgroundPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+        tool_input = [ordered]@{ command = "pwsh -File 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' list; python -m other.server"; run_in_background = $true }
+    } | ConvertTo-Json -Compress
+    $controllerBackgroundDecision = ($controllerBackgroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($controllerBackgroundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A controller mention must not exempt a natively backgrounded tool call.'
+    $guardCacheFile = Join-Path $stateRoot 'guard\denied-launches.json'
+    Set-Content -LiteralPath $guardCacheFile -Value '{not valid json' -Encoding utf8
+    $corruptCacheDecision = ($detachedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($corruptCacheDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A corrupt retry cache must not disable pattern-based denials.'
+    $env:MANAGED_JOBS_ROOT = 'NoSuchDrive:\managed-jobs-state'
+    $unavailableRootDecision = ($detachedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($unavailableRootDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'An unavailable state-root drive must not disable pattern-based denials.'
+    $env:MANAGED_JOBS_ROOT = $stateRoot
     $foregroundPayload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
         tool_input = [ordered]@{ command = 'git status' }

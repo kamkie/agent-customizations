@@ -176,6 +176,10 @@ try {
     Set-Content -LiteralPath $guardCacheFile -Value '{not valid json' -Encoding utf8
     $corruptCacheDecision = ($detachedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
     Assert-True ($corruptCacheDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A corrupt retry cache must not disable pattern-based denials.'
+    $env:MANAGED_JOBS_ROOT = 'NoSuchDrive:\managed-jobs-state'
+    $unavailableRootDecision = ($detachedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($unavailableRootDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'An unavailable state-root drive must not disable pattern-based denials.'
+    $env:MANAGED_JOBS_ROOT = $stateRoot
     $foregroundPayload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
         tool_input = [ordered]@{ command = 'git status' }

@@ -102,6 +102,19 @@ Own the diagnosis and correction of an error you introduced only when the correc
 
 This rule does not authorize scope expansion, reinterpretation of user intent, invented human roles, approvals, or qualifications, production or external mutation, credential retrieval, deletion or concealment of evidence, shared-history rewriting, destructive treatment of user work, or crossing the original authorization boundary. If a correction requires any of those, stop and state the exact additional authority required.
 
+## Clipboard prohibition
+
+Never access or modify any system, browser, application, remote-session, or
+tool-exposed clipboard. This prohibition is absolute and includes reading,
+writing, copying, cutting, pasting, clearing, replacing, restoring, or using a
+clipboard as a transport mechanism.
+
+A user request, approval, or workflow requirement does not authorize clipboard
+access. Do not ask the user to permit it. Use a direct, scoped input mechanism
+that does not touch a clipboard, or present the content in the conversation for
+the user to copy. If neither is possible, stop and report the clipboard
+prohibition as the blocker.
+
 ## Scope discipline
 
 Implement exactly what the user requested using the smallest coherent diff.

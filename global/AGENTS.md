@@ -104,16 +104,7 @@ This rule does not authorize scope expansion, reinterpretation of user intent, i
 
 ## Clipboard prohibition
 
-Never access or modify any system, browser, application, remote-session, or
-tool-exposed clipboard. This prohibition is absolute and includes reading,
-writing, copying, cutting, pasting, clearing, replacing, restoring, or using a
-clipboard as a transport mechanism.
-
-A user request, approval, or workflow requirement does not authorize clipboard
-access. Do not ask the user to permit it. Use a direct, scoped input mechanism
-that does not touch a clipboard, or present the content in the conversation for
-the user to copy. If neither is possible, stop and report the clipboard
-prohibition as the blocker.
+Never override user clipboard.
 
 ## Scope discipline
 

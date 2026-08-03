@@ -147,6 +147,25 @@ try {
     } | ConvertTo-Json -Compress
     $allowedDetachOutput = ($allowedDetachPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
     Assert-True ([string]::IsNullOrWhiteSpace($allowedDetachOutput)) 'The explicit allow-direct marker should still bypass the launch guard.'
+    $compoundPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' list; Start-Process pwsh" }
+    } | ConvertTo-Json -Compress
+    $compoundDecision = ($compoundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($compoundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A controller mention must not exempt a compound command that also detaches directly.'
+    $controllerPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' start -Name api -Executable dotnet" }
+    } | ConvertTo-Json -Compress
+    $controllerOutput = ($controllerPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($controllerOutput)) 'A pure controller invocation should stay exempt from the launch guard.'
+    $retryPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+        tool_input = [ordered]@{ command = 'python -m http.server' }
+    } | ConvertTo-Json -Compress
+    $retryDecision = ($retryPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($retryDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A foreground retry of a recently denied launch should be denied.'
+    Assert-True ($retryDecision.hookSpecificOutput.permissionDecisionReason -match 'recently denied') 'The retry denial should explain that the command was recently denied.'
     $foregroundPayload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
         tool_input = [ordered]@{ command = 'git status' }

@@ -36,31 +36,39 @@ try {
     $matched = $patterns | Where-Object { $command -match $_ } | Select-Object -First 1
 
     # The controller exemption never covers a compound command that also uses a
-    # raw detach primitive.
+    # raw detach primitive or a natively backgrounded tool call.
     $usesController = $command -match 'Invoke-ManagedJob\.ps1|managed-jobs[\\/]scripts'
-    if ($usesController -and -not $matched) { exit 0 }
+    if ($usesController -and -not $matched -and -not $backgroundRequested) { exit 0 }
 
+    # Retry memory is best-effort: a cache failure must weaken only retry
+    # detection, never a pattern or background denial.
     $stateRoot = if ($env:MANAGED_JOBS_ROOT) { $env:MANAGED_JOBS_ROOT } else { Join-Path $HOME '.agent-customizations\managed-jobs' }
     $guardFile = Join-Path (Join-Path $stateRoot 'guard') 'denied-launches.json'
     $sha = [Security.Cryptography.SHA256]::Create()
     $fingerprint = [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($command.Trim())))
     $nowUtc = [datetime]::UtcNow
     $deniedEntries = @()
-    if (Test-Path -LiteralPath $guardFile) {
-        # Ticks survive the JSON round-trip; ConvertFrom-Json mangles ISO date strings.
-        $deniedEntries = @(Get-Content -LiteralPath $guardFile -Raw | ConvertFrom-Json) | Where-Object {
-            ($nowUtc.Ticks - [long]$_.deniedAtUtcTicks) -lt [TimeSpan]::FromHours(1).Ticks
+    try {
+        if (Test-Path -LiteralPath $guardFile) {
+            # Ticks survive the JSON round-trip; ConvertFrom-Json mangles ISO date strings.
+            $deniedEntries = @(Get-Content -LiteralPath $guardFile -Raw | ConvertFrom-Json) | Where-Object {
+                ($nowUtc.Ticks - [long]$_.deniedAtUtcTicks) -lt [TimeSpan]::FromHours(1).Ticks
+            }
         }
-    }
+    } catch { $deniedEntries = @() }
     $retryOfDenied = $deniedEntries | Where-Object { [string]$_.fingerprint -eq $fingerprint } | Select-Object -First 1
 
     if (-not $matched -and -not $backgroundRequested -and -not $retryOfDenied) { exit 0 }
 
-    $deniedEntries = @($deniedEntries | Where-Object { [string]$_.fingerprint -ne $fingerprint }) + @(
-        [ordered]@{ fingerprint = $fingerprint; deniedAtUtcTicks = $nowUtc.Ticks }
-    )
-    $null = New-Item -ItemType Directory -Path (Split-Path -Parent $guardFile) -Force
-    ConvertTo-Json @($deniedEntries) -Depth 4 | Set-Content -LiteralPath $guardFile -Encoding utf8
+    try {
+        $deniedEntries = @($deniedEntries | Where-Object { [string]$_.fingerprint -ne $fingerprint }) + @(
+            [ordered]@{ fingerprint = $fingerprint; deniedAtUtcTicks = $nowUtc.Ticks }
+        )
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $guardFile) -Force
+        $guardTempFile = "$guardFile.$PID.tmp"
+        ConvertTo-Json @($deniedEntries) -Depth 4 | Set-Content -LiteralPath $guardTempFile -Encoding utf8
+        Move-Item -LiteralPath $guardTempFile -Destination $guardFile -Force
+    } catch {}
 
     $reason = if ($retryOfDenied -and -not $matched -and -not $backgroundRequested) {
         "This command was recently denied as a background or detached launch, and rerunning it in the foreground bounded by a tool-call timeout is not an acceptable substitute. Start it as a managed job via the managed-jobs skill and poll status/logs. If the user explicitly requested unmanaged execution, add the comment marker '# managed-jobs: allow-direct'."

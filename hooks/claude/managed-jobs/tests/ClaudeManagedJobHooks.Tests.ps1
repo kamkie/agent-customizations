@@ -166,6 +166,16 @@ try {
     $retryDecision = ($retryPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
     Assert-True ($retryDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A foreground retry of a recently denied launch should be denied.'
     Assert-True ($retryDecision.hookSpecificOutput.permissionDecisionReason -match 'recently denied') 'The retry denial should explain that the command was recently denied.'
+    $controllerBackgroundPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+        tool_input = [ordered]@{ command = "pwsh -File 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' list; python -m other.server"; run_in_background = $true }
+    } | ConvertTo-Json -Compress
+    $controllerBackgroundDecision = ($controllerBackgroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($controllerBackgroundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A controller mention must not exempt a natively backgrounded tool call.'
+    $guardCacheFile = Join-Path $stateRoot 'guard\denied-launches.json'
+    Set-Content -LiteralPath $guardCacheFile -Value '{not valid json' -Encoding utf8
+    $corruptCacheDecision = ($detachedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($corruptCacheDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'A corrupt retry cache must not disable pattern-based denials.'
     $foregroundPayload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
         tool_input = [ordered]@{ command = 'git status' }

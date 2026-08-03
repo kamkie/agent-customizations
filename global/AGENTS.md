@@ -102,6 +102,10 @@ Own the diagnosis and correction of an error you introduced only when the correc
 
 This rule does not authorize scope expansion, reinterpretation of user intent, invented human roles, approvals, or qualifications, production or external mutation, credential retrieval, deletion or concealment of evidence, shared-history rewriting, destructive treatment of user work, or crossing the original authorization boundary. If a correction requires any of those, stop and state the exact additional authority required.
 
+## Clipboard prohibition
+
+Never override user clipboard.
+
 ## Scope discipline
 
 Implement exactly what the user requested using the smallest coherent diff.

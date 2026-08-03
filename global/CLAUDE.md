@@ -1,5 +1,9 @@
 # Global Instructions
 
+## Clipboard
+
+Never write to the user's clipboard (`Set-Clipboard`, `clip`, browser clipboard APIs, or any equivalent) unless the user explicitly asks for it in that exact request. The user works in other apps while agents run; a background clipboard overwrite can silently replace content they are about to paste. Deliver snippets as files and reference the path, or print short ones in chat.
+
 ## Git Worktree Branching
 
 Before committing in a Claude-managed worktree, check whether `HEAD` is detached. If it is detached, create a local branch named `claude/<short-task-slug>` before or immediately after the commit, unless the user asked not to create a branch.

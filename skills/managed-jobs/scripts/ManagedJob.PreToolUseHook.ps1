@@ -25,7 +25,7 @@ try {
 
     $patterns = @(
         '(?i)\bStart-Job\b',
-        '(?i)\bStart-Process\b.*(?:-WindowStyle\s+Hidden|\bwt(?:\.exe)?\b)',
+        '(?i)\bStart-Process\b',
         '(?i)\bwt(?:\.exe)?\b.*\bnew-tab\b',
         '(?i)\bclaude(?:\.exe)?\b.*(?:\s-p\s|/review)',
         '(?i)(?:npm|pnpm|yarn)\s+(?:run\s+)?dev\b',
@@ -41,7 +41,7 @@ try {
         hookSpecificOutput = [ordered]@{
             hookEventName = 'PreToolUse'
             permissionDecision = 'deny'
-            permissionDecisionReason = "Long-running or detached command must use the managed-jobs skill so its PID, state, and logs survive agent restarts. If the user explicitly requested unmanaged execution, add the comment marker '# managed-jobs: allow-direct'."
+            permissionDecisionReason = "Long-running or detached command must use the managed-jobs skill so its PID, state, and logs survive agent restarts. Do not retry it as a foreground run bounded by a tool-call timeout; start a managed job and poll status/logs instead. If the user explicitly requested unmanaged execution, add the comment marker '# managed-jobs: allow-direct'."
         }
     } | ConvertTo-Json -Depth 6 -Compress
 } catch {

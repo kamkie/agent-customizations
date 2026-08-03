@@ -330,8 +330,18 @@ switch ($Action) {
                 $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
                 Start-Process -FilePath $wt.Source -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
             } else {
-                $hostArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $hostScript + '"'), '-JobFile', ('"' + $jobFile + '"'), '-LaunchFile', ('"' + $launchFile + '"'))
-                Start-Process -FilePath 'pwsh.exe' -ArgumentList $hostArguments -WindowStyle Hidden | Out-Null
+                # Start-Process -WindowStyle Hidden is ignored when Windows Terminal is
+                # the default terminal app, so hidden hosts launch with CreateNoWindow.
+                $startInfo = [Diagnostics.ProcessStartInfo]::new()
+                $startInfo.FileName = 'pwsh.exe'
+                $startInfo.UseShellExecute = $false
+                $startInfo.CreateNoWindow = $true
+                foreach ($hostArgument in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $hostScript, '-JobFile', $jobFile, '-LaunchFile', $launchFile)) {
+                    $startInfo.ArgumentList.Add($hostArgument)
+                }
+                $hostProcess = [Diagnostics.Process]::Start($startInfo)
+                if (-not $hostProcess) { throw 'Hidden managed-job host process failed to start.' }
+                $hostProcess.Dispose()
             }
         } catch {
             if ($launchFile -and (Test-Path -LiteralPath $launchFile)) { Remove-Item -LiteralPath $launchFile -Force -ErrorAction SilentlyContinue }

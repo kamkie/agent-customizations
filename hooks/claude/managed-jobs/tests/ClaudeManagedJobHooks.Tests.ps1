@@ -134,6 +134,19 @@ try {
     } | ConvertTo-Json -Compress
     $backgroundDecision = ($backgroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'The launch guard should deny a natively backgrounded command.'
+    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'foreground') 'The deny reason should rule out the foreground-with-timeout fallback.'
+    $detachedPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = "Start-Process pwsh -ArgumentList '-File','engine.ps1'" }
+    } | ConvertTo-Json -Compress
+    $detachedDecision = ($detachedPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+    Assert-True ($detachedDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'The launch guard should deny a bare Start-Process detach, which opens an unmanaged console window.'
+    $allowedDetachPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+        tool_input = [ordered]@{ command = "Start-Process notepad # managed-jobs: allow-direct" }
+    } | ConvertTo-Json -Compress
+    $allowedDetachOutput = ($allowedDetachPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($allowedDetachOutput)) 'The explicit allow-direct marker should still bypass the launch guard.'
     $foregroundPayload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
         tool_input = [ordered]@{ command = 'git status' }

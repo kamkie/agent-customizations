@@ -42,8 +42,8 @@ the depth to the consequence, uncertainty, and reversibility of the decision.
 
    Prioritize unknowns by consequence and decision risk, not curiosity.
    If evidence collection becomes a standalone difficult, current, or
-   consequential investigation, use the applicable research workflow and bring
-   its findings back into this product decision.
+   consequential investigation, use an applicable research workflow when one
+   is available and bring its findings back into this product decision.
 
 3. **Diagnose the underlying problem.** Write one sentence naming the obstacle
    to the actor's progress without restating the requested feature. Define one

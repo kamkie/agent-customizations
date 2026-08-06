@@ -1,4 +1,4 @@
-+# Open Mercato license notice
+# Open Mercato license notice
 
 Parts of this skill are adapted from the Open Mercato
 [`om-ux-shape`](https://github.com/open-mercato/skills/blob/3f2bb892b1280eeb9aa8399bc73add002b945bd0/skills/om-ux-shape/SKILL.md)
@@ -27,4 +27,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-

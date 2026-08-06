@@ -170,6 +170,6 @@ keep the recommendation provisional instead of inventing support.
 
 ## Provenance
 
-This workflow was conceptually informed by Open Mercato's MIT-licensed
-`om-ux-shape` and `om-brainstorm` skills. It is an independent rewrite and does
-not copy their text.
+This workflow adapts Open Mercato's `om-ux-shape` and `om-brainstorm` skills
+under the MIT License. See
+[`references/open-mercato-license.md`](references/open-mercato-license.md).

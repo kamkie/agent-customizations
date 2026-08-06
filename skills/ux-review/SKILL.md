@@ -9,6 +9,17 @@ Review the experience a change actually delivers. Perform the user's work in a
 real browser, inspect the relevant states, and make every recommendation
 traceable to observed evidence and a verifiable acceptance criterion.
 
+## Compatibility
+
+Use this workflow with Codex when a browser-control capability can inspect and
+interact with the target application. If that capability is unavailable or
+still fails after one reasonable retry, return a `blocked` verdict naming the
+missing capability and every surface left unreviewed. Do not substitute source
+inspection or static screenshots for a live walkthrough. Discover the
+repository's runtime, test, and design contracts at execution time. Do not
+install or invoke this skill for an agent or environment that cannot exercise
+the interface in a real browser.
+
 ## Preserve the Boundary
 
 - Read the active user, repository, and global instructions before beginning.
@@ -40,7 +51,9 @@ traceable to observed evidence and a verifiable acceptance criterion.
    launch and test process. Reuse a healthy matching environment rather than
    starting a duplicate. Use the repository-required durable process mechanism
    for a server expected to outlive a tool call; on Windows, use `managed-jobs`
-   when it is available and applicable. Record the base URL, readiness evidence,
+   when it is available and applicable. If a background or detached launch is
+   denied, use the repository's durable-process mechanism instead of retrying
+   the server in the foreground. Record the base URL, readiness evidence,
    process owner, log location, and teardown responsibility. Do not install new
    tooling or modify tracked setup files without authority.
 
@@ -64,8 +77,9 @@ traceable to observed evidence and a verifiable acceptance criterion.
    - keyboard focus and accessible naming;
    - alternate theme when the product exposes one.
 
-   A missing required state is a finding. Mark a state `not exercised` when it
-   cannot be reached safely; do not silently count it as passing.
+   A state that the task needs but the interface does not provide is a finding.
+   Mark a state `not exercised` when it cannot be reached safely; do not silently
+   count it as passing.
 
 6. **Check product consistency and humane behavior.** Compare the interface
    with repository-defined components, tokens, copy rules, and established
@@ -76,9 +90,12 @@ traceable to observed evidence and a verifiable acceptance criterion.
 
 7. **Capture evidence.** Preserve a screenshot or browser snapshot for each
    finding and for important passing states when the available browser supports
-   it. Store evidence outside the source branch unless the user or repository
-   explicitly authorizes an artifact location. Name files by review step and
-   state, verify that each artifact exists, and redact or omit sensitive content.
+   it. Unless the user or repository specifies another location, store evidence
+   in a task-scoped temporary directory outside the source branch. Name files by
+   review step and state, verify that each artifact exists, and redact or omit
+   sensitive content. Retain artifacts through delivery. Report their exact
+   location, sensitivity, retention status, and cleanup responsibility; if an
+   artifact is deleted, do not leave a dangling path in the report.
 
 8. **Write actionable findings.** Rank findings by the combination of impact,
    likely frequency, and reach, not by ease of repair. Each finding must include:
@@ -97,12 +114,18 @@ traceable to observed evidence and a verifiable acceptance criterion.
 9. **Finish and clean up.** Stop only the environment or process this review
    started, unless the user asked to keep it available. Preserve and hand off
    any intentionally surviving process using the active process-management
-   contract. Confirm that the source worktree remains unchanged.
+   contract. Apply the evidence retention decision from step 7 and state what
+   remains. Confirm that the source worktree remains unchanged.
 
 ## Deliver the Review
 
 Lead with `pass`, `pass with findings`, `rethink`, or `blocked`, followed by the
 reason. Use this shape and omit empty sections:
+
+Use `critical`, `high`, `medium`, or `low` severity. `Critical` means the task
+cannot be completed safely or risks irreversible harm; `high` means a serious
+failure in a core or likely path; `medium` means material friction or
+inconsistency; and `low` means limited polish or a low-reach concern.
 
 ```markdown
 ## Verdict: <pass | pass with findings | rethink | blocked>
@@ -138,9 +161,7 @@ reason. Use this shape and omit empty sections:
 Keep findings advisory. A UX verdict is not source-code approval, automated-test
 success, accessibility certification, or merge authorization.
 
-## Compatibility
+## Provenance
 
-Use this workflow with Codex when a browser-control capability can inspect and
-interact with the target application. Discover the repository's runtime, test,
-and design contracts at execution time. Do not install or invoke this skill for
-an agent or environment that cannot exercise the interface in a real browser.
+This workflow was conceptually informed by Open Mercato's MIT-licensed
+`om-ux-review-pr` skill. It is an independent rewrite and does not copy its text.

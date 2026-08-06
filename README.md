@@ -23,6 +23,8 @@ tools' live configuration directories are deployment targets.
   shared by Codex and Claude Code.
 - `skills/orchestrate-work-campaigns` — Codex-specific, visible,
   coordinator-only control of multi-task delivery campaigns.
+- `skills/shape-product-decisions` — evidence-labeled product shaping from an
+  ambiguous request to a concrete decision and implementation handoff.
 - `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.
 - `hooks/claude` — Claude Code-specific managed-job lifecycle cleanup scripts.
 - `config/manifest.json` — the exact files and hook registrations managed for

@@ -122,8 +122,9 @@ function Resolve-ManagedJobReadinessUri {
         throw '-ReadinessUri must not contain credentials, a query, or a fragment.'
     }
     $address = $null
-    $isLoopback = $Uri.Host.Equals('localhost', [StringComparison]::OrdinalIgnoreCase) -or
-        ([Net.IPAddress]::TryParse($Uri.Host, [ref]$address) -and [Net.IPAddress]::IsLoopback($address))
+    $readinessHost = $Uri.DnsSafeHost
+    $isLoopback = $readinessHost.Equals('localhost', [StringComparison]::OrdinalIgnoreCase) -or
+        ([Net.IPAddress]::TryParse($readinessHost, [ref]$address) -and [Net.IPAddress]::IsLoopback($address))
     if (-not $isLoopback) {
         throw '-ReadinessUri must target localhost or a loopback IP address.'
     }
@@ -155,31 +156,36 @@ function Wait-ManagedJobReadiness {
 
             $attempts++
             $response = $null
+            $readyStatusCode = $null
             try {
                 $response = $client.GetAsync($Uri).GetAwaiter().GetResult()
                 $statusCode = [int]$response.StatusCode
                 $lastResult = "HTTP $statusCode"
                 if ($statusCode -ge 200 -and $statusCode -lt 400) {
-                    Start-Sleep -Milliseconds 100
-                    $confirmedJob = Update-ReconciledJob -Job (
-                        Read-ManagedJob -Path (Get-ManagedJobFile -Id $JobId)
-                    )
-                    if ($confirmedJob.status -notin @('starting', 'running')) {
-                        throw "Managed job $JobId reached status '$($confirmedJob.status)' immediately after the readiness response."
-                    }
-                    return [pscustomobject][ordered]@{
-                        status = 'ready'
-                        uri = $Uri
-                        httpStatusCode = $statusCode
-                        attempts = $attempts
-                        checkedAtUtc = [datetime]::UtcNow.ToString('o')
-                        elapsedMilliseconds = [Math]::Round($started.Elapsed.TotalMilliseconds)
-                    }
+                    $readyStatusCode = $statusCode
                 }
             } catch {
                 $lastResult = $_.Exception.GetBaseException().Message
             } finally {
                 if ($response) { $response.Dispose() }
+            }
+
+            if ($null -ne $readyStatusCode) {
+                Start-Sleep -Milliseconds 100
+                $confirmedJob = Update-ReconciledJob -Job (
+                    Read-ManagedJob -Path (Get-ManagedJobFile -Id $JobId)
+                )
+                if ($confirmedJob.status -notin @('starting', 'running')) {
+                    throw "Managed job $JobId reached status '$($confirmedJob.status)' immediately after the readiness response."
+                }
+                return [pscustomobject][ordered]@{
+                    status = 'ready'
+                    uri = $Uri
+                    httpStatusCode = $readyStatusCode
+                    attempts = $attempts
+                    checkedAtUtc = [datetime]::UtcNow.ToString('o')
+                    elapsedMilliseconds = [long][Math]::Round($started.Elapsed.TotalMilliseconds)
+                }
             }
 
             if ([datetime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
@@ -474,7 +480,7 @@ switch ($Action) {
                     -JobId $job.id `
                     -Uri $resolvedReadinessUri `
                     -TimeoutSeconds $ReadinessTimeoutSeconds
-                $job = Read-ManagedJob -Path $jobFile
+                $job = Update-ReconciledJob -Job (Read-ManagedJob -Path $jobFile)
                 $jobOutput = Add-ManagedJobReadiness `
                     -Job (Add-ManagedJobIdentity -Job $job) `
                     -Readiness $readiness

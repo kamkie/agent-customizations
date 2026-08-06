@@ -190,6 +190,7 @@ Start-Sleep -Milliseconds 350
 `$listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $readyPort)
 `$listener.Start()
 Write-Output "readiness-server-pid=`$PID"
+`$requestCount = 0
 while (`$true) {
     `$client = `$listener.AcceptTcpClient()
     try {
@@ -197,7 +198,15 @@ while (`$true) {
         `$buffer = [byte[]]::new(1024)
         `$null = `$stream.Read(`$buffer, 0, `$buffer.Length)
         `$crlf = [string][char]13 + [char]10
-        `$response = [Text.Encoding]::ASCII.GetBytes("HTTP/1.1 204 No Content`$crlf" + "Content-Length: 0`$crlf" + "Connection: close`$crlf`$crlf")
+        `$requestCount++
+        if (`$requestCount -eq 1) {
+            `$responseText = "HTTP/1.1 503 Service Unavailable`$crlf" + "Content-Length: 0`$crlf" + "Connection: close`$crlf`$crlf"
+        } elseif (`$requestCount -eq 2) {
+            `$responseText = "HTTP/1.1 302 Found`$crlf" + "Location: http://127.0.0.1:1/unreachable`$crlf" + "Content-Length: 0`$crlf" + "Connection: close`$crlf`$crlf"
+        } else {
+            `$responseText = "HTTP/1.1 204 No Content`$crlf" + "Content-Length: 0`$crlf" + "Connection: close`$crlf`$crlf"
+        }
+        `$response = [Text.Encoding]::ASCII.GetBytes(`$responseText)
         `$stream.Write(`$response, 0, `$response.Length)
     } finally {
         `$client.Dispose()
@@ -210,8 +219,10 @@ while (`$true) {
     $activeIds.Add($readyJob.id)
     Assert-True ($readyJob.status -eq 'running') 'A ready long-running service should remain running.'
     Assert-True (
-        $readyJob.readiness.status -eq 'ready' -and $readyJob.readiness.httpStatusCode -eq 204
-    ) 'Start should return structured HTTP readiness evidence.'
+        $readyJob.readiness.status -eq 'ready' -and
+        $readyJob.readiness.httpStatusCode -eq 302 -and
+        $readyJob.readiness.attempts -eq 2
+    ) 'Start should retry a 503, accept a redirect without following it, and return readiness evidence.'
     $reusedReadyJob = (& $controller wait-ready -StateRoot $stateRoot -Id $readyJob.id `
         -ReadinessUri $readyUri -ReadinessTimeoutSeconds 2 | Out-String) | ConvertFrom-Json
     Assert-True ($reusedReadyJob.id -eq $readyJob.id -and $reusedReadyJob.readiness.status -eq 'ready') `
@@ -231,7 +242,7 @@ while (`$true) {
     # A failed start-time readiness gate stops only the job started by that
     # invocation and leaves a durable explanation.
     $timeoutPort = Get-FreeTcpPort
-    $timeoutUri = [uri]"http://127.0.0.1:$timeoutPort/health"
+    $timeoutUri = [uri]"http://[::1]:$timeoutPort/health"
     $readinessTimeoutRejected = $false
     try {
         & $controller start -StateRoot $stateRoot -Name 'lifecycle-readiness-timeout' -Executable $pwsh `

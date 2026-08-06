@@ -1,6 +1,6 @@
 ---
 name: shape-product-decisions
-description: Shape ambiguous product, UI/UX, or AI-feature requests into an evidence-labeled recommendation and concrete behavior before implementation. Use when deciding whether or what to build, simplifying a flow, choosing AI versus a simpler mechanism, defining user-facing states and copy, or preparing a product handoff. Do not use for implementation whose behavior is already decided, visual styling alone, code review, browser QA, or open-ended brainstorming without a product decision.
+description: Shape ambiguous product, UI/UX, or AI-feature requests into an evidence-labeled recommendation and concrete behavior before implementation. Use when deciding whether or what to build, simplifying a flow, choosing AI versus a simpler mechanism, defining user-facing states and copy, or preparing a product handoff. Do not use for standalone research or evidence synthesis, implementation whose behavior is already decided, visual styling alone, code review, browser QA, or open-ended brainstorming without a product decision.
 ---
 
 # Shape Product Decisions
@@ -110,12 +110,12 @@ preserve trust, or produce necessary learning.
 
 ## Deliver the Result
 
-Lead with the recommendation or verdict. Use the smallest subset of this shape
-that remains actionable:
+Lead with the recommendation or verdict.
 
 For a low-consequence, reversible decision, `Recommendation`, `Scope`, and
 `Risks and validation` are normally sufficient; omit the other headings unless
-they change the decision or make it executable.
+they change the decision or make it executable. Use the smallest subset of this
+shape that remains actionable:
 
 ```markdown
 ## Recommendation

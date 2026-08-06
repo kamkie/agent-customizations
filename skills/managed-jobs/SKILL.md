@@ -38,8 +38,8 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 
 The command returns only after a 2xx or 3xx response and includes structured
 `readiness` evidence. If the deadline expires, it stops the job created by that
-`start` invocation. To verify a reconciled or otherwise reused job without
-stopping it on probe failure:
+`start` invocation, or reports why cleanup could not be confirmed. To verify a
+reconciled or otherwise reused job without stopping it on probe failure:
 
 ```powershell
 & $jobs wait-ready -Id <job-id> -ReadinessUri $readinessUri -ReadinessTimeoutSeconds 30

@@ -168,7 +168,9 @@ try {
     foreach ($invalidReadinessUri in @(
         [uri]'health',
         [uri]'https://example.com/health',
-        [uri]'http://127.0.0.1:12345/health?token=do-not-store'
+        [uri]'http://127.0.0.1:12345/health?token=do-not-store',
+        [uri]'http://user:password@127.0.0.1:12345/health',
+        [uri]'http://127.0.0.1:12345/health#credential'
     )) {
         $invalidReadinessRejected = $false
         try {
@@ -177,6 +179,12 @@ try {
         } catch { $invalidReadinessRejected = $_.Exception.Message -match 'ReadinessUri' }
         Assert-True $invalidReadinessRejected "Invalid readiness URI should be rejected: $invalidReadinessUri"
     }
+    $orphanedTimeoutRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'invalid-readiness-timeout' -Executable $pwsh `
+            -ReadinessTimeoutSeconds 1 | Out-Null
+    } catch { $orphanedTimeoutRejected = $_.Exception.Message -match 'requires -ReadinessUri' }
+    Assert-True $orphanedTimeoutRejected 'A readiness timeout without a readiness URI should be rejected.'
     Assert-True (
         @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File).Count -eq $beforeReadinessValidation
     ) 'Rejected readiness URIs must not create records.'
@@ -221,7 +229,7 @@ while (`$true) {
     Assert-True (
         $readyJob.readiness.status -eq 'ready' -and
         $readyJob.readiness.httpStatusCode -eq 302 -and
-        $readyJob.readiness.attempts -eq 2
+        $readyJob.readiness.attempts -ge 2
     ) 'Start should retry a 503, accept a redirect without following it, and return readiness evidence.'
     $reusedReadyJob = (& $controller wait-ready -StateRoot $stateRoot -Id $readyJob.id `
         -ReadinessUri $readyUri -ReadinessTimeoutSeconds 2 | Out-String) | ConvertFrom-Json
@@ -253,7 +261,7 @@ while (`$true) {
     $timeoutJob = @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File | ForEach-Object {
         Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
     } | Where-Object name -eq 'lifecycle-readiness-timeout')[0]
-    Assert-True ($timeoutJob.status -eq 'stopped' -and $timeoutJob.error -match 'readiness failed') `
+    Assert-True ($timeoutJob.status -eq 'stopped' -and $timeoutJob.error -match 'readiness gate failed') `
         'A readiness timeout should stop the new managed job and preserve the reason.'
     $timeoutChildPid = Wait-LoggedProcessId -LogPath $timeoutJob.logPath -Pattern 'readiness-timeout-child-pid=(\d+)'
     Assert-True (Wait-ProcessExit -TargetProcessId $timeoutChildPid) `

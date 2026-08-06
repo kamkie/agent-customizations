@@ -115,7 +115,10 @@ function Add-ManagedJobIdentity {
 function Resolve-ManagedJobReadinessUri {
     param([Parameter(Mandatory)][uri]$Uri)
 
-    if (-not $Uri.IsAbsoluteUri -or $Uri.Scheme -notin @('http', 'https')) {
+    if (-not $Uri.IsAbsoluteUri) {
+        throw '-ReadinessUri must be an absolute HTTP or HTTPS URL.'
+    }
+    if ($Uri.Scheme -notin @('http', 'https')) {
         throw '-ReadinessUri must be an absolute HTTP or HTTPS URL.'
     }
     if ($Uri.UserInfo -or $Uri.Query -or $Uri.Fragment) {
@@ -323,6 +326,9 @@ switch ($Action) {
         if (-not $Name) { throw '-Name is required for start.' }
         if (-not $Executable) { throw '-Executable is required for start.' }
         if ($KeepTerminalOpen -and -not $Visible) { throw '-KeepTerminalOpen requires -Visible.' }
+        if ($PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds') -and -not $ReadinessUri) {
+            throw '-ReadinessTimeoutSeconds requires -ReadinessUri.'
+        }
         $resolvedReadinessUri = if ($ReadinessUri) { Resolve-ManagedJobReadinessUri -Uri $ReadinessUri } else { $null }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
         $resolvedOwnerAgent = if ($OwnerAgent) {
@@ -490,14 +496,14 @@ switch ($Action) {
                 if ($current.status -in @('starting', 'running')) {
                     $terminationRequest = [pscustomobject]@{
                         job = $current
-                        reason = "Stopped because readiness failed: $readinessFailure"
+                        reason = 'Stopped because its readiness gate failed.'
                     }
                     $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
                     if ($termination.error) {
-                        throw "$readinessFailure Failed to stop managed job $($current.id): $($termination.error)"
+                        throw "$readinessFailure Failed to stop managed job $($current.id): $($termination.error) Managed job log: $($current.logPath)"
                     }
                 }
-                throw $readinessFailure
+                throw "$readinessFailure Managed job log: $($current.logPath)"
             }
         }
         $jobOutput | ConvertTo-Json -Depth 12
@@ -527,7 +533,7 @@ switch ($Action) {
             -JobId $Id `
             -Uri $resolvedReadinessUri `
             -TimeoutSeconds $ReadinessTimeoutSeconds
-        $job = Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id)
+        $job = Update-ReconciledJob -Job (Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id))
         Add-ManagedJobReadiness `
             -Job (Add-ManagedJobIdentity -Job $job) `
             -Readiness $readiness | ConvertTo-Json -Depth 12

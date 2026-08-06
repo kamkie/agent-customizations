@@ -110,3 +110,6 @@ machine-specific state.
 ## License
 
 MIT
+
+Individual skill directories may include notices for adapted third-party
+material.

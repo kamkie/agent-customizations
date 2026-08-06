@@ -52,6 +52,22 @@ active jobs and does not close a kept-open terminal after its job is complete.
 Equivalent active invocations are rejected using a stable fingerprint under a
 serialized pre-launch check.
 
+## HTTP readiness
+
+`start -ReadinessUri <uri>` and `wait-ready` poll a credential-free loopback
+HTTP(S) URL until it returns a status from 200 through 399. Redirects count as
+ready but are not followed, and the probe bypasses configured proxies. The
+controller confirms the managed job is still active after the response. Each
+result reports the URL, status code, attempt count, check time, and elapsed
+milliseconds.
+
+A failed readiness gate on `start` stops only the job created by that
+invocation and records the reason. A failed `wait-ready` leaves the existing
+job unchanged because it may be shared or intentionally persistent. Readiness
+evidence is returned to the caller rather than stored in the permanent job
+record; hand it off with the job id and log path when downstream work depends on
+the service.
+
 ## Secret boundary
 
 Inherit secrets from the parent process or use standard input, response files,

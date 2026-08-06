@@ -58,6 +58,16 @@ function Wait-ProcessExit {
     return $false
 }
 
+function Get-FreeTcpPort {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    try {
+        $listener.Start()
+        return ([Net.IPEndPoint]$listener.LocalEndpoint).Port
+    } finally {
+        $listener.Stop()
+    }
+}
+
 try {
     $null = New-Item -ItemType Directory -Path $stateRoot -Force
     $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
@@ -151,6 +161,92 @@ try {
     Assert-True ($completedList.id -contains $completed.id) 'Structured list filter should return the completed job.'
     $completedStatus = @((& $controller status -StateRoot $stateRoot -Status completed -Json | Out-String) | ConvertFrom-Json)
     Assert-True ($completedStatus.id -contains $completed.id) 'Structured status filter should return the completed job.'
+
+    # Readiness probes accept only credential-free loopback HTTP(S) URLs and
+    # must reject invalid targets before creating a durable record.
+    $beforeReadinessValidation = @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File).Count
+    foreach ($invalidReadinessUri in @(
+        [uri]'health',
+        [uri]'https://example.com/health',
+        [uri]'http://127.0.0.1:12345/health?token=do-not-store'
+    )) {
+        $invalidReadinessRejected = $false
+        try {
+            & $controller start -StateRoot $stateRoot -Name 'invalid-readiness' -Executable $pwsh `
+                -ReadinessUri $invalidReadinessUri | Out-Null
+        } catch { $invalidReadinessRejected = $_.Exception.Message -match 'ReadinessUri' }
+        Assert-True $invalidReadinessRejected "Invalid readiness URI should be rejected: $invalidReadinessUri"
+    }
+    Assert-True (
+        @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File).Count -eq $beforeReadinessValidation
+    ) 'Rejected readiness URIs must not create records.'
+
+    # A delayed loopback HTTP server proves that start waits for application
+    # readiness and that a reused running job can be checked independently.
+    $readyPort = Get-FreeTcpPort
+    $readyUri = [uri]"http://127.0.0.1:$readyPort/health"
+    $serverCommand = @"
+Start-Sleep -Milliseconds 350
+`$listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $readyPort)
+`$listener.Start()
+Write-Output "readiness-server-pid=`$PID"
+while (`$true) {
+    `$client = `$listener.AcceptTcpClient()
+    try {
+        `$stream = `$client.GetStream()
+        `$buffer = [byte[]]::new(1024)
+        `$null = `$stream.Read(`$buffer, 0, `$buffer.Length)
+        `$crlf = [string][char]13 + [char]10
+        `$response = [Text.Encoding]::ASCII.GetBytes("HTTP/1.1 204 No Content`$crlf" + "Content-Length: 0`$crlf" + "Connection: close`$crlf`$crlf")
+        `$stream.Write(`$response, 0, `$response.Length)
+    } finally {
+        `$client.Dispose()
+    }
+}
+"@
+    $readyJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-readiness' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', $serverCommand) -ReadinessUri $readyUri `
+        -ReadinessTimeoutSeconds 5 | Out-String) | ConvertFrom-Json
+    $activeIds.Add($readyJob.id)
+    Assert-True ($readyJob.status -eq 'running') 'A ready long-running service should remain running.'
+    Assert-True (
+        $readyJob.readiness.status -eq 'ready' -and $readyJob.readiness.httpStatusCode -eq 204
+    ) 'Start should return structured HTTP readiness evidence.'
+    $reusedReadyJob = (& $controller wait-ready -StateRoot $stateRoot -Id $readyJob.id `
+        -ReadinessUri $readyUri -ReadinessTimeoutSeconds 2 | Out-String) | ConvertFrom-Json
+    Assert-True ($reusedReadyJob.id -eq $readyJob.id -and $reusedReadyJob.readiness.status -eq 'ready') `
+        'wait-ready should verify an existing managed job without replacing it.'
+    $unreadyPort = Get-FreeTcpPort
+    $reusedReadinessRejected = $false
+    try {
+        & $controller wait-ready -StateRoot $stateRoot -Id $readyJob.id `
+            -ReadinessUri ([uri]"http://127.0.0.1:$unreadyPort/health") -ReadinessTimeoutSeconds 1 | Out-Null
+    } catch { $reusedReadinessRejected = $_.Exception.Message -match 'was not ready' }
+    Assert-True $reusedReadinessRejected 'wait-ready should report a readiness timeout.'
+    Assert-True ((Get-JobStatus -Id $readyJob.id).status -eq 'running') `
+        'A failed wait-ready probe must leave an existing managed job running.'
+    $null = & $controller stop -StateRoot $stateRoot -Id $readyJob.id
+    $activeIds.Remove($readyJob.id) | Out-Null
+
+    # A failed start-time readiness gate stops only the job started by that
+    # invocation and leaves a durable explanation.
+    $timeoutPort = Get-FreeTcpPort
+    $timeoutUri = [uri]"http://127.0.0.1:$timeoutPort/health"
+    $readinessTimeoutRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'lifecycle-readiness-timeout' -Executable $pwsh `
+            -Arguments @('-NoProfile', '-Command', 'Write-Output "readiness-timeout-child-pid=$PID"; Start-Sleep -Seconds 30') `
+            -ReadinessUri $timeoutUri -ReadinessTimeoutSeconds 1 | Out-Null
+    } catch { $readinessTimeoutRejected = $_.Exception.Message -match 'was not ready' }
+    Assert-True $readinessTimeoutRejected 'Start should fail when its readiness deadline expires.'
+    $timeoutJob = @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File | ForEach-Object {
+        Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+    } | Where-Object name -eq 'lifecycle-readiness-timeout')[0]
+    Assert-True ($timeoutJob.status -eq 'stopped' -and $timeoutJob.error -match 'readiness failed') `
+        'A readiness timeout should stop the new managed job and preserve the reason.'
+    $timeoutChildPid = Wait-LoggedProcessId -LogPath $timeoutJob.logPath -Pattern 'readiness-timeout-child-pid=(\d+)'
+    Assert-True (Wait-ProcessExit -TargetProcessId $timeoutChildPid) `
+        'Readiness failure cleanup should terminate the managed process tree.'
 
     # Secret-looking values are rejected before a record or launch artifact is created.
     $beforeSecretCheck = @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File).Count

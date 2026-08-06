@@ -172,5 +172,6 @@ success, accessibility certification, or merge authorization.
 
 ## Provenance
 
-This workflow was conceptually informed by Open Mercato's MIT-licensed
-`om-ux-review-pr` skill. It is an independent rewrite and does not copy its text.
+This workflow adapts Open Mercato's `om-ux-review-pr` skill under the MIT
+License. See
+[`references/open-mercato-license.md`](references/open-mercato-license.md).

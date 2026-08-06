@@ -1,6 +1,6 @@
 ---
 name: ux-review
-description: Review a changed user interface or flow by exercising it in a real browser and reporting evidence-backed findings ranked by user impact. Use for UX reviews of a pull request, branch, working tree, prototype, or named product flow when a runnable application and browser-control capability are available. Do not use for product shaping before behavior exists, visual styling requests, source-code review, automated test authoring, accessibility conformance certification, or reviews that cannot exercise the interface.
+description: Review a changed user interface or flow by exercising it in a real browser and reporting evidence-backed findings ranked by user impact. Use for UX reviews of a pull request, branch, working tree, prototype, or named product flow when a runnable application and browser-control capability are available. Do not use for product shaping before behavior exists, visual styling requests, source-code review, automated test authoring, accessibility conformance certification, or reviews known in advance to be unable to exercise the interface.
 ---
 
 # Review User Experience
@@ -55,7 +55,9 @@ the interface in a real browser.
    denied, use the repository's durable-process mechanism instead of retrying
    the server in the foreground. Record the base URL, readiness evidence,
    process owner, log location, and teardown responsibility. Do not install new
-   tooling or modify tracked setup files without authority.
+   tooling or modify tracked setup files without authority. After one reasonable
+   repair or retry for an environment, launch, or access failure, return a
+   `blocked` verdict with the exact failure and unreviewed surfaces.
 
 4. **Walk the task.** Open the same entry point the user would use, perform the
    primary task with safe test data, observe the result, and follow the normal
@@ -93,9 +95,12 @@ the interface in a real browser.
    it. Unless the user or repository specifies another location, store evidence
    in a task-scoped temporary directory outside the source branch. Name files by
    review step and state, verify that each artifact exists, and redact or omit
-   sensitive content. Retain artifacts through delivery. Report their exact
-   location, sensitivity, retention status, and cleanup responsibility; if an
-   artifact is deleted, do not leave a dangling path in the report.
+   sensitive content. Retain artifacts while writing the review. Before final
+   handoff, delete the task-scoped temporary directory unless the user asks to
+   keep it or the repository requires retained evidence. For retained artifacts,
+   report the exact location, sensitivity, and cleanup responsibility. For
+   deleted artifacts, preserve the exact observation in the finding and report
+   that the temporary evidence was removed; never leave a dangling path.
 
 8. **Write actionable findings.** Rank findings by the combination of impact,
    likely frequency, and reach, not by ease of repair. Each finding must include:
@@ -114,18 +119,22 @@ the interface in a real browser.
 9. **Finish and clean up.** Stop only the environment or process this review
    started, unless the user asked to keep it available. Preserve and hand off
    any intentionally surviving process using the active process-management
-   contract. Apply the evidence retention decision from step 7 and state what
-   remains. Confirm that the source worktree remains unchanged.
+   contract. Apply the default evidence cleanup or authorized retention from
+   step 7 and state what remains. Confirm that the source worktree remains
+   unchanged.
 
 ## Deliver the Review
-
-Lead with `pass`, `pass with findings`, `rethink`, or `blocked`, followed by the
-reason. Use this shape and omit empty sections:
 
 Use `critical`, `high`, `medium`, or `low` severity. `Critical` means the task
 cannot be completed safely or risks irreversible harm; `high` means a serious
 failure in a core or likely path; `medium` means material friction or
 inconsistency; and `low` means limited polish or a low-reach concern.
+
+Use `pass` when no material findings remain, `pass with findings` for discrete
+defects that do not invalidate the flow, `rethink` when the flow's premise or
+structure is wrong, and `blocked` when the interface cannot be exercised enough
+to support a verdict. Lead with the verdict and reason. Use this shape and omit
+empty sections:
 
 ```markdown
 ## Verdict: <pass | pass with findings | rethink | blocked>

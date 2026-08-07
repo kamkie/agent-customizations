@@ -45,6 +45,7 @@
         "execute-campaign-work-item",
         "managed-jobs",
         "orchestrate-work-campaigns",
+        "shape-product-decisions",
         "ux-review"
       ]
     },
@@ -94,7 +95,8 @@
       "skills": [
         "cross-agent-review",
         "dyslexia-friendly-formatter",
-        "managed-jobs"
+        "managed-jobs",
+        "shape-product-decisions"
       ]
     }
   }

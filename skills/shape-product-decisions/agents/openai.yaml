@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shape Product Decisions"
+  short_description: "Turn ambiguous ideas into product decisions"
+  default_prompt: "Use $shape-product-decisions to decide what this feature should do before implementation."

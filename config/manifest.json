@@ -44,7 +44,8 @@
         "dyslexia-friendly-formatter",
         "execute-campaign-work-item",
         "managed-jobs",
-        "orchestrate-work-campaigns"
+        "orchestrate-work-campaigns",
+        "ux-review"
       ]
     },
     "claude": {

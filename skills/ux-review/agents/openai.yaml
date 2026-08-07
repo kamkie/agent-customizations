@@ -1,0 +1,4 @@
+interface:
+  display_name: "UX Review"
+  short_description: "Review user flows with browser evidence"
+  default_prompt: "Use $ux-review to exercise the changed user flow and produce evidence-backed findings."

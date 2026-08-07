@@ -185,11 +185,14 @@ try {
             -ReadinessTimeoutSeconds 1 | Out-Null
     } catch { $orphanedTimeoutRejected = $_.Exception.Message -match 'requires -ReadinessUri' }
     Assert-True $orphanedTimeoutRejected 'A readiness timeout without a readiness URI should be rejected.'
+    $wrongActionRoot = Join-Path $testRoot 'wrong-action-state'
     $wrongActionReadinessRejected = $false
     try {
-        & $controller list -StateRoot $stateRoot -ReadinessUri ([uri]'http://127.0.0.1:12345/health') | Out-Null
+        & $controller list -StateRoot $wrongActionRoot -ReadinessUri ([uri]'http://127.0.0.1:12345/health') | Out-Null
     } catch { $wrongActionReadinessRejected = $_.Exception.Message -match 'valid only for start and wait-ready' }
     Assert-True $wrongActionReadinessRejected 'Readiness parameters should be rejected for unrelated actions.'
+    Assert-True (-not (Test-Path -LiteralPath $wrongActionRoot)) `
+        'Readiness parameter misuse should fail before the state root is created.'
     Assert-True (
         @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File).Count -eq $beforeReadinessValidation
     ) 'Rejected readiness URIs must not create records.'
@@ -294,6 +297,35 @@ while (`$true) {
         'A failed wait-ready probe must leave an existing managed job running.'
     $null = & $controller stop -StateRoot $stateRoot -Id $readyJob.id
     $activeIds.Remove($readyJob.id) | Out-Null
+
+    # A listener that accepts but never answers proves the per-probe budget is
+    # clamped to the overall readiness deadline and reports a useful diagnostic.
+    $hangingPort = Get-FreeTcpPort
+    $hangingUri = [uri]"http://127.0.0.1:$hangingPort/health"
+    $hangingServerCommand = @"
+`$listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $hangingPort)
+`$listener.Start()
+Write-Output "hanging-readiness-server-pid=`$PID"
+`$client = `$listener.AcceptTcpClient()
+try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() }
+"@
+    $hangingJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-readiness-hangs' `
+        -Executable $pwsh -Arguments @('-NoProfile', '-Command', $hangingServerCommand) | Out-String) | ConvertFrom-Json
+    $activeIds.Add($hangingJob.id)
+    $null = Wait-LoggedProcessId -LogPath $hangingJob.logPath -Pattern 'hanging-readiness-server-pid=(\d+)'
+    $hangingTimer = [Diagnostics.Stopwatch]::StartNew()
+    $hangingReadinessError = $null
+    try {
+        & $controller wait-ready -StateRoot $stateRoot -Id $hangingJob.id `
+            -ReadinessUri $hangingUri -ReadinessTimeoutSeconds 3 | Out-Null
+    } catch { $hangingReadinessError = $_.Exception.Message }
+    $hangingTimer.Stop()
+    Assert-True ($hangingReadinessError -match 'probe exceeded its response budget') `
+        "A hanging readiness endpoint should report its probe budget. Error: $hangingReadinessError"
+    Assert-True ($hangingTimer.Elapsed.TotalSeconds -lt 4) `
+        "A hanging probe should honor the overall deadline. Elapsed: $($hangingTimer.Elapsed.TotalSeconds) seconds."
+    $null = & $controller stop -StateRoot $stateRoot -Id $hangingJob.id
+    $activeIds.Remove($hangingJob.id) | Out-Null
 
     # A failed start-time readiness gate stops only the job started by that
     # invocation and leaves a durable explanation.

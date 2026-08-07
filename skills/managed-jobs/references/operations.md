@@ -62,8 +62,9 @@ result reports the URL, status code, attempt count, check time, and elapsed
 milliseconds.
 
 Each individual probe has a response budget of at most two seconds, clamped to
-the time remaining before the overall readiness deadline. Use a fast health
-endpoint whose response does not trigger application startup work.
+the time remaining before the overall readiness deadline, so an unresponsive
+endpoint cannot consume an extra probe budget. Use a fast health endpoint whose
+response does not trigger application startup work.
 HTTPS probes use normal certificate validation, so trust the service's local
 development certificate before relying on an HTTPS readiness URL.
 

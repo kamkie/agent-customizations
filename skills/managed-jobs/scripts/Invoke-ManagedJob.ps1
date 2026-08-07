@@ -32,6 +32,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$readinessParametersUsed = $PSBoundParameters.ContainsKey('ReadinessUri') -or
+    $PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds')
+if ($Action -notin @('start', 'wait-ready') -and $readinessParametersUsed) {
+    throw '-ReadinessUri and -ReadinessTimeoutSeconds are valid only for start and wait-ready.'
+}
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
 Set-ManagedJobStateRoot -Path $StateRoot
@@ -177,7 +182,12 @@ function Wait-ManagedJobReadiness {
                     $readyStatusCode = $statusCode
                 }
             } catch {
-                $lastResult = $_.Exception.GetBaseException().Message
+                $probeFailure = $_.Exception.GetBaseException()
+                $lastResult = if ($probeCancellation -and $probeCancellation.IsCancellationRequested) {
+                    'probe exceeded its response budget'
+                } else {
+                    $probeFailure.Message
+                }
             } finally {
                 if ($response) { $response.Dispose() }
                 if ($probeCancellation) { $probeCancellation.Dispose() }
@@ -267,6 +277,15 @@ function Stop-ManagedJobTrees {
                 continue
             }
             if (-not (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc)) {
+                if ($recordUnavailable) {
+                    $current.status = 'stopped'
+                    $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                    $current.exitCode = $null
+                    $current.error = [string]$item.reason
+                    Unregister-ManagedJobOwnerReference -Job $current
+                    $outcome.job = $current
+                    continue
+                }
                 $current = Update-ReconciledJob -Job $current
                 $outcome.job = $current
                 if ($current.status -notin @('starting', 'running')) { continue }
@@ -324,7 +343,12 @@ function Stop-ManagedJobTrees {
                     throw "Unable to terminate PID $($target.hostPid)$detail"
                 }
                 $current = $target.outcome.job
-                if (-not $target.recordUnavailable) {
+                if ($target.recordUnavailable) {
+                    $current.status = 'stopped'
+                    $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                    $current.exitCode = $null
+                    $current.error = $target.reason
+                } else {
                     $current = Read-ManagedJob -Path $target.path
                     if ($current.status -in @('starting', 'running')) {
                         $current.status = 'stopped'
@@ -343,12 +367,6 @@ function Stop-ManagedJobTrees {
         }
     }
     return @($outcomes)
-}
-
-$readinessParametersUsed = $PSBoundParameters.ContainsKey('ReadinessUri') -or
-    $PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds')
-if ($Action -notin @('start', 'wait-ready') -and $readinessParametersUsed) {
-    throw '-ReadinessUri and -ReadinessTimeoutSeconds are valid only for start and wait-ready.'
 }
 
 switch ($Action) {

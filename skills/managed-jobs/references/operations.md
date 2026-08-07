@@ -52,6 +52,34 @@ active jobs and does not close a kept-open terminal after its job is complete.
 Equivalent active invocations are rejected using a stable fingerprint under a
 serialized pre-launch check.
 
+## HTTP readiness
+
+`start -ReadinessUri <uri>` and `wait-ready` poll a credential-free loopback
+HTTP(S) URL until it returns a status from 200 through 399. Redirects count as
+ready but are not followed, and the probe bypasses configured proxies. The
+controller confirms the managed job is still active after the response. Each
+result reports the URL, status code, attempt count, check time, and elapsed
+milliseconds.
+
+Each individual probe has a two-second response budget so an unresponsive
+endpoint cannot consume the whole readiness deadline without retries. Use a
+fast health endpoint whose response does not trigger application startup work.
+HTTPS probes use normal certificate validation, so trust the service's local
+development certificate before relying on an HTTPS readiness URL.
+
+The HTTP response proves that a service is listening at the URL, not that the
+managed process owns that socket. Use a task-specific free port and reconcile
+or stop stale jobs before starting a replacement service.
+
+A failed readiness gate on `start` stops only the job created by that
+invocation and records the reason. A failed `wait-ready` leaves the existing
+job unchanged because it may be shared or intentionally persistent. Readiness
+evidence is returned to the caller rather than stored in the permanent job
+record. A failed `start` stores only a generic readiness-gate reason; its thrown
+error includes the probe URL and managed log path for diagnosis. Keep the whole
+readiness URL, including its path, non-secret. Hand successful evidence off with
+the job id and log path when downstream work depends on the service.
+
 ## Secret boundary
 
 Inherit secrets from the parent process or use standard input, response files,

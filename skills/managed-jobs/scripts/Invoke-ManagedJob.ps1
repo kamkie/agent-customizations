@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory)]
-    [ValidateSet('start', 'list', 'status', 'logs', 'stop', 'cleanup', 'reconcile', 'prune')]
+    [ValidateSet('start', 'list', 'status', 'wait-ready', 'logs', 'stop', 'cleanup', 'reconcile', 'prune')]
     [string]$Action,
 
     [string]$Id,
@@ -19,6 +19,9 @@ param(
     [string[]]$CleanupLifetime = @('Turn'),
     [string]$OwnerAgent,
     [string]$OwnerSessionId,
+    [uri]$ReadinessUri,
+    [ValidateRange(1, 600)]
+    [int]$ReadinessTimeoutSeconds = 30,
     [int]$Tail = 100,
     [switch]$Follow,
     [int]$OlderThanDays = 14,
@@ -106,6 +109,107 @@ function Add-ManagedJobIdentity {
     if (($Job.PSObject.Properties.Name -contains 'hostPid') -and $Job.status -in @('starting', 'running', 'orphaned')) {
         $copy.processIdentity = Get-ManagedProcessIdentity -Job $Job
     }
+    return [pscustomobject]$copy
+}
+
+function Resolve-ManagedJobReadinessUri {
+    param([Parameter(Mandatory)][uri]$Uri)
+
+    if (-not $Uri.IsAbsoluteUri) {
+        throw '-ReadinessUri must be an absolute HTTP or HTTPS URL.'
+    }
+    if ($Uri.Scheme -notin @('http', 'https')) {
+        throw '-ReadinessUri must be an absolute HTTP or HTTPS URL.'
+    }
+    if ($Uri.UserInfo -or $Uri.Query -or $Uri.Fragment) {
+        throw '-ReadinessUri must not contain credentials, a query, or a fragment.'
+    }
+    $address = $null
+    $readinessHost = $Uri.DnsSafeHost
+    $isLoopback = $readinessHost.Equals('localhost', [StringComparison]::OrdinalIgnoreCase) -or
+        ([Net.IPAddress]::TryParse($readinessHost, [ref]$address) -and [Net.IPAddress]::IsLoopback($address))
+    if (-not $isLoopback) {
+        throw '-ReadinessUri must target localhost or a loopback IP address.'
+    }
+    return $Uri.AbsoluteUri
+}
+
+function Wait-ManagedJobReadiness {
+    param(
+        [Parameter(Mandatory)][string]$JobId,
+        [Parameter(Mandatory)][string]$Uri,
+        [Parameter(Mandatory)][int]$TimeoutSeconds
+    )
+
+    $started = [Diagnostics.Stopwatch]::StartNew()
+    $deadline = [datetime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $attempts = 0
+    $lastResult = 'no response'
+    $handler = [Net.Http.HttpClientHandler]::new()
+    $handler.AllowAutoRedirect = $false
+    $handler.UseProxy = $false
+    $client = [Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds([Math]::Min(2, $TimeoutSeconds))
+    try {
+        do {
+            $job = Update-ReconciledJob -Job (Read-ManagedJob -Path (Get-ManagedJobFile -Id $JobId))
+            if ($job.status -notin @('starting', 'running')) {
+                throw "Managed job $JobId reached status '$($job.status)' before $Uri became ready."
+            }
+
+            $attempts++
+            $response = $null
+            $readyStatusCode = $null
+            try {
+                $response = $client.GetAsync($Uri).GetAwaiter().GetResult()
+                $statusCode = [int]$response.StatusCode
+                $lastResult = "HTTP $statusCode"
+                if ($statusCode -ge 200 -and $statusCode -lt 400) {
+                    $readyStatusCode = $statusCode
+                }
+            } catch {
+                $lastResult = $_.Exception.GetBaseException().Message
+            } finally {
+                if ($response) { $response.Dispose() }
+            }
+
+            if ($null -ne $readyStatusCode) {
+                Start-Sleep -Milliseconds 100
+                $confirmedJob = Update-ReconciledJob -Job (
+                    Read-ManagedJob -Path (Get-ManagedJobFile -Id $JobId)
+                )
+                if ($confirmedJob.status -notin @('starting', 'running')) {
+                    throw "Managed job $JobId reached status '$($confirmedJob.status)' immediately after the readiness response."
+                }
+                return [pscustomobject][ordered]@{
+                    status = 'ready'
+                    uri = $Uri
+                    httpStatusCode = $readyStatusCode
+                    attempts = $attempts
+                    checkedAtUtc = [datetime]::UtcNow.ToString('o')
+                    elapsedMilliseconds = [long][Math]::Round($started.Elapsed.TotalMilliseconds)
+                }
+            }
+
+            if ([datetime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
+        } while ([datetime]::UtcNow -lt $deadline)
+    } finally {
+        $client.Dispose()
+        $handler.Dispose()
+        $started.Stop()
+    }
+    throw "Managed job $JobId was not ready at $Uri after $TimeoutSeconds seconds ($attempts attempts; last result: $lastResult)."
+}
+
+function Add-ManagedJobReadiness {
+    param(
+        [Parameter(Mandatory)]$Job,
+        [Parameter(Mandatory)]$Readiness
+    )
+
+    $copy = [ordered]@{}
+    foreach ($property in $Job.PSObject.Properties) { $copy[$property.Name] = $property.Value }
+    $copy.readiness = $Readiness
     return [pscustomobject]$copy
 }
 
@@ -222,6 +326,10 @@ switch ($Action) {
         if (-not $Name) { throw '-Name is required for start.' }
         if (-not $Executable) { throw '-Executable is required for start.' }
         if ($KeepTerminalOpen -and -not $Visible) { throw '-KeepTerminalOpen requires -Visible.' }
+        if ($PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds') -and -not $ReadinessUri) {
+            throw '-ReadinessTimeoutSeconds requires -ReadinessUri.'
+        }
+        $resolvedReadinessUri = if ($ReadinessUri) { Resolve-ManagedJobReadinessUri -Uri $ReadinessUri } else { $null }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
         $resolvedOwnerAgent = if ($OwnerAgent) {
             $OwnerAgent.Trim().ToLowerInvariant()
@@ -371,7 +479,34 @@ switch ($Action) {
         # delete its launch handoff from a stale read; reconciliation owns the 30-second
         # unclaimed-start timeout and cleans the launch file when it marks an orphan.
         if ($job.status -eq 'starting') { $job = Read-ManagedJob -Path $jobFile }
-        Add-ManagedJobIdentity -Job $job | ConvertTo-Json -Depth 12
+        $jobOutput = Add-ManagedJobIdentity -Job $job
+        if ($resolvedReadinessUri) {
+            try {
+                $readiness = Wait-ManagedJobReadiness `
+                    -JobId $job.id `
+                    -Uri $resolvedReadinessUri `
+                    -TimeoutSeconds $ReadinessTimeoutSeconds
+                $job = Update-ReconciledJob -Job (Read-ManagedJob -Path $jobFile)
+                $jobOutput = Add-ManagedJobReadiness `
+                    -Job (Add-ManagedJobIdentity -Job $job) `
+                    -Readiness $readiness
+            } catch {
+                $readinessFailure = $_.Exception.GetBaseException().Message
+                $current = Read-ManagedJob -Path $jobFile
+                if ($current.status -in @('starting', 'running')) {
+                    $terminationRequest = [pscustomobject]@{
+                        job = $current
+                        reason = 'Stopped because its readiness gate failed.'
+                    }
+                    $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
+                    if ($termination.error) {
+                        throw "$readinessFailure Failed to stop managed job $($current.id): $($termination.error) Managed job log: $($current.logPath)"
+                    }
+                }
+                throw "$readinessFailure Managed job log: $($current.logPath)"
+            }
+        }
+        $jobOutput | ConvertTo-Json -Depth 12
     }
     'list' {
         $jobs = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ } | Sort-Object createdAtUtc -Descending)
@@ -385,6 +520,23 @@ switch ($Action) {
             $jobs = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ } | Sort-Object createdAtUtc -Descending)
             Write-JobCollection -Jobs (Select-ManagedJobs -Jobs $jobs)
         }
+    }
+    'wait-ready' {
+        if (-not $Id) { throw '-Id is required for wait-ready.' }
+        if (-not $ReadinessUri) { throw '-ReadinessUri is required for wait-ready.' }
+        $resolvedReadinessUri = Resolve-ManagedJobReadinessUri -Uri $ReadinessUri
+        $job = Update-ReconciledJob -Job (Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id))
+        if ($job.status -notin @('starting', 'running')) {
+            throw "Job $Id cannot become ready; current status is $($job.status)."
+        }
+        $readiness = Wait-ManagedJobReadiness `
+            -JobId $Id `
+            -Uri $resolvedReadinessUri `
+            -TimeoutSeconds $ReadinessTimeoutSeconds
+        $job = Update-ReconciledJob -Job (Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id))
+        Add-ManagedJobReadiness `
+            -Job (Add-ManagedJobIdentity -Job $job) `
+            -Readiness $readiness | ConvertTo-Json -Depth 12
     }
     'logs' {
         if (-not $Id) { throw '-Id is required for logs.' }

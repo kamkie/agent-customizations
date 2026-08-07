@@ -1,4 +1,4 @@
 interface:
   display_name: "Managed Jobs"
-  short_description: "Run and recover long-lived Windows processes"
-  default_prompt: "Use $managed-jobs to start, inspect, recover, or stop a long-running local process with durable logs."
+  short_description: "Run, verify, and recover long-lived processes"
+  default_prompt: "Use $managed-jobs to start, wait for readiness, inspect, recover, or stop a long-running local process with durable logs."

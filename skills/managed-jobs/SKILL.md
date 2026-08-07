@@ -1,6 +1,6 @@
 ---
 name: managed-jobs
-description: Contain, run, inspect, recover, and stop long-running local processes on Windows with explicit lifetimes, durable state, and logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, or work that should remain attached to the active tool call.
+description: Contain, run, verify readiness, inspect, recover, and stop long-running local processes on Windows with explicit lifetimes, durable state, and logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote-service health monitoring, or work that should remain attached to the active tool call.
 ---
 
 # Managed Jobs
@@ -23,6 +23,28 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 & $jobs logs -Id <job-id> -Tail 100
 ```
 
+## HTTP readiness
+
+When downstream work needs a local HTTP service immediately, replace the plain
+`start` call above with a readiness-gated start:
+
+```powershell
+# Replace this example with the service's loopback health URL.
+$readinessUri = [uri]'http://127.0.0.1:5000/health'
+$job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
+    -WorkingDirectory $repo -ReadinessUri $readinessUri `
+    -ReadinessTimeoutSeconds 60 | Out-String) | ConvertFrom-Json
+```
+
+The command returns only after a 2xx or 3xx response and includes structured
+`readiness` evidence. If the deadline expires, it stops the job created by that
+`start` invocation, or reports why cleanup could not be confirmed. To verify a
+reconciled or otherwise reused job without stopping it on probe failure:
+
+```powershell
+& $jobs wait-ready -Id <job-id> -ReadinessUri $readinessUri -ReadinessTimeoutSeconds 30
+```
+
 - Keep short commands attached to the active agent tool call.
 - Default long-lived work to hidden supervised execution; record the returned id,
   current status, and log path.
@@ -31,6 +53,9 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
   across turns, and use `-Lifetime Persistent` only when it must intentionally
   survive the session.
 - Reconcile after restarts and reuse an equivalent active job.
+- For a local HTTP service, use the readiness gate before handing its URL to
+  downstream work. The probe URL must use HTTP(S), target loopback, and contain
+  no credentials, query, or fragment.
 - Treat arguments, environment entries, records, and logs as non-secret.
 - Use visible Windows Terminal mode only when the user asks to watch the output.
 - Never replace the controller with direct detached/background process commands.
@@ -50,3 +75,9 @@ Stop only after the work is complete or when the user explicitly asks:
 
 Read [operations.md](references/operations.md) for shared state roots, secret
 handling, structured recovery, identity checks, visible options, and pruning.
+
+## Provenance
+
+The HTTP readiness workflow adapts Open Mercato's `om-prepare-test-env` under
+the MIT License. See
+[`references/open-mercato-license.md`](references/open-mercato-license.md).

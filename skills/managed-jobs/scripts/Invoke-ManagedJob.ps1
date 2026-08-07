@@ -32,6 +32,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$readinessParametersUsed = $PSBoundParameters.ContainsKey('ReadinessUri') -or
+    $PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds')
+if ($Action -notin @('start', 'wait-ready') -and $readinessParametersUsed) {
+    throw '-ReadinessUri and -ReadinessTimeoutSeconds are valid only for start and wait-ready.'
+}
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
 Set-ManagedJobStateRoot -Path $StateRoot
@@ -149,7 +154,7 @@ function Wait-ManagedJobReadiness {
     $handler.AllowAutoRedirect = $false
     $handler.UseProxy = $false
     $client = [Net.Http.HttpClient]::new($handler)
-    $client.Timeout = [TimeSpan]::FromSeconds([Math]::Min(2, $TimeoutSeconds))
+    $client.Timeout = [Threading.Timeout]::InfiniteTimeSpan
     try {
         do {
             $job = Update-ReconciledJob -Job (Read-ManagedJob -Path (Get-ManagedJobFile -Id $JobId))
@@ -160,17 +165,32 @@ function Wait-ManagedJobReadiness {
             $attempts++
             $response = $null
             $readyStatusCode = $null
+            $probeCancellation = $null
             try {
-                $response = $client.GetAsync($Uri).GetAwaiter().GetResult()
+                $remainingMilliseconds = [Math]::Max(1, ($deadline - [datetime]::UtcNow).TotalMilliseconds)
+                $probeCancellation = [Threading.CancellationTokenSource]::new(
+                    [TimeSpan]::FromMilliseconds([Math]::Min(2000, $remainingMilliseconds))
+                )
+                $response = $client.GetAsync(
+                    $Uri,
+                    [Net.Http.HttpCompletionOption]::ResponseHeadersRead,
+                    $probeCancellation.Token
+                ).GetAwaiter().GetResult()
                 $statusCode = [int]$response.StatusCode
                 $lastResult = "HTTP $statusCode"
                 if ($statusCode -ge 200 -and $statusCode -lt 400) {
                     $readyStatusCode = $statusCode
                 }
             } catch {
-                $lastResult = $_.Exception.GetBaseException().Message
+                $probeFailure = $_.Exception.GetBaseException()
+                $lastResult = if ($probeCancellation -and $probeCancellation.IsCancellationRequested) {
+                    'probe exceeded its response budget'
+                } else {
+                    $probeFailure.Message
+                }
             } finally {
                 if ($response) { $response.Dispose() }
+                if ($probeCancellation) { $probeCancellation.Dispose() }
             }
 
             if ($null -ne $readyStatusCode) {
@@ -240,13 +260,32 @@ function Stop-ManagedJobTrees {
         $outcomes.Add($outcome) | Out-Null
         try {
             $path = Get-ManagedJobFile -Id $job.id
-            $current = Read-ManagedJob -Path $path
+            try {
+                $current = Read-ManagedJob -Path $path
+                $recordUnavailable = $false
+            } catch {
+                if (-not ($item.PSObject.Properties.Name -contains 'allowRecordFallback') -or
+                    -not $item.allowRecordFallback) {
+                    throw
+                }
+                $current = $job
+                $recordUnavailable = $true
+            }
             $outcome.job = $current
             if ($current.status -notin @('starting', 'running')) {
                 try { Unregister-ManagedJobOwnerReference -Job $current } catch {}
                 continue
             }
             if (-not (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc)) {
+                if ($recordUnavailable) {
+                    $current.status = 'stopped'
+                    $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                    $current.exitCode = $null
+                    $current.error = [string]$item.reason
+                    Unregister-ManagedJobOwnerReference -Job $current
+                    $outcome.job = $current
+                    continue
+                }
                 $current = Update-ReconciledJob -Job $current
                 $outcome.job = $current
                 if ($current.status -notin @('starting', 'running')) { continue }
@@ -271,6 +310,7 @@ function Stop-ManagedJobTrees {
                 hostPid = $current.hostPid
                 hostStartedAtUtc = $current.hostStartedAtUtc
                 stopErrors = @($stopErrors)
+                recordUnavailable = $recordUnavailable
             }) | Out-Null
         } catch {
             $outcome.error = $_.Exception.Message
@@ -302,13 +342,21 @@ function Stop-ManagedJobTrees {
                     }
                     throw "Unable to terminate PID $($target.hostPid)$detail"
                 }
-                $current = Read-ManagedJob -Path $target.path
-                if ($current.status -in @('starting', 'running')) {
+                $current = $target.outcome.job
+                if ($target.recordUnavailable) {
                     $current.status = 'stopped'
                     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                     $current.exitCode = $null
                     $current.error = $target.reason
-                    Write-ManagedJob -Path $target.path -Job $current
+                } else {
+                    $current = Read-ManagedJob -Path $target.path
+                    if ($current.status -in @('starting', 'running')) {
+                        $current.status = 'stopped'
+                        $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                        $current.exitCode = $null
+                        $current.error = $target.reason
+                        Write-ManagedJob -Path $target.path -Job $current
+                    }
                 }
                 Unregister-ManagedJobOwnerReference -Job $current
                 $target.outcome.job = $current
@@ -492,11 +540,13 @@ switch ($Action) {
                     -Readiness $readiness
             } catch {
                 $readinessFailure = $_.Exception.GetBaseException().Message
-                $current = Read-ManagedJob -Path $jobFile
+                $current = $job
+                try { $current = Read-ManagedJob -Path $jobFile } catch {}
                 if ($current.status -in @('starting', 'running')) {
                     $terminationRequest = [pscustomobject]@{
                         job = $current
                         reason = 'Stopped because its readiness gate failed.'
+                        allowRecordFallback = $true
                     }
                     $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
                     if ($termination.error) {

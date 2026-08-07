@@ -45,7 +45,8 @@
         "execute-campaign-work-item",
         "managed-jobs",
         "orchestrate-work-campaigns",
-        "shape-product-decisions"
+        "shape-product-decisions",
+        "ux-review"
       ]
     },
     "claude": {

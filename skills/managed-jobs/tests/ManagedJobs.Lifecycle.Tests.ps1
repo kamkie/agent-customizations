@@ -185,9 +185,57 @@ try {
             -ReadinessTimeoutSeconds 1 | Out-Null
     } catch { $orphanedTimeoutRejected = $_.Exception.Message -match 'requires -ReadinessUri' }
     Assert-True $orphanedTimeoutRejected 'A readiness timeout without a readiness URI should be rejected.'
+    $wrongActionReadinessRejected = $false
+    try {
+        & $controller list -StateRoot $stateRoot -ReadinessUri ([uri]'http://127.0.0.1:12345/health') | Out-Null
+    } catch { $wrongActionReadinessRejected = $_.Exception.Message -match 'valid only for start and wait-ready' }
+    Assert-True $wrongActionReadinessRejected 'Readiness parameters should be rejected for unrelated actions.'
     Assert-True (
         @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File).Count -eq $beforeReadinessValidation
     ) 'Rejected readiness URIs must not create records.'
+
+    $completedReadinessRejected = $false
+    try {
+        & $controller wait-ready -StateRoot $stateRoot -Id $completed.id `
+            -ReadinessUri ([uri]'http://127.0.0.1:12345/health') | Out-Null
+    } catch { $completedReadinessRejected = $_.Exception.Message -match 'current status is completed' }
+    Assert-True $completedReadinessRejected 'wait-ready should reject a terminal managed job.'
+
+    $exitingPort = Get-FreeTcpPort
+    $exitingReadinessRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'lifecycle-readiness-exits' -Executable $pwsh `
+            -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Milliseconds 300') `
+            -ReadinessUri ([uri]"http://127.0.0.1:$exitingPort/health") -ReadinessTimeoutSeconds 3 | Out-Null
+    } catch { $exitingReadinessRejected = $_.Exception.Message -match "reached status '(completed|failed)'" }
+    Assert-True $exitingReadinessRejected 'A job that exits during probing should fail before the readiness deadline.'
+
+    # A concurrently removed record must not prevent start from terminating the
+    # process tree that this invocation owns after its readiness gate fails.
+    $recordLossPort = Get-FreeTcpPort
+    $recordLossCommand = @"
+Write-Output "readiness-record-loss-child-pid=`$PID"
+Start-Sleep -Milliseconds 750
+`$record = Get-ChildItem -LiteralPath '$stateRoot\jobs' -Filter '*.json' -File | Where-Object {
+    try { (Get-Content -LiteralPath `$_ -Raw | ConvertFrom-Json).name -eq 'lifecycle-readiness-record-loss' } catch { `$false }
+} | Select-Object -First 1
+if (`$record) { Remove-Item -LiteralPath `$record.FullName -Force }
+Start-Sleep -Seconds 30
+"@
+    $recordLossError = $null
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'lifecycle-readiness-record-loss' -Executable $pwsh `
+            -Arguments @('-NoProfile', '-Command', $recordLossCommand) `
+            -ReadinessUri ([uri]"http://127.0.0.1:$recordLossPort/health") -ReadinessTimeoutSeconds 5 | Out-Null
+    } catch { $recordLossError = $_.Exception.Message }
+    Assert-True ($recordLossError -match 'Managed job record not found') `
+        "A missing owned-job record should preserve the readiness failure. Error: $recordLossError"
+    $recordLossLog = Get-ChildItem -LiteralPath (Join-Path $stateRoot 'logs') `
+        -Filter '*-lifecycle-readiness-record-loss-*.log' -File | Select-Object -First 1
+    $recordLossChildPid = Wait-LoggedProcessId -LogPath $recordLossLog.FullName `
+        -Pattern 'readiness-record-loss-child-pid=(\d+)'
+    Assert-True (Wait-ProcessExit -TargetProcessId $recordLossChildPid) `
+        'Readiness failure cleanup should terminate its owned process even when the record disappears.'
 
     # A delayed loopback HTTP server proves that start waits for application
     # readiness and that a reused running job can be checked independently.

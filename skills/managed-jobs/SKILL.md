@@ -23,28 +23,6 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 & $jobs logs -Id <job-id> -Tail 100
 ```
 
-## HTTP readiness
-
-When downstream work needs a local HTTP service immediately, replace the plain
-`start` call above with a readiness-gated start:
-
-```powershell
-# Replace this example with the service's loopback health URL.
-$readinessUri = [uri]'http://127.0.0.1:5000/health'
-$job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
-    -WorkingDirectory $repo -ReadinessUri $readinessUri `
-    -ReadinessTimeoutSeconds 60 | Out-String) | ConvertFrom-Json
-```
-
-The command returns only after a 2xx or 3xx response and includes structured
-`readiness` evidence. If the deadline expires, it stops the job created by that
-`start` invocation, or reports why cleanup could not be confirmed. To verify a
-reconciled or otherwise reused job without stopping it on probe failure:
-
-```powershell
-& $jobs wait-ready -Id <job-id> -ReadinessUri $readinessUri -ReadinessTimeoutSeconds 30
-```
-
 - Keep short commands attached to the active agent tool call.
 - Default long-lived work to hidden supervised execution; record the returned id,
   current status, and log path.
@@ -75,6 +53,28 @@ Stop only after the work is complete or when the user explicitly asks:
 
 Read [operations.md](references/operations.md) for shared state roots, secret
 handling, structured recovery, identity checks, visible options, and pruning.
+
+## HTTP readiness
+
+When downstream work needs a local HTTP service immediately, replace the plain
+`start` call above with a readiness-gated start:
+
+```powershell
+# Replace this example with the service's loopback health URL.
+$readinessUri = [uri]'http://127.0.0.1:5000/health'
+$job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
+    -WorkingDirectory $repo -ReadinessUri $readinessUri `
+    -ReadinessTimeoutSeconds 60 | Out-String) | ConvertFrom-Json
+```
+
+The command returns only after a 2xx or 3xx response and includes structured
+`readiness` evidence. If the deadline expires, it stops the job created by that
+`start` invocation, or reports why cleanup could not be confirmed. To verify a
+reconciled or otherwise reused job without stopping it on probe failure:
+
+```powershell
+& $jobs wait-ready -Id <job-id> -ReadinessUri $readinessUri -ReadinessTimeoutSeconds 30
+```
 
 ## Provenance
 

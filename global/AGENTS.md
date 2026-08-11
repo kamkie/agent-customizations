@@ -120,6 +120,11 @@ Implement exactly what the user requested using the smallest coherent diff.
 
 ## Pull request handoff and cleanup
 
+When repository policy is silent, keep one coherent problem per pull request.
+Lead the pull-request body with the problem and why the change is needed, then
+summarize the solution, validation, and remaining risk. Do not use a
+file-by-file changelog as a substitute for the rationale.
+
 When an agent-authored pull request has received opposite-agent review, ensure
 the result is recorded and every finding is fixed or answered. Unless the user
 or repository requires the pull request to remain draft, mark it ready before

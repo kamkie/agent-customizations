@@ -19,6 +19,8 @@ tools' live configuration directories are deployment targets.
   reading without changing its content.
 - `skills/execute-campaign-work-item` — scoped execution and evidence-backed
   handoff for one controller-assigned campaign work item.
+- `skills/lavish` — pinned, loopback-only HTML artifact review with annotations
+  and guarded publishing, setup, and update operations for Codex.
 - `skills/managed-jobs` — durable supervision for long-running local processes,
   shared by Codex and Claude Code.
 - `skills/orchestrate-work-campaigns` — Codex-specific, visible,

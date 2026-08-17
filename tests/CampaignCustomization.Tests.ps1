@@ -106,7 +106,13 @@ $caseCount = ([regex]::Matches($forwardCases, '(?m)^## Case \d+\b')).Count
 if ($caseCount -ne 6) {
     throw "Forward-test fixture must contain exactly six input-only cases; found $caseCount."
 }
-if ($forwardCases -match '(?im)^\s*(Expected|Correct behavior|Answer|Rubric)\s*:') {
+$answerLeakPattern = '(?im)^\s*(?:[-*+]\s+)?(?:\*\*|__)?\s*(?:Expected(?:\s+(?:outcome|answer|behavior|result))?|Correct\s+behavior|Answer|Rubric|Solution)\b'
+foreach ($leakSample in @('Expected outcome: stop', '**Expected:** continue', '- Answer — defer')) {
+    if ($leakSample -notmatch $answerLeakPattern) {
+        throw "Forward-test answer-leak guard missed sample: $leakSample"
+    }
+}
+if ($forwardCases -match $answerLeakPattern) {
     throw 'Forward-test fixture must not reveal expected decisions or a scoring rubric.'
 }
 

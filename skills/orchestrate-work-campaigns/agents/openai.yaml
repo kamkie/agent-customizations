@@ -1,4 +1,4 @@
 interface:
   display_name: "Orchestrate Work Campaigns"
-  short_description: "Coordinate visible multi-task delivery campaigns"
-  default_prompt: "Use $orchestrate-work-campaigns to coordinate this multi-part work as an inspectable campaign."
+  short_description: "Run visible multi-repository delivery campaigns"
+  default_prompt: "Use $orchestrate-work-campaigns to start a delivery campaign for this tracker."

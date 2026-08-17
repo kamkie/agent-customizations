@@ -25,6 +25,29 @@ function Assert-PolicyMatch {
     }
 }
 
+function Get-PolicySlice {
+    param(
+        [Parameter(Mandatory)][string]$Case,
+        [Parameter(Mandatory)][string]$Content,
+        [Parameter(Mandatory)][string]$Pattern
+    )
+
+    $match = [regex]::Match($Content, $Pattern)
+    if (-not $match.Success) {
+        throw "Campaign policy regression in '$Case': required section was not found. Pattern: $Pattern"
+    }
+    return $match.Value
+}
+
+$controllerPilot = Get-PolicySlice `
+    -Case 'controller pilot step' `
+    -Content $controller `
+    -Pattern '(?ms)^6\. \*\*Deliver one representative pilot\.\*\*.*?(?=^7\. \*\*)'
+$controllerTemplatePilot = Get-PolicySlice `
+    -Case 'controller-template pilot step' `
+    -Content $controllerTemplate `
+    -Pattern '(?ms)^7\. With delivery authority,.*?(?=^8\.)'
+
 Assert-PolicyMatch -Case 'no publication authority stops before hidden fan-out' `
     -Content $controller `
     -Pattern '(?s)publication or review authority is absent.*finish the bounded inventory and stop.*Do not fan out implementation or accumulate hidden local commits'
@@ -33,10 +56,10 @@ Assert-PolicyMatch -Case 'short campaign trigger grants visible delivery but not
     -Content $global `
     -Pattern '(?s)Start delivery campaign <tracker>.*remote branch pushes.*draft\s+pull or merge requests.*CI monitoring.*opposite-agent review.*does not authorize merge or deployment'
 Assert-PolicyMatch -Case 'publication path requires pilot CI review and final head' `
-    -Content $controller `
+    -Content $controllerPilot `
     -Pattern '(?s)representative pilot.*draft PR/MR.*CI.*opposite-agent.*final-head'
 Assert-PolicyMatch -Case 'controller template preserves the pilot delivery gate' `
-    -Content $controllerTemplate `
+    -Content $controllerTemplatePilot `
     -Pattern '(?s)representative applicable delivery unit.*draft PR/MR.*CI.*opposite-agent.*final-head'
 
 Assert-PolicyMatch -Case 'controller accepts direct child steering' `

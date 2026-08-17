@@ -103,6 +103,8 @@ Stop and return control when:
 Terminal handoff:
 - Outcome: [COMPLETE/BLOCKED and ACCEPT/ACCEPT ENABLER/NEUTRAL/REJECT/INCONCLUSIVE/DEFER, with impact].
 - Deliverable: [exact input/output, remote branch, PR/MR, head, CI and review].
+- Delivery state: [performed and withheld external actions, readiness,
+  merge/deploy, and integration state].
 - Scope: [owned diff, write ownership, read-only inputs, unrelated preservation].
 - Validation: [result summary and private exact-evidence location].
 - Evidence: [artifacts/retention, worktree/clean state/locks, policy rechecks,

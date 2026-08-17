@@ -155,6 +155,16 @@ foreach ($file in $managedFiles) {
     }
 }
 
+$campaignPolicyTest = Join-Path $repositoryRoot 'tests\CampaignCustomization.Tests.ps1'
+if (-not (Test-Path -LiteralPath $campaignPolicyTest -PathType Leaf)) {
+    $errors.Add('Missing campaign customization policy test.')
+} else {
+    $campaignTestOutput = @(& pwsh -NoProfile -File $campaignPolicyTest 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        $errors.Add('Campaign customization policy test failed: ' + ($campaignTestOutput -join ' '))
+    }
+}
+
 if ($errors.Count -gt 0) {
     $errors | ForEach-Object { Write-Error $_ }
     exit 1

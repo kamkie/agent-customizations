@@ -19,9 +19,6 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\claude\managed-jobs\tests\ClaudeManagedJobHooks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Claude managed-job hook lifecycle test failed.' }
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\CampaignCustomization.Tests.ps1')
-    if ($LASTEXITCODE -ne 0) { throw 'Campaign customization policy test failed.' }
-
     $null = New-Item -ItemType Directory -Path $codexSandbox -Force
     $lookalikeStopCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
         (Join-Path $codexSandbox 'hooks\managed-jobs\ManagedJob.StopHook.ps1') +

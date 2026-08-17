@@ -1,12 +1,16 @@
 ---
 name: orchestrate-work-campaigns
-description: Coordinate an authorized multi-part delivery campaign through one visible controller, bounded repository-owner tasks, tracker-visible delivery state, a representative pilot, CI, opposite-agent review, audited handoffs, and final validation. Use when the user says "Start delivery campaign TRACKER", for parent/child issue campaigns, dependency-led delivery, or an explicit controller task. Do not use for a single work item, ordinary multi-file implementation, simple delegation, or review-only coordination.
+description: Coordinate an authorized multi-part delivery campaign through one visible controller, bounded delivery-unit owner tasks, tracker-visible delivery state, a representative pilot, CI, opposite-agent review, audited handoffs, and final validation. Use when the user says "Start delivery campaign TRACKER", for parent/child issue campaigns, dependency-led delivery, or an explicit controller task. Do not use for a single work item, ordinary multi-file implementation, simple delegation, or review-only coordination.
 ---
 
 # Orchestrate Work Campaigns
 
 Act only as the campaign bootstrap or controller. Never implement, repair, or
 integrate a worker's owned scope in the controller checkout.
+
+Treat each repository as a delivery unit in a multi-repository campaign. In a
+single-repository campaign, use each independently reviewable outcome as the
+delivery unit. Apply the pilot, visible matrix, and denominator per unit.
 
 ## Run the Common Path
 
@@ -25,7 +29,7 @@ integrate a worker's owned scope in the controller checkout.
 3. **Build the live execution profile and inventory.** Record instruction
    sources and exact versions, original baseline, current accepted state,
    topology, dependencies, shared locks, validation contract, delivery gates,
-   actor identities, policy refresh points, and the full in-scope repository
+   actor identities, policy refresh points, and the full in-scope delivery-unit
    denominator. Discover repository-specific values at runtime.
 4. **Pass the delivery-viability gate.** Before broad implementation, prove that
    one repository owner can continue through local preflight, commit, remote
@@ -35,13 +39,13 @@ integrate a worker's owned scope in the controller checkout.
    finish the bounded inventory and stop at a delivery-authority checkpoint.
    Do not fan out implementation or accumulate hidden local commits.
 5. **Create the primary campaign view.** Maintain a tracker- or host-visible
-   matrix with one row per in-scope repository and columns for applicability,
+   matrix with one row per in-scope delivery unit and columns for applicability,
    owner task, branch, PR/MR, exact head, CI, opposite review, and outcome or
    blocker. Keep a private ledger for exact evidence, locks, and audit history;
    it is secondary and must not replace team-visible delivery state. Reconcile
    live tasks, jobs, branches, and PRs before creating replacements.
-6. **Deliver one representative pilot.** Select one typical applicable
-   repository and create its visible owner task with a complete contract. Audit
+6. **Deliver one representative pilot.** Select one typical applicable delivery
+   unit and create its visible owner task with a complete contract. Audit
    it through draft PR/MR, CI, opposite-agent findings and fixes, re-review, and
    final-head validation. Do not fan out until this proves the delivery path or
    exposes a campaign-wide blocker. A local commit is not a successful pilot.
@@ -68,7 +72,7 @@ integrate a worker's owned scope in the controller checkout.
     invent an integration branch or combined PR. Resolve interaction failures
     through owning workers. Reconcile applicable repositories so delivered,
     blocked, deferred, and omitted equal the applicable count; completion
-    requires `omitted = 0`. Count a repository
+    requires `omitted = 0`. Count a delivery unit
     as delivered only when its team-visible artifact reaches the contract's CI,
     review, and final-head state; classify local-only commits as blocked at
     publication. Report the outcome and denominator first, then concise links,

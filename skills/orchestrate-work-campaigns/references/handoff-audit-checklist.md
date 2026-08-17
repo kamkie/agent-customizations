@@ -80,7 +80,7 @@ authorized action.
 - Update the tracker- or host-visible matrix from freshly verified task, branch,
   PR/MR, exact-head, CI, review, and outcome state. Keep private audit detail in
   the secondary ledger.
-- Reconcile every applicable repository into exactly one delivery state:
+- Reconcile every applicable delivery unit into exactly one delivery state:
   delivered, blocked, deferred, or omitted. Require `omitted = 0` before
   campaign completion and explain every blocked or deferred row.
 - Count delivery only when the team-visible artifact reached the contract's CI,

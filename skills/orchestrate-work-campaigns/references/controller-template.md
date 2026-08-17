@@ -4,6 +4,9 @@ Use this template after replacing bracketed fields with live, domain-specific de
 
 Audit child reports with [handoff-audit-checklist.md](handoff-audit-checklist.md). Treat a terminal handoff as a claim until the controller verifies it against exact live state.
 
+A delivery unit is one repository in a multi-repository campaign or one
+independently reviewable outcome in a single-repository campaign.
+
 ```text
 Use $orchestrate-work-campaigns as the persistent controller for [campaign objective] in [repository/project], tracked by [parent item] and [child items]. You are the active controller; do not create another controller.
 
@@ -29,17 +32,17 @@ User and repository authority:
 Operating requirements:
 1. Read and obey all repository, workspace, and tool instructions. Inspect live source, tracker, task, process, and external-system state. Preserve unrelated work.
 2. Act as controller. Maintain the tracker- or host-visible campaign matrix as
-   the primary view, with one row per in-scope repository and live task,
+   the primary view, with one row per in-scope delivery unit and live task,
    branch, PR/MR, exact-head, CI, review, and outcome state. Maintain a private
    durable ledger for exact evidence, locks, audit history, and recovery detail.
 3. Do not implement or repair child scopes in the controller checkout. Do not edit, cherry-pick, rebase, commit, merge, or otherwise integrate child work there.
 4. Create a separate user-visible task with an isolated worktree and self-contained prompt beginning with `Use $execute-campaign-work-item` for each authorized child and integration/review stage.
 5. Reconcile long-running jobs after restart. Do not create equivalent duplicate tasks or jobs.
-6. Inventory the full repository denominator before implementation. If remote
+6. Inventory the full delivery-unit denominator before implementation. If remote
    publication or opposite-agent review is not authorized, publish the
    inventory if allowed and stop at the delivery-authority checkpoint without
    creating broad local implementations or commits.
-7. With delivery authority, send one representative applicable repository
+7. With delivery authority, send one representative applicable delivery unit
    through its owning task, commit, remote branch, draft PR/MR, tracker link,
    CI, opposite-agent review and fixes, re-review, and final-head validation.
    Start fan-out only after this pilot passes or the user resolves its
@@ -83,7 +86,7 @@ Operating requirements:
     result reachable from the fresh target tip before advancing accepted state.
 17. Publish, deploy, notify, delete, or clean up only when the exact action is
     authorized and its live gate passes.
-18. Reconcile every applicable repository as delivered, blocked, deferred, or
+18. Reconcile every applicable delivery unit as delivered, blocked, deferred, or
     omitted; completion requires zero omitted rows. Local-only commits are
     blocked at publication, never delivered. Keep [parent tracker] updated and
     report the outcome, denominator, visible links, blockers, and remaining
@@ -101,7 +104,7 @@ unless genuinely blocked by missing authority or unavailable external state.
 Keep this view in the campaign tracker or another team-visible host. The ledger
 below retains exact private evidence but is not the campaign summary.
 
-| Repository | Applicability | Owner task | Branch | PR/MR | Exact head | CI | Opposite review | Outcome/blocker |
+| Repository/delivery unit | Applicability | Owner task | Branch | PR/MR | Exact head | CI | Opposite review | Outcome/blocker |
 |---|---|---|---|---|---|---|---|---|
 
 ## Ledger Skeleton
@@ -155,6 +158,6 @@ below retains exact private evidence but is not the campaign summary.
 
 ## Final deliverables, remaining authority, and delivery order
 
-Inventory total: [count]. Applicable: [count]. Delivered: [count]. Blocked:
+Delivery-unit total: [count]. Applicable: [count]. Delivered: [count]. Blocked:
 [count]. Deferred: [count]. Omitted: [count; must be zero for completion].
 ```

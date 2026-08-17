@@ -70,7 +70,7 @@ delivery unit. Apply the pilot, visible matrix, and denominator per unit.
    and re-audit every head changed by fixes.
 10. **Integrate and finish.** Follow the repository-defined topology; do not
     invent an integration branch or combined PR. Resolve interaction failures
-    through owning workers. Reconcile applicable repositories so delivered,
+    through owning workers. Reconcile applicable delivery units so delivered,
     blocked, deferred, and omitted equal the applicable count; completion
     requires `omitted = 0`. Count a delivery unit
     as delivered only when its team-visible artifact reaches the contract's CI,

@@ -159,8 +159,15 @@ $campaignPolicyTest = Join-Path $repositoryRoot 'tests\CampaignCustomization.Tes
 if (-not (Test-Path -LiteralPath $campaignPolicyTest -PathType Leaf)) {
     $errors.Add('Missing campaign customization policy test.')
 } else {
-    $campaignTestOutput = @(& pwsh -NoProfile -File $campaignPolicyTest 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    $campaignTestFailed = $false
+    try {
+        $campaignTestOutput = @(& pwsh -NoProfile -File $campaignPolicyTest 2>&1)
+        $campaignTestFailed = $LASTEXITCODE -ne 0
+    } catch {
+        $campaignTestOutput = @($_.Exception.Message)
+        $campaignTestFailed = $true
+    }
+    if ($campaignTestFailed) {
         $errors.Add('Campaign customization policy test failed: ' + ($campaignTestOutput -join ' '))
     }
 }

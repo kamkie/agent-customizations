@@ -47,10 +47,12 @@ delivery unit. Apply the pilot, visible matrix, and denominator per unit.
    is absent, finish the bounded inventory and stop at a delivery-authority
    checkpoint. Do not fan out implementation or accumulate hidden local commits.
 6. **Deliver one representative pilot.** Select one typical applicable delivery
-   unit and create its visible owner task with a complete contract. Audit
-   it through draft PR/MR, CI, opposite-agent findings and fixes, re-review, and
-   final-head validation. Do not fan out until this proves the delivery path or
-   exposes a campaign-wide blocker. A local commit is not a successful pilot.
+   unit and create its visible owner task. Begin the prompt with
+   `Use $execute-campaign-work-item` and include the same complete contract
+   required for every worker below. Audit it through draft PR/MR, CI,
+   opposite-agent findings and fixes, re-review, and final-head validation. Do
+   not fan out until this proves the delivery path or exposes a campaign-wide
+   blocker. A local commit is not a successful pilot.
 7. **Launch bounded workers.** After the pilot gate passes, create a separate
    visible, worktree-backed task for each authorized implementation,
    investigation, integration, or final-review unit. Begin each prompt with

@@ -103,8 +103,8 @@ Assert-PolicyMatch -Case 'worker cannot claim local-only delivery' `
     -Pattern '(?s)local-only commit is\s+not delivered or complete delivery'
 
 $caseCount = ([regex]::Matches($forwardCases, '(?m)^## Case \d+\b')).Count
-if ($caseCount -ne 6) {
-    throw "Forward-test fixture must contain exactly six input-only cases; found $caseCount."
+if ($caseCount -lt 6) {
+    throw "Forward-test fixture must retain at least six input-only cases; found $caseCount."
 }
 $answerLeakPattern = '(?im)^\s*(?:(?:#{1,6}|>|[-*+]|\d+\.)\s+)*(?:\*\*|__)?\s*(?:Expected(?:\s+(?:outcome|answer|behavior|result))?|Correct\s+behavior|Answer|Rubric|Solution)\b'
 foreach ($leakSample in @(

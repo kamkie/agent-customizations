@@ -72,10 +72,11 @@ state and report the exact additional write scope or authority required.
 6. When authorized, the repository owner normally continues the same work item
    through local preflight, commit, remote branch, draft PR/MR, tracker link,
    CI, required opposite-agent review, finding fixes, re-review, and final-head
-   validation. Do not hand these ordinary delivery stages to replacement owners.
-   Recheck live policy, actor, exact head, gates, and unresolved feedback before
-   each terminal action. Treat any post-review commit as invalidating affected
-   CI and review evidence.
+   validation, followed by the repository-gated draft-to-ready transition when
+   authorized. Do not hand these ordinary delivery stages to replacement
+   owners. Recheck live policy, actor, exact head, gates, and unresolved
+   feedback before each terminal action. Treat any post-review commit as
+   invalidating affected CI and review evidence.
 7. Perform merge, deployment, notification, deletion, or cleanup only when the
    current contract or later direct user instruction explicitly authorizes that
    action and every repository gate passes. Publication authority alone never

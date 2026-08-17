@@ -19,7 +19,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\claude\managed-jobs\tests\ClaudeManagedJobHooks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Claude managed-job hook lifecycle test failed.' }
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\orchestrate-work-campaigns\tests\CampaignCustomization.Tests.ps1')
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\CampaignCustomization.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Campaign customization policy test failed.' }
 
     $null = New-Item -ItemType Directory -Path $codexSandbox -Force

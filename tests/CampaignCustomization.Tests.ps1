@@ -2,7 +2,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..')).Path
+$repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 
 $global = Get-Content -LiteralPath (Join-Path $repositoryRoot 'global\AGENTS.md') -Raw
 $controller = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\SKILL.md') -Raw
@@ -10,7 +10,7 @@ $controllerTemplate = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skill
 $audit = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\handoff-audit-checklist.md') -Raw
 $worker = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\execute-campaign-work-item\SKILL.md') -Raw
 $workerRecovery = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\execute-campaign-work-item\references\exceptional-recovery.md') -Raw
-$forwardCases = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'forward-test-cases.md') -Raw
+$forwardCases = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'fixtures\campaign-forward-test-cases.md') -Raw
 
 function Assert-PolicyMatch {
     param(

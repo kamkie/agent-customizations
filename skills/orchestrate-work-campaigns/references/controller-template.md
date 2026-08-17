@@ -81,9 +81,13 @@ Operating requirements:
     invalidates affected evidence.
 16. Merge or enable auto-merge only when the recorded authority or trigger and
     every exact-head gate are live. Use a head-match guard when supported. For
-    auto-merge, monitor until it completes or stops; enabling it is not
-    completion. After merge, fetch [target remote/ref] and prove the authorized
-    result reachable from the fresh target tip before advancing accepted state.
+    auto-merge, record the guarded head and monitor until it completes or stops;
+    enabling it is not completion. Only after the PR reports merged, freshly
+    prove its final head equals the audited authorized head and its reported
+    merge/squash/rebase result belongs to that PR. Fetch [target remote/ref],
+    record the result SHA and fresh target tip, and prove the result reachable
+    from that tip. Do not require tip equality when unrelated commits may land
+    concurrently. Advance accepted state only after this post-merge proof.
 17. Publish, deploy, notify, delete, or clean up only when the exact action is
     authorized and its live gate passes.
 18. Reconcile every applicable delivery unit as delivered, blocked, deferred, or

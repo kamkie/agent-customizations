@@ -57,10 +57,10 @@ Assert-PolicyMatch -Case 'short campaign trigger grants visible delivery but not
     -Pattern '(?s)Start delivery campaign <tracker>.*remote branch pushes.*draft\s+pull or merge requests.*CI monitoring.*opposite-agent review.*does not authorize merge or deployment'
 Assert-PolicyMatch -Case 'publication path requires pilot CI review and final head' `
     -Content $controllerPilot `
-    -Pattern '(?s)representative pilot.*draft PR/MR.*CI.*opposite-agent.*final-head'
+    -Pattern '(?s)representative pilot.*draft PR/MR.*\bCI\b.*opposite-agent.*final-head'
 Assert-PolicyMatch -Case 'controller template preserves the pilot delivery gate' `
     -Content $controllerTemplatePilot `
-    -Pattern '(?s)representative applicable delivery unit.*draft PR/MR.*CI.*opposite-agent.*final-head'
+    -Pattern '(?s)representative applicable delivery unit.*draft PR/MR.*\bCI\b.*opposite-agent.*final-head'
 
 Assert-PolicyMatch -Case 'controller accepts direct child steering' `
     -Content $controller `
@@ -83,7 +83,7 @@ Assert-PolicyMatch -Case 'audit checklist cannot veto user product decisions' `
 
 Assert-PolicyMatch -Case 'cross-repository exact-ref reads preserve single-repository writes' `
     -Content $worker `
-    -Pattern '(?s)Limit writes to the owned repository and paths.*verified exact ref or artifact from another repository.*read'
+    -Pattern '(?s)Limit writes to the owned repository and paths.*verified exact ref or artifact from another repository.*without taking write ownership'
 
 Assert-PolicyMatch -Case 'controller reconciles the applicable denominator' `
     -Content $controller `

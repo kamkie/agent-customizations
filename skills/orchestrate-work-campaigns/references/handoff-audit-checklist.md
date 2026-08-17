@@ -33,9 +33,12 @@ Use this checklist before accepting a child result, advancing the accepted integ
 
 ## 4. Verify remote delivery state when applicable
 
-- If the child contract has no remote branch or PR, record the authority gap and
-  verify the exact local state. A local-only commit may be valid evidence, but
-  it remains blocked at publication and is not a delivered campaign result.
+- If the child contract legitimately requires no remote branch or PR, record
+  `not applicable` with the reason and verify its domain-equivalent exact
+  artifact and delivery state. If an implementation or delivery item lacks
+  publication authority, record that authority gap and verify the exact local
+  state; a local-only commit may be valid evidence, but it remains blocked at
+  publication and is not a delivered campaign result.
 - Otherwise, fetch or freshly query remote state and prove the remote branch and PR head equal the audited output HEAD.
 - Read draft or ready state, required checks, approvals, review comments, and unresolved threads for that exact head under current repository policy.
 - Confirm every actionable finding is resolved or explicitly blocks the transition.

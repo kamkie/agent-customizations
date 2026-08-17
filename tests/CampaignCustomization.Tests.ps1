@@ -49,11 +49,11 @@ function Get-PolicySlice {
 $controllerPilot = Get-PolicySlice `
     -Case 'controller pilot step' `
     -Content $controller `
-    -Pattern '(?ms)^6\. \*\*Deliver one representative pilot\.\*\*.*?(?=^7\. \*\*)'
+    -Pattern '(?ms)^\d+\. \*\*Deliver one representative pilot\.\*\*.*?(?=^\d+\. \*\*|^##\s)'
 $controllerTemplatePilot = Get-PolicySlice `
     -Case 'controller-template pilot step' `
     -Content $controllerTemplate `
-    -Pattern '(?ms)^7\. With delivery authority,.*?(?=^8\.)'
+    -Pattern '(?ms)^\d+\. With delivery authority,.*?(?=^\d+\.\s|^Start by )'
 
 Assert-PolicyMatch -Case 'no publication authority stops before hidden fan-out' `
     -Content $controller `

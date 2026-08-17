@@ -47,6 +47,8 @@ tools' live configuration directories are deployment targets.
   live installations.
 - `scripts/test.ps1` — exercises verification, sandbox installations, clean
   status, target isolation, and drift detection.
+- `tests` — repository-local behavior regressions and input-only forward-test
+  fixtures that are validated here but not installed into agent homes.
 
 Claude Code loads personal instructions from `~/.claude/CLAUDE.md` and
 personal skills from `~/.claude/skills`. Codex uses `~/.codex/AGENTS.md` and

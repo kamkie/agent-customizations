@@ -31,7 +31,13 @@ delivery unit. Apply the pilot, visible matrix, and denominator per unit.
    topology, dependencies, shared locks, validation contract, delivery gates,
    actor identities, policy refresh points, and the full in-scope delivery-unit
    denominator. Discover repository-specific values at runtime.
-4. **Pass the delivery-viability gate.** Before broad implementation, confirm
+4. **Create the primary campaign view.** Maintain a tracker- or host-visible
+   matrix with one row per in-scope delivery unit and columns for applicability,
+   owner task, branch, PR/MR, exact head, CI, opposite review, and outcome or
+   blocker. Keep a private ledger for exact evidence, locks, and audit history;
+   it is secondary and must not replace team-visible delivery state. Reconcile
+   live tasks, jobs, branches, and PRs before creating replacements.
+5. **Pass the delivery-viability gate.** Before broad implementation, confirm
    that authority, actor identities, host access, tools, and repository policy
    allow one owner to attempt local preflight, commit, remote branch, draft
    PR/MR, tracker link, repository CI (or explicit evidence that none exists),
@@ -40,12 +46,6 @@ delivery unit. Apply the pilot, visible matrix, and denominator per unit.
    proof; do not run a duplicate pilot here. If publication or review authority
    is absent, finish the bounded inventory and stop at a delivery-authority
    checkpoint. Do not fan out implementation or accumulate hidden local commits.
-5. **Create the primary campaign view.** Maintain a tracker- or host-visible
-   matrix with one row per in-scope delivery unit and columns for applicability,
-   owner task, branch, PR/MR, exact head, CI, opposite review, and outcome or
-   blocker. Keep a private ledger for exact evidence, locks, and audit history;
-   it is secondary and must not replace team-visible delivery state. Reconcile
-   live tasks, jobs, branches, and PRs before creating replacements.
 6. **Deliver one representative pilot.** Select one typical applicable delivery
    unit and create its visible owner task with a complete contract. Audit
    it through draft PR/MR, CI, opposite-agent findings and fixes, re-review, and

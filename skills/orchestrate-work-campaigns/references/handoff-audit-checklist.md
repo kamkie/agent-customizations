@@ -11,11 +11,13 @@ Use this checklist before accepting a child result, advancing the accepted integ
 
 ## 2. Verify contract, scope, and repository state
 
-- Read the worker's latest user messages before relying on the assigned
-  contract. Treat later direct user steering as a contract delta, mark affected
-  controller decisions and earlier audit evidence stale, and confirm the worker
-  notified the controller. Return unresolved ambiguity to the user; do not
-  reinstate an older controller decision by audit.
+- Inspect the worker's controller notification and, when the task interface
+  exposes them, its latest user messages before relying on the assigned
+  contract. Otherwise require the handoff to identify the exact user delta and
+  its provenance; return unverifiable or ambiguous steering to the user instead
+  of fabricating a cross-task read. Treat verified later steering as a contract
+  delta, mark affected controller decisions and earlier audit evidence stale,
+  and do not reinstate an older controller decision by audit.
 - Re-read the child's objective, non-goals, owned and forbidden paths, dependencies, authority, validation contract, and stop conditions.
 - Compare the expected input with the actual merge base and inspect the complete input-to-output diff and commit list.
 - Confirm every changed and untracked path is authorized, collateral documentation is handled, unrelated work is preserved, and the reported clean state is accurate.

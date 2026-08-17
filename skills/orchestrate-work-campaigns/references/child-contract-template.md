@@ -108,7 +108,7 @@ Terminal handoff:
 - Scope: [owned diff, write ownership, read-only inputs, unrelated preservation].
 - Validation: [result summary and private exact-evidence location].
 - Evidence: [artifacts/retention, worktree/clean state/locks, policy rechecks,
-  performed and withheld external actions in the private record].
+  and exact audit record in the private evidence location].
 - Limitations: [blocker, stale evidence, deviations, or none].
 - Next: [specific controller action and remaining authority].
 

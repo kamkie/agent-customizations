@@ -10,7 +10,14 @@ $controllerTemplate = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skill
 $audit = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\handoff-audit-checklist.md') -Raw
 $worker = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\execute-campaign-work-item\SKILL.md') -Raw
 $workerRecovery = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\execute-campaign-work-item\references\exceptional-recovery.md') -Raw
-$forwardCases = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'fixtures\campaign-forward-test-cases.md') -Raw
+$fixtureRoot = Join-Path $PSScriptRoot 'fixtures'
+$forwardCaseFiles = @(Get-ChildItem -LiteralPath $fixtureRoot -Filter '*.md' -File -Recurse | Sort-Object FullName)
+if ($forwardCaseFiles.Count -eq 0) {
+    throw 'Forward-test fixtures must contain at least one Markdown file.'
+}
+$forwardCases = ($forwardCaseFiles | ForEach-Object {
+    Get-Content -LiteralPath $_.FullName -Raw
+}) -join [Environment]::NewLine
 
 function Assert-PolicyMatch {
     param(

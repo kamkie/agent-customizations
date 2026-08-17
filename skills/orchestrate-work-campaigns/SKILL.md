@@ -31,13 +31,15 @@ delivery unit. Apply the pilot, visible matrix, and denominator per unit.
    topology, dependencies, shared locks, validation contract, delivery gates,
    actor identities, policy refresh points, and the full in-scope delivery-unit
    denominator. Discover repository-specific values at runtime.
-4. **Pass the delivery-viability gate.** Before broad implementation, prove that
-   one repository owner can continue through local preflight, commit, remote
-   branch, draft PR/MR, tracker link, repository CI (or explicit evidence that
-   none exists), required opposite-agent review, finding fixes and re-review,
-   and final-head validation. If publication or review authority is absent,
-   finish the bounded inventory and stop at a delivery-authority checkpoint.
-   Do not fan out implementation or accumulate hidden local commits.
+4. **Pass the delivery-viability gate.** Before broad implementation, confirm
+   that authority, actor identities, host access, tools, and repository policy
+   allow one owner to attempt local preflight, commit, remote branch, draft
+   PR/MR, tracker link, repository CI (or explicit evidence that none exists),
+   required opposite-agent review, finding fixes and re-review, and final-head
+   validation. The representative pilot in step 6 supplies the live delivery
+   proof; do not run a duplicate pilot here. If publication or review authority
+   is absent, finish the bounded inventory and stop at a delivery-authority
+   checkpoint. Do not fan out implementation or accumulate hidden local commits.
 5. **Create the primary campaign view.** Maintain a tracker- or host-visible
    matrix with one row per in-scope delivery unit and columns for applicability,
    owner task, branch, PR/MR, exact head, CI, opposite review, and outcome or

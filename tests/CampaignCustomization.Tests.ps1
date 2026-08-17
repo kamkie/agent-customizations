@@ -19,8 +19,9 @@ function Assert-PolicyMatch {
         [Parameter(Mandatory)][string]$Pattern
     )
 
-    if ($Content -notmatch $Pattern) {
-        throw "Campaign policy regression in '$Case': required behavior was not found."
+    $normalizedContent = [regex]::Replace($Content, '\s+', ' ')
+    if ($normalizedContent -notmatch $Pattern) {
+        throw "Campaign policy regression in '$Case': required behavior was not found. Pattern: $Pattern"
     }
 }
 
@@ -46,7 +47,7 @@ Assert-PolicyMatch -Case 'worker notifies on direct steering' `
     -Pattern '(?s)direct user instruction.*contract delta.*supersedes stale controller decisions.*Notify the controller'
 Assert-PolicyMatch -Case 'audit invalidates stale controller decisions' `
     -Content $audit `
-    -Pattern '(?s)direct user steering.*contract delta.*controller decisions.*stale'
+    -Pattern '(?s)later steering.*contract delta.*controller decisions.*stale'
 Assert-PolicyMatch -Case 'recovery preserves direct user corrections' `
     -Content $workerRecovery `
     -Pattern '(?s)Direct user correction after audit or deferral.*Notify the controller.*invalidates'

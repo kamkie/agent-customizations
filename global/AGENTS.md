@@ -96,8 +96,9 @@ Design documents and proposals are not agent operating instructions unless the u
 
 `Start delivery campaign <tracker>` authorizes the bounded campaign inventory,
 visible task/worktree/branch creation, local commits, remote branch pushes, draft
-pull or merge requests, tracker links and status updates, CI monitoring, and
-required opposite-agent review with finding fixes and re-review. Use the
+pull or merge requests, their repository-gated readiness transition, tracker
+links and status updates, CI monitoring, and required opposite-agent review
+with finding fixes and re-review. Use the
 `orchestrate-work-campaigns` workflow and discover each repository's delivery
 rules at runtime.
 

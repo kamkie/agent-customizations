@@ -68,10 +68,11 @@ delivery unit. Apply the pilot, visible matrix, and denominator per unit.
    ambiguity to the user; do not override the user, stop the worker, or clean
    its recovery state from an earlier audit.
 9. **Audit each handoff.** Verify identity, ownership, exact inputs and outputs,
-   diff, validation, artifacts, locks, delivery authority, and live remote head.
-   Audit establishes evidence and state; it does not veto or reinterpret user
-   product or architecture decisions. Return discrepancies to the same worker
-   and re-audit every head changed by fixes.
+   complete diff, scope, clean worktree state, validation, artifacts, locks,
+   delivery authority, and live remote head. Audit establishes evidence and
+   state; it does not veto or reinterpret user product or architecture
+   decisions. Return discrepancies to the same worker and re-audit every head
+   changed by fixes.
 10. **Integrate and finish.** Follow the repository-defined topology; do not
     invent an integration branch or combined PR. Resolve interaction failures
     through owning workers. Reconcile applicable delivery units so delivered,

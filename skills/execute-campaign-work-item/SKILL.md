@@ -85,7 +85,7 @@ state and report the exact additional write scope or authority required.
 ## Return the Terminal Handoff
 
 ```text
-Outcome: [COMPLETE/BLOCKED and ACCEPT/REJECT/INCONCLUSIVE, with impact].
+Outcome: [COMPLETE/BLOCKED and ACCEPT/ACCEPT ENABLER/NEUTRAL/REJECT/INCONCLUSIVE/DEFER, with impact].
 Deliverable: [exact input/output, remote branch, PR/MR, head, CI and review].
 Scope: [owned diff, write ownership, read-only inputs, unrelated preservation].
 Validation: [result summary and private exact-evidence location].

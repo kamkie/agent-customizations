@@ -98,7 +98,7 @@ Stop and return control when:
 - [additional issue-specific stop conditions].
 
 Terminal handoff:
-- Outcome: [COMPLETE/BLOCKED and ACCEPT/REJECT/INCONCLUSIVE, with impact].
+- Outcome: [COMPLETE/BLOCKED and ACCEPT/ACCEPT ENABLER/NEUTRAL/REJECT/INCONCLUSIVE/DEFER, with impact].
 - Deliverable: [exact input/output, remote branch, PR/MR, head, CI and review].
 - Scope: [owned diff, write ownership, read-only inputs, unrelated preservation].
 - Validation: [result summary and private exact-evidence location].

@@ -1,6 +1,6 @@
 ---
 name: execute-campaign-work-item
-description: Execute one bounded implementation, investigation, integration, or final-review work item assigned by a visible campaign controller, from an exact accepted input through scoped validation and an evidence-backed terminal handoff. Use only when the current task contains an explicit campaign child contract. Do not design campaigns, create sibling tasks, coordinate multiple work items, accept campaign state, or capture ordinary standalone work.
+description: Execute one bounded repository-owned campaign work item from an exact accepted input through implementation, validation, authorized draft publication, CI, opposite-agent review and fixes, final-head verification, and a concise evidence-backed handoff. Use only when the task contains an explicit campaign child contract, including later direct-user contract deltas. Do not design campaigns, create sibling tasks, coordinate multiple work items, accept campaign state, or capture ordinary standalone work.
 ---
 
 # Execute Campaign Work Item
@@ -15,7 +15,8 @@ Proceed only when the task states all of the following:
 - policy sources, their consequences, precedence, and refresh points;
 - one objective, acceptance criteria, non-goals, and owned and forbidden paths;
 - exact accepted base ref and SHA or artifact version, refresh steps,
-  dependencies, worktree and branch owner, and shared locks;
+  dependencies, exact-ref read-only inputs, worktree and branch owner, and
+  shared locks;
 - authorized writes and external actions, required actor identities, gates, and
   explicitly forbidden actions;
 - required work, collateral documentation, validation and evidence, artifact
@@ -25,6 +26,22 @@ Treat unlisted external actions and scope as unauthorized. If the base,
 ownership, scope, lock, authority, or required evidence is missing or ambiguous,
 return `BLOCKED` before editing and identify the exact controller decision
 needed.
+
+## Apply Direct User Steering
+
+Treat a direct user instruction in this worker as a contract delta that
+supersedes stale controller decisions unless higher-priority safety or policy
+conflicts. Notify the controller immediately with the exact delta and identify
+audits, decisions, validation, and delivery state that are now stale. Continue
+when the user instruction resolves scope and authority unambiguously; return
+remaining ambiguity or conflict to the user instead of letting the controller
+silently narrow or override it.
+
+Do not stop, discard recovery artifacts, or preserve a prior `DEFER` merely to
+protect the original contract. A maintained applicable repository's recoverable
+product, test-bootstrap, or schema defect is work to address when the current
+user-authorized outcome and owned write paths cover it. Otherwise preserve the
+state and report the exact additional write scope or authority required.
 
 ## Execute the Common Path
 
@@ -36,8 +53,12 @@ needed.
    Stop on a dirty, stale, detached, multiply owned, or mismatched state instead
    of repairing or replacing it silently.
 3. Perform only the assigned work using the smallest coherent diff. Preserve
-   unrelated work. Do not create sibling tasks, change campaign topology,
-   integrate other workers, or advance the controller's accepted state.
+   unrelated work. Limit writes to the owned repository and paths. You may read
+   a verified exact ref or artifact from another repository as an authoritative
+   input without taking write ownership; record its repository, exact version,
+   provenance, and purpose. Do not create sibling tasks, change campaign
+   topology, integrate other workers, or advance the controller's accepted
+   state.
 4. Use the repository-required durable process mechanism for long-running work.
    Reuse an equivalent active process and preserve logs, failed attempts,
    interruptions, and contaminated evidence under the contract's retention
@@ -45,29 +66,31 @@ needed.
 5. Run the directly required validation against the exact output. Follow the
    stated retry and contamination rules; rerun every check invalidated by a
    changed input. Keep claims bounded by the evidence.
-6. Perform only contract-authorized commit, push, tracker, PR, review,
-   readiness, merge, deployment, messaging, or cleanup actions. Recheck live
-   policy, actor, exact head, gates, reviews, and unresolved feedback immediately
-   before a terminal action.
-7. Inspect the final diff and worktree state, then return the structured handoff
-   below. Do not declare the result accepted or start dependent work.
+6. When authorized, the repository owner normally continues the same work item
+   through local preflight, commit, remote branch, draft PR/MR, tracker link,
+   CI, required opposite-agent review, finding fixes, re-review, and final-head
+   validation. Do not hand these ordinary delivery stages to replacement owners.
+   Recheck live policy, actor, exact head, gates, and unresolved feedback before
+   each terminal action. Treat any post-review commit as invalidating affected
+   CI and review evidence.
+7. Perform merge, deployment, notification, deletion, or cleanup only when the
+   current contract or later direct user instruction explicitly authorizes that
+   action and every repository gate passes. Publication authority alone never
+   supplies merge or deployment authority.
+8. Inspect the final diff and worktree state, retain exact evidence in the
+   approved private location, and return the concise handoff below. Do not
+   declare campaign acceptance or start dependent work. A local-only commit is
+   not delivered or complete delivery.
 
 ## Return the Terminal Handoff
 
 ```text
-Execution: [COMPLETE or BLOCKED, with reason].
-Outcome: [ACCEPT, ACCEPT ENABLER/NEUTRAL, REJECT, or INCONCLUSIVE/DEFER].
-Recommendation and impact: [evidence-bounded conclusion].
-Exact input: [ref and SHA or artifact version].
-Exact output: [branch, commit/tree SHA, artifact version, or no change].
-Scope and diff: [owned changes and unrelated-work preservation].
-Validation: [commands/methods, results, exact tested version, evidence].
-Artifacts: [locations, classification, retention, cleanup status].
-Ownership and locks: [task, worktree, branch, clean state, lock release].
-Policy and authority: [sources, rechecks, authorized and withheld actions].
-Delivery state: [remote branch, PR, exact head, checks, reviews, approvals].
-Deviations and limitations: [retries, contamination, findings, or none].
-Next action: [specific controller decision], authority [present/absent].
+Outcome: [COMPLETE/BLOCKED and ACCEPT/REJECT/INCONCLUSIVE, with impact].
+Deliverable: [exact input/output, remote branch, PR/MR, head, CI and review].
+Scope: [owned diff, write ownership, read-only inputs, unrelated preservation].
+Validation: [result summary and private exact-evidence location].
+Limitations: [blocker, stale evidence, deviations, or none].
+Next: [specific controller action and remaining authority].
 ```
 
 Return evidence and a recommendation only. The controller owns handoff audit,

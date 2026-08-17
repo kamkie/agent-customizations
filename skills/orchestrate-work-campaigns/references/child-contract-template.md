@@ -89,6 +89,9 @@ Direct user steering:
   audits, decisions, validation, report rows, and delivery state.
 - Continue when the user resolved scope and authority clearly. Return remaining
   ambiguity to the user; do not let a stale controller audit override it.
+- Refresh shared locks and resource ownership before acting. Reconfirm or
+  acquire the campaign lock when the delta touches a serialized surface;
+  controller sequencing cannot veto the user's decision.
 
 Stop and return control when:
 - policy, authority, base provenance, ownership, or a required lock is ambiguous;

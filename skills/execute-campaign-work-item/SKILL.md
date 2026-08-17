@@ -33,9 +33,12 @@ Treat a direct user instruction in this worker as a contract delta that
 supersedes stale controller decisions unless higher-priority safety or policy
 conflicts. Notify the controller immediately with the exact delta and identify
 audits, decisions, validation, and delivery state that are now stale. Continue
-when the user instruction resolves scope and authority unambiguously; return
-remaining ambiguity or conflict to the user instead of letting the controller
-silently narrow or override it.
+when the user instruction resolves scope and authority unambiguously, after
+refreshing shared locks and resource ownership. If the delta touches a
+serialized surface, obtain or reconfirm the same campaign lock before acting;
+controller coordination may sequence the work but may not override the user's
+decision. Return remaining ambiguity or conflict to the user instead of letting
+the controller silently narrow or override it.
 
 Do not stop, discard recovery artifacts, or preserve a prior `DEFER` merely to
 protect the original contract. A maintained applicable repository's recoverable

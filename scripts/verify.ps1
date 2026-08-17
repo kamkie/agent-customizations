@@ -133,7 +133,8 @@ foreach ($skillName in $actualSkills) {
 $managedRoots = @(
     (Join-Path $repositoryRoot 'global'),
     (Join-Path $repositoryRoot 'skills'),
-    (Join-Path $repositoryRoot 'hooks')
+    (Join-Path $repositoryRoot 'hooks'),
+    (Join-Path $repositoryRoot 'tests')
 )
 $forbiddenExtensions = @('.jsonl', '.log', '.key', '.pem')
 $hazardPattern = '(?i)(gho_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|C:\\Users\\[^\\\s]+|[A-Z]:\\Projects\\)'

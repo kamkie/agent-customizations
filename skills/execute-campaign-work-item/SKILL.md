@@ -90,6 +90,8 @@ state and report the exact additional write scope or authority required.
 
 ```text
 Outcome: [COMPLETE/BLOCKED and ACCEPT/ACCEPT ENABLER/NEUTRAL/REJECT/INCONCLUSIVE/DEFER, with impact].
+Contract delta: [latest direct user instruction and provenance, affected stale
+state and lock rechecks, or none].
 Deliverable: [exact input/output, remote branch, PR/MR, head, CI and review].
 Delivery state: [performed and withheld external actions, readiness,
 merge/deploy, and integration state].

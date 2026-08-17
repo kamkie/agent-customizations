@@ -124,9 +124,10 @@ Validation: [commands or methods, expected results, evidence, retry rules].
 Artifacts: [destinations, privacy, retention, cleanup or promotion rules].
 Delivery: [commit, branch, publication, review, readiness, merge restrictions].
 Stop conditions: [ambiguity, expansion, contamination, unavailable authority].
-Handoff: [outcome/impact, exact input/output and delivery head, performed and
-withheld actions plus integration state, owned diff and read-only inputs,
-validation/evidence, limitations, next action and authority].
+Handoff: [outcome/impact, latest user contract delta and provenance, exact
+input/output and delivery head, performed and withheld actions plus integration
+state, owned diff and read-only inputs, validation/evidence, limitations, next
+action and authority].
 ```
 
 Keep writes within the owned repository and paths. Exact-ref, read-only inputs

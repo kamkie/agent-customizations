@@ -24,6 +24,20 @@ which remains authoritative for deciding where a rule belongs.
 
 ## Maintain agent instructions
 
+Before editing a repository instruction file, check whether it briefly defines,
+where applicable:
+
+- the product or system purpose and primary users;
+- non-negotiable product or operational qualities;
+- project-specific terminology;
+- major entry points, clients, adapters, or deployment surfaces;
+- the directly affected reverse and recovery paths;
+- the validation map for each major area; and
+- destructive or production-sensitive boundaries.
+
+Include only information an agent needs before changing the repository. Do not
+duplicate the README or general architecture documentation.
+
 - Keep a rule only when it is stable, broadly applicable at that instruction
   scope, and likely to change agent behavior materially.
 - Write direct, testable instructions. State the trigger, required behavior,

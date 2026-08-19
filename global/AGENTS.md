@@ -34,6 +34,17 @@ After repeated failed attempts, stop making near-duplicate changes. Recheck the
 assumptions, identify the leading uncertainty, and run or request one
 discriminating diagnostic before trying another fix.
 
+## Parallel write ownership
+
+Before parallel agents may write, assign disjoint ownership by file or
+subsystem. Serialize changes to shared files, schemas, manifests, lockfiles,
+migrations, generated sources, and integration points. Read-only investigation
+may overlap.
+
+Each worker must stay within its assigned boundary. The coordinating agent owns
+integration and must inspect the combined diff for overlapping or conflicting
+changes.
+
 ## Response shape and continuity
 
 Make Codex-authored responses easy to scan and act on without sacrificing

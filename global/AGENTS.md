@@ -123,7 +123,15 @@ Never override user clipboard.
 
 ## Scope discipline
 
-Implement exactly what the user requested using the smallest coherent diff.
+Implement exactly what the user requested using the simplest coherent model
+and the smallest coherent diff. Do not optimize only for the fewest changed
+lines when that preserves obsolete state, duplicate paths, or unnecessary
+layers within the authorized scope.
+
+Before adding an abstraction, dependency, compatibility path, persistent state,
+or new workflow, identify the concrete constraint it solves. A broader redesign
+may be recommended separately when it would materially simplify the system, but
+do not implement it without authority.
 
 - Change only code required for the requested behavior.
 - Do not add legacy support, compatibility shims, fallbacks, aliases, migrations, feature flags, speculative abstractions, adjacent fixes, cleanup, or unrelated refactors unless explicitly requested.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lavish"
+  short_description: "Review HTML artifacts with annotated feedback"
+  default_prompt: "Use $lavish to create and review a local interactive HTML artifact for this request."

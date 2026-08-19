@@ -4,6 +4,9 @@ Use this template after replacing bracketed fields with live, domain-specific de
 
 Audit child reports with [handoff-audit-checklist.md](handoff-audit-checklist.md). Treat a terminal handoff as a claim until the controller verifies it against exact live state.
 
+A delivery unit is one repository in a multi-repository campaign or one
+independently reviewable outcome in a single-repository campaign.
+
 ```text
 Use $orchestrate-work-campaigns as the persistent controller for [campaign objective] in [repository/project], tracked by [parent item] and [child items]. You are the active controller; do not create another controller.
 
@@ -13,6 +16,8 @@ Campaign registration:
 - Original baseline: [ref and exact SHA/artifact version].
 - Current accepted integration state: [ref and exact SHA/artifact version].
 - Delivery topology and target: [independent/stacked/integrated units, order, and target remote/ref].
+- Delivery viability and pilot: [publication/review authority, representative
+  repository, required draft PR/MR, CI, review, and final-head proof].
 
 User and repository authority:
 - Coordinate [authorized scope].
@@ -26,24 +31,85 @@ User and repository authority:
 
 Operating requirements:
 1. Read and obey all repository, workspace, and tool instructions. Inspect live source, tracker, task, process, and external-system state. Preserve unrelated work.
-2. Act as controller. Maintain a durable ledger with registration, policy, authority, original baseline, accepted-state history, dependency graph, resource locks, task and worktree ownership, decisions, evidence, branches, commits, PRs, exact-head checks and reviews, delivery proof, limitations, and final report.
+2. Act as controller. Maintain the tracker- or host-visible campaign matrix as
+   the primary view, with one row per in-scope delivery unit and live task,
+   branch, PR/MR, exact-head, CI, review, and outcome state. Maintain a private
+   durable ledger for exact evidence, locks, audit history, and recovery detail.
 3. Do not implement or repair child scopes in the controller checkout. Do not edit, cherry-pick, rebase, commit, merge, or otherwise integrate child work there.
 4. Create a separate user-visible task with an isolated worktree and self-contained prompt beginning with `Use $execute-campaign-work-item` for each authorized child and integration/review stage.
 5. Reconcile long-running jobs after restart. Do not create equivalent duplicate tasks or jobs.
-6. Serialize work using [shared resources]. Parallelize only work proven independent and authorized.
-7. Process children initially in this dependency-safe order: [ordered children]. Revalidate and document any reordering.
-8. Each child must start from [exact repository-defined input state], stay within its contract, preserve evidence, run [validation contract], and return [outcome vocabulary].
-9. Audit every terminal handoff against the exact identity, ownership, scope, clean-state, validation, artifact, remote-state, authority, and recovery requirements in this prompt before accepting its state, changing the accepted integration state, crossing a delivery gate, or starting a dependent child. Record rejected and inconclusive outcomes with their evidence.
-10. When an audit returns discrepancies, resume the same visible task/session and worktree. If that task cannot resume, return `BLOCKED`. Transfer ownership or create a replacement task/worktree only with explicit authority, and mark the original superseded before another task owns its branch or worktree.
-11. After child work, use separate visible tasks for [repository-required integration groups], complete accepted-stack validation against the original baseline, and bisect interactions if necessary.
-12. Run [review method] over final artifacts, evidence quality, cross-change interactions, operational risks, and hidden regressions. Return fixes to the owning task or an authorized recovery task and revalidate actionable findings.
-13. Before a remote readiness or merge transition, freshly read the PR and prove its head equals the audited output. Read checks, approvals, reviews, and unresolved threads for that exact head. Any push or head change invalidates affected evidence.
-14. Merge or enable auto-merge only when the recorded authority or trigger and every exact-head gate are live. Use a head-match guard when supported. For auto-merge, record the guarded head and monitor until it completes or stops; enabling it is not completion. Only after the PR reports merged, freshly prove its final head equals the audited authorized head and its reported merge/squash/rebase result belongs to that PR. Fetch [target remote/ref], record the result SHA and fresh target tip, and prove the result is reachable from that tip. Do not require tip equality when unrelated commits may land concurrently. Advance accepted state only after the topology's post-merge proof succeeds.
-15. Publish, deploy, notify, delete, or clean up only when the exact action is authorized and its live gate passes.
-16. Keep [parent tracker] updated with a consolidated impact table, task and artifact links, decisions, audit outcomes, limitations, accepted-state history, and recommended delivery order.
+6. Inventory the full delivery-unit denominator before implementation. If remote
+   publication or opposite-agent review is not authorized, publish the
+   inventory if allowed and stop at the delivery-authority checkpoint without
+   creating broad local implementations or commits.
+7. With delivery authority, send one representative applicable delivery unit
+   through its owning task, commit, remote branch, draft PR/MR, tracker link,
+   CI, opposite-agent review and fixes, re-review, and final-head validation.
+   Start fan-out only after this pilot passes or the user resolves its
+   campaign-wide blocker.
+8. Serialize work using [shared resources]. After the pilot, parallelize only
+   work proven independent and authorized, in this dependency-safe order:
+   [ordered children]. Revalidate and document any reordering.
+9. Each child must start from [exact repository-defined input state], stay
+   within its owned writes, preserve evidence, run [validation contract], and
+   normally retain ownership through authorized draft delivery and review.
+   Record exact-ref read-only inputs from other repositories separately from
+   write ownership.
+10. Treat direct user steering in a child as a contract delta. The child
+    notifies this controller; mark affected audits, decisions, evidence, and
+    report rows stale, reconcile the contract and matrix, and return genuine
+    ambiguity to the user. Do not override the correction with an earlier audit
+    or clean the worker's recovery state.
+11. Audit every terminal handoff against exact identity, ownership, scope,
+    validation, artifact, remote-state, authority, and recovery evidence.
+    Audits verify evidence and state; they do not veto user product or
+    architecture decisions. Record rejected and inconclusive evidence without
+    converting it into an unauthorized product decision.
+12. When an audit returns discrepancies, resume the same visible task/session
+    and worktree. If that task cannot resume, return `BLOCKED`. Transfer
+    ownership or create a replacement only with explicit authority, and mark
+    the original superseded first.
+13. After child work, use separate visible tasks for [repository-required
+    integration groups], complete accepted-stack validation against the
+    original baseline, and bisect interactions if necessary.
+14. Run [review method] over final artifacts, evidence quality, cross-change
+    interactions, operational risks, and hidden regressions. Return fixes to
+    the owning task and revalidate affected CI and review on the new head.
+15. Before a remote readiness or merge transition, freshly read the PR and
+    prove its head equals the audited output. Read checks, approvals, reviews,
+    and unresolved threads for that exact head. Any push or head change
+    invalidates affected evidence.
+16. Merge or enable auto-merge only when the recorded authority or trigger and
+    every exact-head gate are live. Use a head-match guard when supported. For
+    auto-merge, record the guarded head and monitor until it completes or stops;
+    enabling it is not completion. Only after the PR reports merged, freshly
+    prove its final head equals the audited authorized head and its reported
+    merge/squash/rebase result belongs to that PR. Fetch [target remote/ref],
+    record the result SHA and fresh target tip, and prove the result reachable
+    from that tip. Do not require tip equality when unrelated commits may land
+    concurrently. Advance accepted state only after this post-merge proof.
+17. Publish, deploy, notify, delete, or clean up only when the exact action is
+    authorized and its live gate passes.
+18. Reconcile every applicable delivery unit as delivered, blocked, deferred, or
+    omitted; completion requires zero omitted rows. Local-only commits are
+    blocked at publication, never delivered. Keep [parent tracker] updated and
+    report the outcome, denominator, visible links, blockers, and remaining
+    merge/deploy authority before private evidence detail.
 
-Start by inspecting live state, creating the ledger, and marking controller-task registration pending until the launcher supplies it. Verify the parent-tracker registration before creating the first child or integration task, then start [first authorized child or approval checkpoint]. Continue until complete unless genuinely blocked by missing authority or unavailable external state.
+Start by inspecting live state, building the inventory and visible matrix, and
+marking controller-task registration pending until the launcher supplies it.
+Verify registration, then start [representative pilot or delivery-authority
+checkpoint]. Do not fan out before the pilot passes. Continue until complete
+unless genuinely blocked by missing authority or unavailable external state.
 ```
+
+## Primary Campaign Matrix
+
+Keep this view in the campaign tracker or another team-visible host. The ledger
+below retains exact private evidence but is not the campaign summary.
+
+| Repository/delivery unit | Applicability | Owner task | Branch | PR/MR | Exact head | CI | Opposite review | Outcome/blocker |
+|---|---|---|---|---|---|---|---|---|
 
 ## Ledger Skeleton
 
@@ -62,6 +128,8 @@ Start by inspecting live state, creating the ledger, and marking controller-task
 |---|---|---|---|---|
 
 ## Original baseline, topology, and current accepted state
+
+## Visible campaign matrix location and last reconciliation
 
 ## Dependency graph, ownership, and resource locks
 
@@ -93,4 +161,7 @@ Start by inspecting live state, creating the ledger, and marking controller-task
 ## Review findings, collateral work, stale evidence, and resolutions
 
 ## Final deliverables, remaining authority, and delivery order
+
+Delivery-unit total: [count]. Applicable: [count]. Delivered: [count]. Blocked:
+[count]. Deferred: [count]. Omitted: [count; must be zero for completion].
 ```

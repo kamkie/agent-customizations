@@ -11,10 +11,20 @@ Use this checklist before accepting a child result, advancing the accepted integ
 
 ## 2. Verify contract, scope, and repository state
 
+- Inspect the worker's controller notification and, when the task interface
+  exposes them, its latest user messages before relying on the assigned
+  contract. Otherwise require the handoff to identify the exact user delta and
+  its provenance; return unverifiable or ambiguous steering to the user instead
+  of fabricating a cross-task read. Treat verified later steering as a contract
+  delta, mark affected controller decisions and earlier audit evidence stale,
+  and do not reinstate an older controller decision by audit.
 - Re-read the child's objective, non-goals, owned and forbidden paths, dependencies, authority, validation contract, and stop conditions.
 - Compare the expected input with the actual merge base and inspect the complete input-to-output diff and commit list.
 - Confirm every changed and untracked path is authorized, collateral documentation is handled, unrelated work is preserved, and the reported clean state is accurate.
 - Record unauthorized, unexplained, generated, or missing changes as discrepancies rather than silently repairing them.
+- Distinguish the single repository's owned writes from verified exact-ref,
+  read-only inputs in other repositories. Cross-repository reads do not require
+  or imply write ownership.
 
 ## 3. Verify validation, evidence, and limitations
 
@@ -25,7 +35,12 @@ Use this checklist before accepting a child result, advancing the accepted integ
 
 ## 4. Verify remote delivery state when applicable
 
-- If the child contract has no remote branch or PR, record `not applicable` with the reason and verify the domain-equivalent exact artifact and delivery state instead.
+- If the child contract legitimately requires no remote branch or PR, record
+  `not applicable` with the reason and verify its domain-equivalent exact
+  artifact and delivery state. If an implementation or delivery item lacks
+  publication authority, record that authority gap and verify the exact local
+  state; a local-only commit may be valid evidence, but it remains blocked at
+  publication and is not a delivered campaign result.
 - Otherwise, fetch or freshly query remote state and prove the remote branch and PR head equal the audited output HEAD.
 - Read draft or ready state, required checks, approvals, review comments, and unresolved threads for that exact head under current repository policy.
 - Confirm every actionable finding is resolved or explicitly blocks the transition.
@@ -46,7 +61,11 @@ Use an audit outcome separate from the child's campaign recommendation:
 - `RETURN`: correction or revalidation belongs in the same task/session and worktree.
 - `BLOCKED`: recovery requires new authority or unavailable external state.
 
-A verified recommendation can still be accepted, excluded, or deferred. Record the decision, exact previous and resulting accepted states, evidence, limitations, and next authorized action.
+A verified recommendation can still be accepted, excluded, or deferred. Audit
+verifies evidence, state, scope, and authority; it does not veto or reinterpret
+a direct user product or architecture decision. Record the decision, exact
+previous and resulting accepted states, evidence, limitations, and next
+authorized action.
 
 ## 7. Recover without losing ownership or provenance
 
@@ -55,6 +74,20 @@ A verified recommendation can still be accepted, excluded, or deferred. Record t
 - Do not edit, cherry-pick, rebase, commit, merge, or repair child work in the controller checkout.
 - Do not create a replacement task, worktree, branch, job, experiment, or PR without explicit authority. If replacement is approved, mark the original superseded before another task owns its branch or worktree, and preserve its evidence.
 - Retain resource locks until the owning task is safely resumed, superseded, or audited as released.
+- Preserve recovery artifacts and ownership when later user steering reopens a
+  deferred item. Do not stop or clean that worker based only on the stale audit.
+
+## 8. Reconcile campaign visibility and denominator
+
+- Update the tracker- or host-visible matrix from freshly verified task, branch,
+  PR/MR, exact-head, CI, review, and outcome state. Keep private audit detail in
+  the secondary ledger.
+- Reconcile every applicable delivery unit into exactly one delivery state:
+  delivered, blocked, deferred, or omitted. Require `omitted = 0` before
+  campaign completion and explain every blocked or deferred row.
+- Count delivery only when the team-visible artifact reached the contract's CI,
+  opposite-review, and final-head state. Never use a local commit count as the
+  delivered count.
 
 ## Audit Record
 
@@ -76,4 +109,5 @@ A verified recommendation can still be accepted, excluded, or deferred. Record t
 - Previous and resulting accepted state: [exact versions]
 - Recovery or next action: [action, owner, authority status]
 - Delivery proof, if applicable: [merge result, fetched target ref/tip, reachability evidence]
+- Visible matrix reconciliation: [row/link, applicability, delivery state]
 ```

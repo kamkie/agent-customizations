@@ -92,6 +92,21 @@ If the user clarifies that an earlier request was only a question, treat that as
 
 Design documents and proposals are not agent operating instructions unless the user explicitly designates them as such. Once implementation is authorized, continue through every in-scope step without repeated approval.
 
+## Delivery campaign trigger
+
+`Start delivery campaign <tracker>` authorizes the bounded campaign inventory,
+visible task/worktree/branch creation, local commits, remote branch pushes, draft
+pull or merge requests, their repository-gated readiness transition, tracker
+links and status updates, CI monitoring, and required opposite-agent review
+with finding fixes and re-review. Use the
+`orchestrate-work-campaigns` workflow and discover each repository's delivery
+rules at runtime.
+
+This trigger does not authorize merge or deployment. Require the user to add
+that authority explicitly, for example `merge approved changes` or an exact
+deployment instruction, and continue to enforce repository safety and
+exact-head gates.
+
 ## Calls to action
 
 Use an `Action required:` block only when work is genuinely blocked and cannot continue without a user decision, missing authority, a credential, or an external-state change. State the exact blocker and the concise decision or instruction needed. Otherwise, when a useful follow-up exists, prefer one optional `Next:` recommendation. If the work is complete and there is no useful next step, omit the call to action. Converge and recommend rather than ending with an undifferentiated menu when one option is clearly preferable.

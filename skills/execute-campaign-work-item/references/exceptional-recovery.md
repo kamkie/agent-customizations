@@ -1,8 +1,9 @@
 # Exceptional Worker Recovery
 
 Use this reference only when the normal worker path cannot continue. Preserve
-the original contract, task, worktree, branch, evidence, and ownership until the
-controller records a recovery decision.
+the task, worktree, branch, evidence, and ownership until recovery is recorded.
+Preserve the original contract unless a later direct user instruction changes
+it; that instruction follows the contract-delta protocol in `SKILL.md`.
 
 ## Starting-state or ownership mismatch
 
@@ -37,6 +38,18 @@ controller records a recovery decision.
   exact output and delivery state, and issue a replacement terminal handoff.
 - Do not assume earlier checks, reviews, or approvals still apply after a head
   change.
+
+## Direct user correction after audit or deferral
+
+- Notify the controller with the exact correction and identify every audit,
+  deferral, validation result, report row, and delivery gate it invalidates.
+- Resume the same task and owned repository when the correction is clear and
+  authorized. Do not wait for the controller to reapprove the user's decision.
+- Use verified exact-ref, read-only inputs from another repository when the
+  correction names them as authoritative; keep all writes within owned paths.
+- Preserve a prior blocked or deferred result as history, not as a veto over the
+  corrected work. Return unresolved safety, policy, ownership, or scope
+  ambiguity to the user.
 
 ## Unavailable task or irrecoverable state
 

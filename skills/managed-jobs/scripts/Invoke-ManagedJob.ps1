@@ -906,15 +906,22 @@ switch ($Action) {
                     $registeredSession.ToString('D') -eq $expectedTerminalSession
             } catch {}
             if (-not $sessionMatches) {
-                $terminationRequest = [pscustomobject]@{
-                    job = $job
-                    reason = 'Stopped because its background terminal session identity did not match.'
+                $latest = Update-ReconciledJob -Job (Read-ManagedJob -Path $jobFile)
+                if ($latest.status -ne 'running') {
+                    # Normal completion can remove the control file between the
+                    # status read and identity check. Preserve that terminal result.
+                    $job = $latest
+                } else {
+                    $terminationRequest = [pscustomobject]@{
+                        job = $latest
+                        reason = 'Stopped because its background terminal session identity did not match.'
+                    }
+                    $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
+                    if ($termination.error) {
+                        throw "The background shared-terminal host registered an unexpected pane and could not be stopped safely: $($termination.error)"
+                    }
+                    throw 'The background shared-terminal host registered an unexpected pane.'
                 }
-                $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
-                if ($termination.error) {
-                    throw "The background shared-terminal host registered an unexpected pane and could not be stopped safely: $($termination.error)"
-                }
-                throw 'The background shared-terminal host registered an unexpected pane.'
             }
         }
         $jobOutput = Add-ManagedJobIdentity -Job $job

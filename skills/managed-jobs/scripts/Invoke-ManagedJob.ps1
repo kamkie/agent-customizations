@@ -850,6 +850,12 @@ switch ($Action) {
                     if ($afterClose.status -eq 'running') {
                         $job = $afterClose
                         $backgroundCloseError = $null
+                    } elseif ($afterClose.status -eq 'starting') {
+                        # The pane may still publish a host identity. Keep the active
+                        # owner reference so turn/session cleanup can contain it.
+                        $afterClose.error = 'Background terminal host missed its startup deadline and its pane could not be confirmed closed.'
+                        Write-ManagedJob -Path $jobFile -Job $afterClose
+                        throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
                     }
                 }
                 if ($job.status -ne 'running') {

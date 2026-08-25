@@ -168,16 +168,31 @@ while ($true) {
     Assert-True (-not (Test-Path -LiteralPath $controlFile)) `
         'Explicit stop should remove shared-terminal control metadata.'
 
+    $interruptCommand = @'
+$previousControlCMode = [Console]::TreatControlCAsInput
+try {
+    [Console]::TreatControlCAsInput = $true
+    Write-Output 'interrupt-ready'
+    $pressedKey = [Console]::ReadKey($true)
+    Write-Output "interrupt-key-code=$([int]$pressedKey.KeyChar)"
+} finally {
+    [Console]::TreatControlCAsInput = $previousControlCMode
+}
+'@
     $interrupt = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-interrupt' `
-        -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output "interrupt-ready"; Start-Sleep -Seconds 30') `
+        -Executable $pwsh -Arguments @('-NoProfile', '-Command', $interruptCommand) `
         -Visible -SharedTerminal -Lifetime Persistent | Out-String) | ConvertFrom-Json
     $activeIds.Add($interrupt.id)
     $null = Wait-PanePattern -Id $interrupt.id -Pattern 'interrupt-ready'
     $null = & $controller send-key -Id $interrupt.id -StateRoot $stateRoot -Key 'Ctrl+C'
-    $interrupt = Wait-JobStatus -Id $interrupt.id -Expected @('completed', 'failed', 'orphaned') -Seconds 10
+    $interrupt = Wait-JobStatus -Id $interrupt.id -Expected @('completed', 'failed') -Seconds 10
     $activeIds.Remove($interrupt.id) | Out-Null
-    Assert-True ($interrupt.status -in @('completed', 'failed', 'orphaned')) `
-        'The named Ctrl+C key should interrupt the foreground process in the registered pane.'
+    $interruptLog = Get-Content -LiteralPath $interrupt.logPath -Raw
+    Assert-True (
+        $interrupt.status -eq 'completed' -and
+        $interruptLog -match 'interrupt-key-code=3' -and
+        $interrupt.terminalControlState -eq 'released'
+    ) 'The named Ctrl+C key should reach the foreground process without orphaning the managed host.'
 
     $orphan = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-orphan' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output "orphan-child-pid=$PID"; Start-Sleep -Seconds 30') `

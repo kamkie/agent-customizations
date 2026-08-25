@@ -57,7 +57,10 @@ Stop only after the work is complete or when the user explicitly asks:
 
 Shared-terminal mode is an explicit visible-only option. It uses the installed
 Microsoft Intelligent Terminal package and keeps every controller action scoped
-to the pane registered by that managed job:
+to the pane registered by that managed job. When Intelligent Terminal is
+already running, the controller creates the managed pane as a background tab
+without changing the user's foreground window or active pane. Otherwise it
+falls back to a foreground `wtai.exe` bootstrap:
 
 ```powershell
 $job = (& $jobs start -Name console -Executable pwsh.exe `
@@ -68,6 +71,10 @@ $job = (& $jobs start -Name console -Executable pwsh.exe `
 & $jobs send-key -Id $job.id -Key Enter
 & $jobs send-key -Id $job.id -Key 'Ctrl+C'
 ```
+
+Add `-RequireBackgroundTab` when focus must not change. It fails instead of
+performing the foreground bootstrap when no Intelligent Terminal window is
+already running.
 
 `send-input` is literal and is only for known non-secret text. Never send an
 authentication secret through the controller; the user must type it directly

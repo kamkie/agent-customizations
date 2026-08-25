@@ -13,6 +13,7 @@ param(
     [hashtable]$Environment = @{},
     [switch]$Visible,
     [switch]$SharedTerminal,
+    [switch]$RequireBackgroundTab,
     [switch]$KeepTerminalOpen,
     [ValidateSet('Auto', 'Turn', 'Session', 'Persistent')]
     [string]$Lifetime = 'Auto',
@@ -46,6 +47,9 @@ if ($Action -notin @('start', 'wait-ready') -and $readinessParametersUsed) {
 }
 if ($Action -ne 'start' -and $PSBoundParameters.ContainsKey('SharedTerminal')) {
     throw '-SharedTerminal is valid only for start.'
+}
+if ($Action -ne 'start' -and $PSBoundParameters.ContainsKey('RequireBackgroundTab')) {
+    throw '-RequireBackgroundTab is valid only for start.'
 }
 if ($Action -ne 'send-input' -and $PSBoundParameters.ContainsKey('InputText')) {
     throw '-InputText is valid only for send-input.'
@@ -344,30 +348,14 @@ function Invoke-SharedTerminalCli {
     )
 
     $tools = Resolve-IntelligentTerminalTools
-    $startInfo = [Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $tools.wtcli
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $startInfo.Environment['WT_SESSION'] = $Context.sessionId
-    $startInfo.Environment['WT_COM_CLSID'] = $Context.comClsid
-    foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add([string]$argument) }
-
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $startInfo
-    try {
-        if (-not $process.Start()) { throw 'The shared-terminal controller failed to start.' }
-        $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
-        $standardErrorTask = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit(10000)) {
-            try { $process.Kill($true) } catch {}
-            throw 'The shared-terminal controller timed out.'
-        }
-        $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
-        $standardError = $standardErrorTask.GetAwaiter().GetResult()
-        if ($process.ExitCode -ne 0) {
-            $detail = $standardError.Trim()
+    $result = Invoke-IntelligentTerminalCliProcess `
+        -Tools $tools `
+        -ComClsid $Context.comClsid `
+        -SessionId $Context.sessionId `
+        -Arguments $Arguments
+    if ($result.exitCode -ne 0) {
+        $detail = $result.standardError.Trim()
+        try {
             foreach ($privateValue in @(
                 [string]$Context.sessionId,
                 ([guid]$Context.sessionId).ToString('B'),
@@ -378,13 +366,66 @@ function Invoke-SharedTerminalCli {
                     $detail = $detail -replace [regex]::Escape($privateValue), '<redacted>'
                 }
             }
-            if ($detail.Length -gt 1000) { $detail = $detail.Substring(0, 1000) }
-            if ($detail) { throw "The shared-terminal controller failed: $detail" }
-            throw "The shared-terminal controller failed with exit code $($process.ExitCode)."
+        } catch {}
+        if ($detail.Length -gt 1000) { $detail = $detail.Substring(0, 1000) }
+        if ($detail) { throw "The shared-terminal controller failed: $detail" }
+        throw "The shared-terminal controller failed with exit code $($result.exitCode)."
+    }
+    return $result.standardOutput
+}
+
+function Get-ManagedJobHostPowerShellArguments {
+    param(
+        [Parameter(Mandatory)][string]$HostScript,
+        [Parameter(Mandatory)][string]$JobFile,
+        [Parameter(Mandatory)][string]$LaunchFile,
+        [switch]$KeepOpen
+    )
+
+    $escapeLiteral = {
+        param([string]$Value)
+        return "'" + $Value.Replace("'", "''") + "'"
+    }
+    $hostInvocation = '& {0} -JobFile {1} -LaunchFile {2}' -f
+        (& $escapeLiteral $HostScript),
+        (& $escapeLiteral $JobFile),
+        (& $escapeLiteral $LaunchFile)
+    $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($hostInvocation))
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
+    if ($KeepOpen) { $arguments += '-NoExit' }
+    return $arguments + @('-EncodedCommand', $encodedCommand)
+}
+
+function Start-ManagedJobBackgroundTerminalTab {
+    param(
+        [Parameter(Mandatory)]$Connection,
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$WorkingDirectory,
+        [Parameter(Mandatory)][string[]]$PowerShellArguments
+    )
+
+    $commandLine = (@('pwsh.exe') + $PowerShellArguments) -join ' '
+    $result = Invoke-IntelligentTerminalCliProcess `
+        -Tools $Connection.tools `
+        -ComClsid $Connection.comClsid `
+        -Arguments @(
+            '--json', 'new-tab',
+            '--command', $commandLine,
+            '--title', $Name,
+            '--cwd', $WorkingDirectory
+        )
+    if ($result.exitCode -ne 0) {
+        throw 'The background shared-terminal tab failed to launch.'
+    }
+    try {
+        $payload = $result.standardOutput | ConvertFrom-Json
+        $sessionId = [guid]::Empty
+        if (-not [guid]::TryParse([string]$payload.session_id, [ref]$sessionId)) {
+            throw 'missing session identifier'
         }
-        return $standardOutput
-    } finally {
-        $process.Dispose()
+        return $sessionId.ToString('D')
+    } catch {
+        throw 'The background shared-terminal tab returned an invalid result.'
     }
 }
 
@@ -536,11 +577,29 @@ switch ($Action) {
         if (-not $Executable) { throw '-Executable is required for start.' }
         if ($KeepTerminalOpen -and -not $Visible) { throw '-KeepTerminalOpen requires -Visible.' }
         if ($SharedTerminal -and -not $Visible) { throw '-SharedTerminal requires -Visible.' }
+        if ($RequireBackgroundTab -and -not $SharedTerminal) {
+            throw '-RequireBackgroundTab requires -SharedTerminal.'
+        }
         if ($PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds') -and -not $ReadinessUri) {
             throw '-ReadinessTimeoutSeconds requires -ReadinessUri.'
         }
         $resolvedReadinessUri = if ($ReadinessUri) { Resolve-ManagedJobReadinessUri -Uri $ReadinessUri } else { $null }
         $terminalTools = if ($SharedTerminal) { Resolve-IntelligentTerminalTools } else { $null }
+        $backgroundTerminalConnection = if ($SharedTerminal) {
+            Get-LiveIntelligentTerminalConnection -Tools $terminalTools
+        } else {
+            $null
+        }
+        if ($RequireBackgroundTab -and -not $backgroundTerminalConnection) {
+            throw '-RequireBackgroundTab needs an already-running Microsoft Intelligent Terminal window.'
+        }
+        $sharedTerminalLaunchMode = if (-not $SharedTerminal) {
+            $null
+        } elseif ($backgroundTerminalConnection) {
+            'background-tab'
+        } else {
+            'foreground-bootstrap'
+        }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
         $resolvedOwnerAgent = if ($OwnerAgent) {
             $OwnerAgent.Trim().ToLowerInvariant()
@@ -582,6 +641,7 @@ switch ($Action) {
         $launchFile = $null
         $jobFile = $null
         $jobId = $null
+        $expectedTerminalSession = $null
         try {
             $deadline = [datetime]::UtcNow.AddSeconds(10)
             do {
@@ -638,6 +698,7 @@ switch ($Action) {
                 $job['sharedTerminal'] = $true
                 $job['terminalPackageVersion'] = $terminalTools.packageVersion
                 $job['terminalControlState'] = 'pending'
+                $job['terminalLaunchMode'] = $sharedTerminalLaunchMode
             }
             $launch = [ordered]@{
                 executable = $Executable
@@ -650,16 +711,36 @@ switch ($Action) {
             $hostScript = Join-Path $PSScriptRoot 'ManagedJob.Host.ps1'
 
             if ($Visible) {
-                $terminalExecutable = if ($SharedTerminal) {
-                    $terminalTools.wtai
+                $pwshArguments = if ($SharedTerminal) {
+                    Get-ManagedJobHostPowerShellArguments `
+                        -HostScript $hostScript `
+                        -JobFile $jobFile `
+                        -LaunchFile $launchFile `
+                        -KeepOpen:$KeepTerminalOpen
                 } else {
-                    (Get-Command wt.exe -ErrorAction Stop).Source
+                    $ordinaryVisibleArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
+                    if ($KeepTerminalOpen) { $ordinaryVisibleArguments += '-NoExit' }
+                    $ordinaryVisibleArguments + @(
+                        '-File', ('"' + $hostScript + '"'),
+                        '-JobFile', ('"' + $jobFile + '"'),
+                        '-LaunchFile', ('"' + $launchFile + '"')
+                    )
                 }
-                $pwshArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
-                if ($KeepTerminalOpen) { $pwshArguments += '-NoExit' }
-                $pwshArguments += @('-File', ('"' + $hostScript + '"'), '-JobFile', ('"' + $jobFile + '"'), '-LaunchFile', ('"' + $launchFile + '"'))
-                $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
-                Start-Process -FilePath $terminalExecutable -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
+                if ($SharedTerminal -and $backgroundTerminalConnection) {
+                    $expectedTerminalSession = Start-ManagedJobBackgroundTerminalTab `
+                        -Connection $backgroundTerminalConnection `
+                        -Name $Name `
+                        -WorkingDirectory $resolvedDirectory `
+                        -PowerShellArguments $pwshArguments
+                } else {
+                    $terminalExecutable = if ($SharedTerminal) {
+                        $terminalTools.wtai
+                    } else {
+                        (Get-Command wt.exe -ErrorAction Stop).Source
+                    }
+                    $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
+                    Start-Process -FilePath $terminalExecutable -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
+                }
             } else {
                 # Start-Process -WindowStyle Hidden is ignored when Windows Terminal is
                 # the default terminal app, so hidden hosts launch with CreateNoWindow.
@@ -704,6 +785,26 @@ switch ($Action) {
         # delete its launch handoff from a stale read; reconciliation owns the 30-second
         # unclaimed-start timeout and cleans the launch file when it marks an orphan.
         if ($job.status -eq 'starting') { $job = Read-ManagedJob -Path $jobFile }
+        if ($expectedTerminalSession -and $job.status -eq 'running') {
+            $registeredSession = [guid]::Empty
+            $sessionMatches = $false
+            try {
+                $control = Read-ManagedJob -Path (Get-ManagedJobControlFile -Id $job.id)
+                $sessionMatches = [guid]::TryParse([string]$control.wtSession, [ref]$registeredSession) -and
+                    $registeredSession.ToString('D') -eq $expectedTerminalSession
+            } catch {}
+            if (-not $sessionMatches) {
+                $terminationRequest = [pscustomobject]@{
+                    job = $job
+                    reason = 'Stopped because its background terminal session identity did not match.'
+                }
+                $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
+                if ($termination.error) {
+                    throw "The background shared-terminal host registered an unexpected pane and could not be stopped safely: $($termination.error)"
+                }
+                throw 'The background shared-terminal host registered an unexpected pane.'
+            }
+        }
         $jobOutput = Add-ManagedJobIdentity -Job $job
         if ($resolvedReadinessUri) {
             try {

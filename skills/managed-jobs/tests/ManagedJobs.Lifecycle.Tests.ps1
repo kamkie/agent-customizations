@@ -127,6 +127,13 @@ try {
     } catch { $hiddenSharedRejected = $_.Exception.Message -match 'requires -Visible' }
     Assert-True $hiddenSharedRejected 'SharedTerminal should require visible execution.'
 
+    $backgroundWithoutSharedRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'invalid-background-without-shared' `
+            -Executable $pwsh -Visible -RequireBackgroundTab | Out-Null
+    } catch { $backgroundWithoutSharedRejected = $_.Exception.Message -match 'requires -SharedTerminal' }
+    Assert-True $backgroundWithoutSharedRejected 'RequireBackgroundTab should require shared-terminal mode.'
+
     # The host must return instead of propagating the child exit when -NoExit is
     # responsible for keeping a visible terminal open. The durable record retains
     # the real child result.

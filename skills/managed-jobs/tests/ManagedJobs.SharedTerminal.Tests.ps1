@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$RequireUserInput
+    [switch]$RequireUserInput,
+    [switch]$AllowForegroundBootstrap
 )
 
 $ErrorActionPreference = 'Stop'
@@ -73,6 +74,32 @@ function Wait-ProcessExit {
     return $false
 }
 
+function Get-ForegroundWindowHandle {
+    if (-not ('ManagedJobsSharedTerminalNative' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class ManagedJobsSharedTerminalNative
+{
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+}
+'@
+    }
+    return [ManagedJobsSharedTerminalNative]::GetForegroundWindow().ToInt64()
+}
+
+function Get-ActiveTerminalSession {
+    param([Parameter(Mandatory)]$Connection)
+    $result = Invoke-IntelligentTerminalCliProcess `
+        -Tools $Connection.tools `
+        -ComClsid $Connection.comClsid `
+        -Arguments @('--json', 'active-pane')
+    if ($result.exitCode -ne 0) { throw 'Unable to inspect the active Intelligent Terminal pane.' }
+    $payload = $result.standardOutput | ConvertFrom-Json
+    return [string]$payload.session_id
+}
+
 try {
     $null = New-Item -ItemType Directory -Path $stateRoot -Force
     Set-ManagedJobStateRoot -Path $stateRoot
@@ -83,11 +110,37 @@ try {
     $env:MANAGED_JOBS_ROOT = $stateRoot
 
     $tools = Resolve-IntelligentTerminalTools
+    $backgroundConnection = Get-LiveIntelligentTerminalConnection -Tools $tools
     Assert-True (
         (Split-Path -Leaf $tools.wtai) -eq 'wtai.exe' -and
         (Split-Path -Leaf $tools.wtcli) -eq 'wtcli.exe' -and
         [version]$tools.packageVersion -ge [version]'0.2.2192.0'
     ) 'Shared-terminal tools should resolve from the installed Microsoft package.'
+    if (-not $backgroundConnection -and -not $AllowForegroundBootstrap) {
+        $backgroundRequirementRejected = $false
+        try {
+            & $controller start -StateRoot $stateRoot -Name 'background-required-without-window' `
+                -Executable $pwsh -Visible -SharedTerminal -RequireBackgroundTab | Out-Null
+        } catch {
+            $backgroundRequirementRejected = $_.Exception.Message -match 'already-running Microsoft Intelligent Terminal window'
+        }
+        Assert-True $backgroundRequirementRejected `
+            'RequireBackgroundTab should reject a focus-stealing cold bootstrap.'
+        [pscustomobject]@{
+            result = 'skipped'
+            reason = 'No running Microsoft Intelligent Terminal window; refusing a focus-stealing cold bootstrap.'
+            assertions = $assertionCount
+            packageVersion = $tools.packageVersion
+        } | ConvertTo-Json
+        return
+    }
+    $backgroundOnlyParameters = if ($AllowForegroundBootstrap) { @{} } else { @{ RequireBackgroundTab = $true } }
+    $foregroundBefore = if ($backgroundConnection) { Get-ForegroundWindowHandle } else { $null }
+    $activeSessionBefore = if ($backgroundConnection) {
+        Get-ActiveTerminalSession -Connection $backgroundConnection
+    } else {
+        $null
+    }
 
     $interactiveCommand = @'
 Write-Output "shared-child-pid=$PID"
@@ -107,13 +160,22 @@ while ($true) {
 '@
     $shared = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-interactive' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', $interactiveCommand) `
-        -Visible -SharedTerminal | Out-String) | ConvertFrom-Json
+        -Visible -SharedTerminal @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($shared.id)
     $shared = Wait-JobStatus -Id $shared.id -Expected @('running')
     Assert-True ($shared.schemaVersion -eq 4 -and $shared.visible -and $shared.sharedTerminal) `
         'Shared-terminal launch should use the durable opt-in schema.'
     Assert-True ($shared.processContainment -eq 'windows-job-object-kill-on-close') `
         'The in-pane host should retain Windows Job Object containment.'
+    if ($backgroundConnection) {
+        Assert-True ($shared.terminalLaunchMode -eq 'background-tab') `
+            'A live Intelligent Terminal should use background-tab launch mode.'
+        Assert-True ((Get-ForegroundWindowHandle) -eq $foregroundBefore) `
+            'Background-tab launch must not change the foreground window.'
+        Assert-True (
+            (Get-ActiveTerminalSession -Connection $backgroundConnection) -eq $activeSessionBefore
+        ) 'Background-tab launch must leave the user active pane unchanged.'
+    }
 
     $controlFile = Get-ManagedJobControlFile -Id $shared.id
     Assert-True (Test-Path -LiteralPath $controlFile -PathType Leaf) `
@@ -196,7 +258,7 @@ try {
 '@
     $interrupt = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-interrupt' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', $interruptCommand) `
-        -Visible -SharedTerminal -Lifetime Persistent | Out-String) | ConvertFrom-Json
+        -Visible -SharedTerminal -Lifetime Persistent @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($interrupt.id)
     $null = Wait-PanePattern -Id $interrupt.id -Pattern 'interrupt-ready'
     $null = & $controller send-key -Id $interrupt.id -StateRoot $stateRoot -Key 'Ctrl+C'
@@ -211,7 +273,7 @@ try {
 
     $orphan = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-orphan' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output "orphan-child-pid=$PID"; Start-Sleep -Seconds 30') `
-        -Visible -SharedTerminal -Lifetime Persistent | Out-String) | ConvertFrom-Json
+        -Visible -SharedTerminal -Lifetime Persistent @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($orphan.id)
     $orphan = Wait-JobStatus -Id $orphan.id -Expected @('running')
     $orphanControlFile = Get-ManagedJobControlFile -Id $orphan.id
@@ -228,7 +290,7 @@ try {
 
     $turnOwned = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-turn-cleanup' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output "turn-child-pid=$PID"; Start-Sleep -Seconds 30') `
-        -Visible -SharedTerminal | Out-String) | ConvertFrom-Json
+        -Visible -SharedTerminal @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($turnOwned.id)
     $turnOwned = Wait-JobStatus -Id $turnOwned.id -Expected @('running')
     $turnChildPid = Wait-LoggedProcessId -LogPath $turnOwned.logPath -Pattern 'turn-child-pid=(\d+)'
@@ -245,7 +307,7 @@ try {
 
     $sessionOwned = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-session-cleanup' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output "session-child-pid=$PID"; Start-Sleep -Seconds 30') `
-        -Visible -SharedTerminal -Lifetime Session | Out-String) | ConvertFrom-Json
+        -Visible -SharedTerminal -Lifetime Session @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($sessionOwned.id)
     $sessionOwned = Wait-JobStatus -Id $sessionOwned.id -Expected @('running')
     $sessionChildPid = Wait-LoggedProcessId -LogPath $sessionOwned.logPath -Pattern 'session-child-pid=(\d+)'

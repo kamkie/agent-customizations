@@ -268,7 +268,11 @@ function Resolve-IntelligentTerminalTools {
 
     $packageRoot = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath([string]$package.InstallLocation))
     $packagePrefix = $packageRoot + [IO.Path]::DirectorySeparatorChar
-    $resolved = [ordered]@{ packageVersion = [string]$package.Version }
+    $resolved = [ordered]@{
+        packageVersion = [string]$package.Version
+        packageRoot = $packageRoot
+        comClsid = '{A2E4F6B8-1C3D-4E5F-A6B7-C8D9E0F1A2B3}'
+    }
     foreach ($leaf in @('wtai.exe', 'wtcli.exe')) {
         $candidate = [IO.Path]::GetFullPath((Join-Path $packageRoot $leaf))
         if (-not $candidate.StartsWith($packagePrefix, [StringComparison]::OrdinalIgnoreCase) -or
@@ -278,6 +282,96 @@ function Resolve-IntelligentTerminalTools {
         $resolved[[IO.Path]::GetFileNameWithoutExtension($leaf)] = $candidate
     }
     return [pscustomobject]$resolved
+}
+
+function Invoke-IntelligentTerminalCliProcess {
+    param(
+        [Parameter(Mandatory)]$Tools,
+        [Parameter(Mandatory)][string]$ComClsid,
+        [string]$SessionId,
+        [Parameter(Mandatory)][string[]]$Arguments,
+        [ValidateRange(1, 30)][int]$TimeoutSeconds = 10
+    )
+
+    $parsedComClsid = [guid]::Empty
+    if (-not [guid]::TryParse($ComClsid, [ref]$parsedComClsid)) {
+        throw 'The Intelligent Terminal COM identifier is invalid.'
+    }
+    if ($SessionId) {
+        $parsedSessionId = [guid]::Empty
+        if (-not [guid]::TryParse($SessionId, [ref]$parsedSessionId)) {
+            throw 'The Intelligent Terminal session identifier is invalid.'
+        }
+    }
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $Tools.wtcli
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.Environment['WT_COM_CLSID'] = $parsedComClsid.ToString('B')
+    if ($SessionId) { $startInfo.Environment['WT_SESSION'] = $parsedSessionId.ToString('D') }
+    foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add([string]$argument) }
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) { throw 'The Intelligent Terminal CLI failed to start.' }
+        $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+        $standardErrorTask = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            try { $process.Kill($true) } catch {}
+            throw 'The Intelligent Terminal CLI timed out.'
+        }
+        return [pscustomobject]@{
+            exitCode = $process.ExitCode
+            standardOutput = $standardOutputTask.GetAwaiter().GetResult()
+            standardError = $standardErrorTask.GetAwaiter().GetResult()
+        }
+    } finally {
+        $process.Dispose()
+    }
+}
+
+function Get-LiveIntelligentTerminalConnection {
+    param([Parameter(Mandatory)]$Tools)
+
+    $packagePrefix = [IO.Path]::TrimEndingDirectorySeparator(
+        [IO.Path]::GetFullPath([string]$Tools.packageRoot)
+    ) + [IO.Path]::DirectorySeparatorChar
+    $packageProcess = Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
+        Where-Object {
+            try {
+                $_.Path -and
+                [IO.Path]::GetFullPath([string]$_.Path).StartsWith(
+                    $packagePrefix,
+                    [StringComparison]::OrdinalIgnoreCase
+                )
+            } catch {
+                $false
+            }
+        } |
+        Select-Object -First 1
+    if (-not $packageProcess) { return $null }
+
+    try {
+        $probe = Invoke-IntelligentTerminalCliProcess `
+            -Tools $Tools `
+            -ComClsid $Tools.comClsid `
+            -Arguments @('--json', 'list-windows')
+        if ($probe.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
+            return $null
+        }
+        $payload = $probe.standardOutput | ConvertFrom-Json
+        if (@($payload.windows).Count -eq 0) { return $null }
+        return [pscustomobject]@{
+            tools = $Tools
+            comClsid = ([guid]$Tools.comClsid).ToString('B')
+        }
+    } catch {
+        return $null
+    }
 }
 
 function Get-InvocationFingerprint {

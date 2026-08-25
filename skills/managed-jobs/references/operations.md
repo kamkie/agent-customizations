@@ -57,6 +57,14 @@ its `WT_SESSION` and `WT_COM_CLSID` in the job's separate local control file.
 Those identifiers are never returned by `start` or `status` and are never
 written to the ordinary managed log.
 
+If that exact package already has a live window, shared launch uses its packaged
+`wtcli new-tab` protocol path. Version 0.2 creates protocol tabs in the
+background, so the user's foreground window and active pane remain unchanged.
+The controller verifies the returned session id against the session registered
+by the managed host. With no live window, shared launch uses `wtai.exe` as a
+foreground bootstrap. Add `-RequireBackgroundTab` to reject that cold-start
+fallback when focus preservation is mandatory.
+
 The controller accepts only the managed job id. `capture`, `send-input`, and
 `send-key` load and validate that job's host identity, Job Object containment,
 and registered control file before invoking the packaged CLI. They never accept
@@ -79,7 +87,9 @@ Terminal windows are allowed:
 
 ```powershell
 pwsh ./skills/managed-jobs/tests/ManagedJobs.SharedTerminal.Tests.ps1
-# Add -RequireUserInput to verify direct non-secret user typing in the pane.
+# The default run skips if no live window exists, so it never cold-starts into focus.
+# Add -AllowForegroundBootstrap only for an explicitly attended cold-start run.
+# Add -RequireUserInput to verify direct non-secret user typing after selecting the background tab.
 ```
 
 ## Duplicate detection

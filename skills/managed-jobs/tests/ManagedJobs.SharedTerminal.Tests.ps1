@@ -110,7 +110,13 @@ try {
     $env:MANAGED_JOBS_ROOT = $stateRoot
 
     $tools = Resolve-IntelligentTerminalTools
-    $backgroundConnection = Get-LiveIntelligentTerminalConnection -Tools $tools
+    $backgroundProbeError = $null
+    try {
+        $backgroundConnection = Get-LiveIntelligentTerminalConnection -Tools $tools
+    } catch {
+        $backgroundConnection = $null
+        $backgroundProbeError = $_.Exception.Message
+    }
     Assert-True (
         (Split-Path -Leaf $tools.wtai) -eq 'wtai.exe' -and
         (Split-Path -Leaf $tools.wtcli) -eq 'wtcli.exe' -and
@@ -129,13 +135,20 @@ try {
             & $controller start -StateRoot $stateRoot -Name 'background-required-without-window' `
                 -Executable $pwsh -Visible -SharedTerminal -RequireBackgroundTab | Out-Null
         } catch {
-            $backgroundRequirementRejected = $_.Exception.Message -match 'already-running Microsoft Intelligent Terminal window'
+            $backgroundRequirementRejected = $_.Exception.Message -match (
+                'already-running Microsoft Intelligent Terminal window|' +
+                'could not be verified; refusing a focus-stealing foreground fallback'
+            )
         }
         Assert-True $backgroundRequirementRejected `
             'RequireBackgroundTab should reject a focus-stealing cold bootstrap.'
         [pscustomobject]@{
             result = 'skipped'
-            reason = 'No running Microsoft Intelligent Terminal window; refusing a focus-stealing cold bootstrap.'
+            reason = if ($backgroundProbeError) {
+                'A running Microsoft Intelligent Terminal process was not protocol-ready; refusing a focus-stealing fallback.'
+            } else {
+                'No running Microsoft Intelligent Terminal window; refusing a focus-stealing cold bootstrap.'
+            }
             assertions = $assertionCount
             packageVersion = $tools.packageVersion
         } | ConvertTo-Json

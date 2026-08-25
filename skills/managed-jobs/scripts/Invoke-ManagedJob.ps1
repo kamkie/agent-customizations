@@ -495,6 +495,9 @@ function Stop-ManagedJobTrees {
                 $current = $target.outcome.job
                 if ($target.recordUnavailable) {
                     $current.status = 'stopped'
+                    if ($current.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$current.sharedTerminal) {
+                        $current.terminalControlState = 'released'
+                    }
                     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                     $current.exitCode = $null
                     $current.error = $target.reason

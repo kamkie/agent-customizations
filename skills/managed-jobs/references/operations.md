@@ -47,6 +47,41 @@ Add `-KeepTerminalOpen` only when the user wants the terminal to remain open
 after completion. The user must close that terminal manually; `stop` manages
 active jobs and does not close a kept-open terminal after its job is complete.
 
+### Shared terminal
+
+Add `-SharedTerminal` only with `-Visible` when both the user and agent need the
+same managed pane. Shared mode resolves `wtai.exe` and `wtcli.exe` directly from
+the installed `Microsoft.IntelligentTerminal` Store package (version
+0.2.2192.0 or newer); it does not trust a PATH alias. The in-pane host records
+its `WT_SESSION` and `WT_COM_CLSID` in the job's separate local control file.
+Those identifiers are never returned by `start` or `status` and are never
+written to the ordinary managed log.
+
+The controller accepts only the managed job id. `capture`, `send-input`, and
+`send-key` load and validate that job's host identity, Job Object containment,
+and registered control file before invoking the packaged CLI. They never accept
+an arbitrary pane id or use the focused pane. Capture is limited to 1-500 lines.
+Literal input is passed without shell interpretation, and named keys are limited
+to `Enter`, `Tab`, `Escape`, `Backspace`, and `Ctrl+C`.
+
+Pane content is sensitive. Do not store captures or paste them into ordinary
+logs. Never send credentials with `send-input`; leave an authentication prompt
+visible for the user to answer directly, and do not poll capture while that
+secret prompt is waiting. Resume capture only after the user says the secret
+entry is complete.
+
+Normal completion, explicit stop, turn/session cleanup, failed launch, prune,
+and orphan reconciliation remove the job-scoped control file. Control metadata
+does not survive as a general pane registry.
+
+Run the focused integration test on a desktop session where visible Windows
+Terminal windows are allowed:
+
+```powershell
+pwsh ./skills/managed-jobs/tests/ManagedJobs.SharedTerminal.Tests.ps1
+# Add -RequireUserInput to verify direct non-secret user typing in the pane.
+```
+
 ## Duplicate detection
 
 Equivalent active invocations are rejected using a stable fingerprint under a

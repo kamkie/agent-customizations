@@ -121,6 +121,12 @@ try {
     } catch { $hiddenKeepOpenRejected = $_.Exception.Message -match 'requires -Visible' }
     Assert-True $hiddenKeepOpenRejected 'KeepTerminalOpen should require visible execution.'
 
+    $hiddenSharedRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'invalid-hidden-shared' -Executable $pwsh -SharedTerminal | Out-Null
+    } catch { $hiddenSharedRejected = $_.Exception.Message -match 'requires -Visible' }
+    Assert-True $hiddenSharedRejected 'SharedTerminal should require visible execution.'
+
     # The host must return instead of propagating the child exit when -NoExit is
     # responsible for keeping a visible terminal open. The durable record retains
     # the real child result.
@@ -148,7 +154,9 @@ try {
     $completed = Wait-JobStatus -Id $completed.id -Expected @('completed')
     $recordText = Get-Content -LiteralPath (Join-Path $stateRoot "jobs\$($completed.id).json") -Raw
     Assert-True ($recordText -notmatch 'lifecycle-ok|not-recorded|Lifecycle Test') 'Permanent records must omit argument text and environment values.'
-    Assert-True ($completed.schemaVersion -eq 3) 'New records should use schema version 3.'
+    Assert-True ($completed.schemaVersion -eq 3) 'Existing start callers should retain schema version 3.'
+    Assert-True ($completed.PSObject.Properties.Name -notcontains 'sharedTerminal') `
+        'Existing start callers should retain their durable record shape.'
     Assert-True ($completed.ownerAgent -eq 'codex' -and $completed.ownerSessionId -eq $testSessionId) 'Codex records should capture their owning session even when a Claude session id is inherited.'
     Assert-True ($completed.lifetime -eq 'turn') 'Codex Auto lifetime should resolve to turn.'
     Assert-True ($completed.processContainment -eq 'windows-job-object-kill-on-close') 'Managed hosts should enable Windows process-tree containment.'
@@ -378,6 +386,12 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
         try { Assert-SecretSafeInvocation -Arguments @() -Environment @{ $safeKey = 'configuration' } } catch { $safeAccepted = $false }
         Assert-True $safeAccepted "Benign environment key should not be rejected: $safeKey"
     }
+    $terminalSecretRejected = $false
+    try { Assert-SharedTerminalInputSafe -InputText 'api-token=do-not-send' } catch { $terminalSecretRejected = $true }
+    Assert-True $terminalSecretRejected 'Shared-terminal input should reject likely credential material.'
+    $terminalMarkerAccepted = $true
+    try { Assert-SharedTerminalInputSafe -InputText 'run-safe-marker' } catch { $terminalMarkerAccepted = $false }
+    Assert-True $terminalMarkerAccepted 'Shared-terminal input should accept ordinary non-secret literal text.'
     $firstFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments @('-NoProfile') -WorkingDirectory (Get-Location).Path -Environment @{ PORT = '3000' }
     $secondFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments @('-NoProfile') -WorkingDirectory (Get-Location).Path -Environment @{ PORT = '4000' }
     Assert-True ($firstFingerprint -ne $secondFingerprint) 'Environment values should distinguish invocation fingerprints.'
@@ -532,6 +546,8 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
         logPath = (Join-Path $stateRoot "logs\$orphanId.log"); exitCode = $null; error = $null
     }
     $orphanRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$orphanId.json") -Encoding utf8
+    @{ schemaVersion = 1; jobId = $orphanId; hostPid = 2147483647; wtSession = [guid]::NewGuid(); wtComClsid = [guid]::NewGuid() } |
+        ConvertTo-Json | Set-Content -LiteralPath (Get-ManagedJobControlFile -Id $orphanId) -Encoding utf8
     $staleId = '20000101-000000-lifecycle-stale-start-000001'
     $staleLaunch = Join-Path $stateRoot "launch\$staleId.json"
     $staleRecord = [ordered]@{
@@ -547,6 +563,8 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     $orphan = @($orphanSummary.jobs | Where-Object id -eq $orphanId)[0]
     Assert-True ($orphan.status -eq 'orphaned') 'Reconcile should mark a missing recorded host orphaned.'
     Assert-True (-not $orphan.processIdentity.matches) 'Orphan inspection should preserve and report identity mismatch.'
+    Assert-True (-not (Test-Path -LiteralPath (Get-ManagedJobControlFile -Id $orphanId))) `
+        'Orphan reconciliation should remove stale shared-terminal control metadata.'
     Assert-True (@($orphanSummary.jobs).id -contains $staleId) 'Reconcile should orphan a stale unclaimed start after its grace period.'
     Assert-True (-not (Test-Path -LiteralPath $staleLaunch)) 'Orphan reconciliation should remove an unclaimed launch handoff.'
 

@@ -1,6 +1,6 @@
 ---
 name: managed-jobs
-description: Contain, run, verify readiness, inspect, recover, and stop long-running local processes on Windows with explicit lifetimes, durable state, and logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote-service health monitoring, or work that should remain attached to the active tool call.
+description: Contain, run, verify readiness, inspect, interact with opt-in visible shared terminals, recover, and stop long-running local processes on Windows with explicit lifetimes, durable state, and logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote-service health monitoring, or work that should remain attached to the active tool call.
 ---
 
 # Managed Jobs
@@ -36,6 +36,8 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
   no credentials, query, or fragment.
 - Treat arguments, environment entries, records, and logs as non-secret.
 - Use visible Windows Terminal mode only when the user asks to watch the output.
+- Use shared-terminal mode only when the user needs bidirectional collaboration
+  in that visible managed pane.
 - Never replace the controller with direct detached/background process commands.
 - When a hook denies a background or detached launch, start a managed job; a
   foreground retry bounded by a tool-call timeout is not an acceptable
@@ -51,8 +53,32 @@ Stop only after the work is complete or when the user explicitly asks:
 & $jobs stop -Id <job-id>
 ```
 
+## Shared terminal
+
+Shared-terminal mode is an explicit visible-only option. It uses the installed
+Microsoft Intelligent Terminal package and keeps every controller action scoped
+to the pane registered by that managed job:
+
+```powershell
+$job = (& $jobs start -Name console -Executable pwsh.exe `
+    -Arguments @('-NoProfile') -WorkingDirectory $repo `
+    -Visible -SharedTerminal | Out-String) | ConvertFrom-Json
+& $jobs capture -Id $job.id -MaxLines 80
+& $jobs send-input -Id $job.id -InputText 'Get-Location'
+& $jobs send-key -Id $job.id -Key Enter
+& $jobs send-key -Id $job.id -Key 'Ctrl+C'
+```
+
+`send-input` is literal and is only for known non-secret text. Never send an
+authentication secret through the controller; the user must type it directly
+in the visible terminal. Do not automatically capture while a secret prompt is
+waiting for user input. Treat all captured pane output as sensitive: return it
+only to the active task and never copy it into a job record, ordinary managed
+log, or other durable artifact.
+
 Read [operations.md](references/operations.md) for shared state roots, secret
-handling, structured recovery, identity checks, visible options, and pruning.
+handling, structured recovery, identity checks, visible and shared-terminal
+options, and pruning.
 
 ## HTTP readiness
 

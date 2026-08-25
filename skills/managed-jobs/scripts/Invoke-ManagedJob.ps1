@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory)]
-    [ValidateSet('start', 'list', 'status', 'wait-ready', 'logs', 'stop', 'cleanup', 'reconcile', 'prune')]
+    [ValidateSet('start', 'list', 'status', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'prune')]
     [string]$Action,
 
     [string]$Id,
@@ -12,6 +12,7 @@ param(
     [string]$WorkingDirectory = (Get-Location).Path,
     [hashtable]$Environment = @{},
     [switch]$Visible,
+    [switch]$SharedTerminal,
     [switch]$KeepTerminalOpen,
     [ValidateSet('Auto', 'Turn', 'Session', 'Persistent')]
     [string]$Lifetime = 'Auto',
@@ -24,6 +25,12 @@ param(
     [int]$ReadinessTimeoutSeconds = 30,
     [int]$Tail = 100,
     [switch]$Follow,
+    [AllowEmptyString()]
+    [string]$InputText,
+    [ValidateSet('Enter', 'Tab', 'Escape', 'Backspace', 'Ctrl+C')]
+    [string[]]$Key,
+    [ValidateRange(1, 500)]
+    [int]$MaxLines = 100,
     [int]$OlderThanDays = 14,
     [string]$StateRoot,
     [ValidateSet('starting', 'running', 'completed', 'failed', 'stopped', 'orphaned', 'invalid')]
@@ -36,6 +43,18 @@ $readinessParametersUsed = $PSBoundParameters.ContainsKey('ReadinessUri') -or
     $PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds')
 if ($Action -notin @('start', 'wait-ready') -and $readinessParametersUsed) {
     throw '-ReadinessUri and -ReadinessTimeoutSeconds are valid only for start and wait-ready.'
+}
+if ($Action -ne 'start' -and $PSBoundParameters.ContainsKey('SharedTerminal')) {
+    throw '-SharedTerminal is valid only for start.'
+}
+if ($Action -ne 'send-input' -and $PSBoundParameters.ContainsKey('InputText')) {
+    throw '-InputText is valid only for send-input.'
+}
+if ($Action -ne 'send-key' -and $PSBoundParameters.ContainsKey('Key')) {
+    throw '-Key is valid only for send-key.'
+}
+if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
+    throw '-MaxLines is valid only for capture.'
 }
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
@@ -61,9 +80,18 @@ function Get-AllManagedJobs {
     }
 }
 
+function Remove-ManagedJobControl {
+    param([Parameter(Mandatory)][string]$JobId)
+    $controlFile = Get-ManagedJobControlFile -Id $JobId
+    if (Test-Path -LiteralPath $controlFile -PathType Leaf) {
+        Remove-Item -LiteralPath $controlFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Update-ReconciledJob {
     param($Job)
     if ($Job.status -notin @('starting', 'running')) {
+        Remove-ManagedJobControl -JobId $Job.id
         try { Unregister-ManagedJobOwnerReference -Job $Job } catch {}
         return $Job
     }
@@ -79,6 +107,7 @@ function Update-ReconciledJob {
     $path = Get-ManagedJobFile -Id $Job.id
     $current = Read-ManagedJob -Path $path
     if ($current.status -notin @('starting', 'running')) {
+        Remove-ManagedJobControl -JobId $current.id
         try { Unregister-ManagedJobOwnerReference -Job $current } catch {}
         return $current
     }
@@ -92,9 +121,13 @@ function Update-ReconciledJob {
     }
     if (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc) { return $current }
     $current.status = 'orphaned'
+    if ($current.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$current.sharedTerminal) {
+        $current.terminalControlState = 'released'
+    }
     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
     $current.error = 'Recorded host process is no longer running and no terminal state was recorded.'
     Write-ManagedJob -Path $path -Job $current
+    Remove-ManagedJobControl -JobId $current.id
     Unregister-ManagedJobOwnerReference -Job $current
     $unclaimedLaunch = Join-Path (Join-Path (Get-ManagedJobRoot) 'launch') "$($Job.id).json"
     if (Test-Path -LiteralPath $unclaimedLaunch) { Remove-Item -LiteralPath $unclaimedLaunch -Force }
@@ -233,6 +266,106 @@ function Add-ManagedJobReadiness {
     return [pscustomobject]$copy
 }
 
+function Get-SharedTerminalContext {
+    param([Parameter(Mandatory)][string]$JobId)
+
+    $job = Update-ReconciledJob -Job (Read-ManagedJob -Path (Get-ManagedJobFile -Id $JobId))
+    if ($job.PSObject.Properties.Name -notcontains 'sharedTerminal' -or -not [bool]$job.sharedTerminal) {
+        throw "Job $JobId was not started in shared-terminal mode."
+    }
+    if ($job.status -ne 'running') {
+        throw "Job $JobId is not available for shared-terminal control; current status is $($job.status)."
+    }
+    if (-not (Test-ManagedProcessIdentity -ProcessId $job.hostPid -ExpectedStartTimeUtc $job.hostStartedAtUtc)) {
+        throw "Job $JobId does not have a matching managed-host identity."
+    }
+    if ($job.PSObject.Properties.Name -notcontains 'processContainment' -or
+        [string]$job.processContainment -ne 'windows-job-object-kill-on-close') {
+        throw "Job $JobId has not confirmed Windows process-tree containment."
+    }
+
+    $controlFile = Get-ManagedJobControlFile -Id $JobId
+    $control = Read-ManagedJob -Path $controlFile
+    $requiredControlProperties = @(
+        'schemaVersion', 'jobId', 'hostPid', 'hostStartedAtUtc', 'wtSession', 'wtComClsid'
+    )
+    if ($job.terminalControlState -ne 'registered' -or
+        @($requiredControlProperties | Where-Object { $control.PSObject.Properties.Name -notcontains $_ }).Count -gt 0 -or
+        [int]$control.schemaVersion -ne 1) {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
+    $terminalSession = [guid]::Empty
+    $terminalComClsid = [guid]::Empty
+    $controlStart = $null
+    try { $controlStart = [datetimeoffset]::Parse([string]$control.hostStartedAtUtc).UtcDateTime } catch {}
+    $jobStart = [datetimeoffset]::Parse([string]$job.hostStartedAtUtc).UtcDateTime
+    if ([string]$control.jobId -ne $JobId -or
+        [int]$control.hostPid -ne [int]$job.hostPid -or
+        -not $controlStart -or
+        [math]::Abs(($controlStart - $jobStart).TotalSeconds) -ge 2 -or
+        -not [guid]::TryParse([string]$control.wtSession, [ref]$terminalSession) -or
+        -not [guid]::TryParse([string]$control.wtComClsid, [ref]$terminalComClsid)) {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
+
+    return [pscustomobject]@{
+        job = $job
+        sessionId = $terminalSession.ToString('D')
+        comClsid = $terminalComClsid.ToString('B')
+    }
+}
+
+function Invoke-SharedTerminalCli {
+    param(
+        [Parameter(Mandatory)]$Context,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $tools = Resolve-IntelligentTerminalTools
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $tools.wtcli
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.Environment['WT_SESSION'] = $Context.sessionId
+    $startInfo.Environment['WT_COM_CLSID'] = $Context.comClsid
+    foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add([string]$argument) }
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) { throw 'The shared-terminal controller failed to start.' }
+        $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+        $standardErrorTask = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(10000)) {
+            try { $process.Kill($true) } catch {}
+            throw 'The shared-terminal controller timed out.'
+        }
+        $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
+        $standardError = $standardErrorTask.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            $detail = $standardError.Trim()
+            foreach ($privateValue in @(
+                [string]$Context.sessionId,
+                ([guid]$Context.sessionId).ToString('B'),
+                [string]$Context.comClsid,
+                ([guid]$Context.comClsid).ToString('D')
+            )) {
+                if ($privateValue) {
+                    $detail = $detail -replace [regex]::Escape($privateValue), '<redacted>'
+                }
+            }
+            if ($detail.Length -gt 1000) { $detail = $detail.Substring(0, 1000) }
+            if ($detail) { throw "The shared-terminal controller failed: $detail" }
+            throw "The shared-terminal controller failed with exit code $($process.ExitCode)."
+        }
+        return $standardOutput
+    } finally {
+        $process.Dispose()
+    }
+}
+
 function Write-JobCollection {
     param([object[]]$Jobs)
     $output = @(foreach ($job in @($Jobs)) {
@@ -273,15 +406,20 @@ function Stop-ManagedJobTrees {
             }
             $outcome.job = $current
             if ($current.status -notin @('starting', 'running')) {
+                Remove-ManagedJobControl -JobId $current.id
                 try { Unregister-ManagedJobOwnerReference -Job $current } catch {}
                 continue
             }
             if (-not (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc)) {
                 if ($recordUnavailable) {
                     $current.status = 'stopped'
+                    if ($current.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$current.sharedTerminal) {
+                        $current.terminalControlState = 'released'
+                    }
                     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                     $current.exitCode = $null
                     $current.error = [string]$item.reason
+                    Remove-ManagedJobControl -JobId $current.id
                     Unregister-ManagedJobOwnerReference -Job $current
                     $outcome.job = $current
                     continue
@@ -352,12 +490,16 @@ function Stop-ManagedJobTrees {
                     $current = Read-ManagedJob -Path $target.path
                     if ($current.status -in @('starting', 'running')) {
                         $current.status = 'stopped'
+                        if ($current.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$current.sharedTerminal) {
+                            $current.terminalControlState = 'released'
+                        }
                         $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                         $current.exitCode = $null
                         $current.error = $target.reason
                         Write-ManagedJob -Path $target.path -Job $current
                     }
                 }
+                Remove-ManagedJobControl -JobId $current.id
                 Unregister-ManagedJobOwnerReference -Job $current
                 $target.outcome.job = $current
             } catch {
@@ -374,10 +516,12 @@ switch ($Action) {
         if (-not $Name) { throw '-Name is required for start.' }
         if (-not $Executable) { throw '-Executable is required for start.' }
         if ($KeepTerminalOpen -and -not $Visible) { throw '-KeepTerminalOpen requires -Visible.' }
+        if ($SharedTerminal -and -not $Visible) { throw '-SharedTerminal requires -Visible.' }
         if ($PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds') -and -not $ReadinessUri) {
             throw '-ReadinessTimeoutSeconds requires -ReadinessUri.'
         }
         $resolvedReadinessUri = if ($ReadinessUri) { Resolve-ManagedJobReadinessUri -Uri $ReadinessUri } else { $null }
+        $terminalTools = if ($SharedTerminal) { Resolve-IntelligentTerminalTools } else { $null }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
         $resolvedOwnerAgent = if ($OwnerAgent) {
             $OwnerAgent.Trim().ToLowerInvariant()
@@ -418,6 +562,7 @@ switch ($Action) {
         $lock = $null
         $launchFile = $null
         $jobFile = $null
+        $jobId = $null
         try {
             $deadline = [datetime]::UtcNow.AddSeconds(10)
             do {
@@ -441,9 +586,11 @@ switch ($Action) {
             $logPath = Join-Path (Join-Path $root 'logs') "$jobId.log"
             $launchFile = Join-Path (Join-Path $root 'launch') "$jobId.json"
             $environmentObject = [ordered]@{}
-            foreach ($key in $Environment.Keys) { $environmentObject[[string]$key] = [string]$Environment[$key] }
+            foreach ($environmentKey in $Environment.Keys) {
+                $environmentObject[[string]$environmentKey] = [string]$Environment[$environmentKey]
+            }
             $job = [ordered]@{
-                schemaVersion = 3
+                schemaVersion = if ($SharedTerminal) { 4 } else { 3 }
                 id = $jobId
                 name = $Name
                 kind = $Kind
@@ -468,6 +615,11 @@ switch ($Action) {
                 exitCode = $null
                 error = $null
             }
+            if ($SharedTerminal) {
+                $job['sharedTerminal'] = $true
+                $job['terminalPackageVersion'] = $terminalTools.packageVersion
+                $job['terminalControlState'] = 'pending'
+            }
             $launch = [ordered]@{
                 executable = $Executable
                 arguments = @($Arguments)
@@ -479,12 +631,16 @@ switch ($Action) {
             $hostScript = Join-Path $PSScriptRoot 'ManagedJob.Host.ps1'
 
             if ($Visible) {
-                $wt = Get-Command wt.exe -ErrorAction Stop
+                $terminalExecutable = if ($SharedTerminal) {
+                    $terminalTools.wtai
+                } else {
+                    (Get-Command wt.exe -ErrorAction Stop).Source
+                }
                 $pwshArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
                 if ($KeepTerminalOpen) { $pwshArguments += '-NoExit' }
                 $pwshArguments += @('-File', ('"' + $hostScript + '"'), '-JobFile', ('"' + $jobFile + '"'), '-LaunchFile', ('"' + $launchFile + '"'))
                 $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
-                Start-Process -FilePath $wt.Source -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
+                Start-Process -FilePath $terminalExecutable -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
             } else {
                 # Start-Process -WindowStyle Hidden is ignored when Windows Terminal is
                 # the default terminal app, so hidden hosts launch with CreateNoWindow.
@@ -501,11 +657,15 @@ switch ($Action) {
             }
         } catch {
             if ($launchFile -and (Test-Path -LiteralPath $launchFile)) { Remove-Item -LiteralPath $launchFile -Force -ErrorAction SilentlyContinue }
+            if ($jobId) { Remove-ManagedJobControl -JobId $jobId }
             if ($jobFile -and (Test-Path -LiteralPath $jobFile)) {
                 try {
                     $failedJob = Read-ManagedJob -Path $jobFile
                     if ($failedJob.status -eq 'starting') {
                         $failedJob.status = 'failed'
+                        if ($failedJob.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$failedJob.sharedTerminal) {
+                            $failedJob.terminalControlState = 'released'
+                        }
                         $failedJob.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                         $failedJob.error = 'Managed host launch failed before startup completed.'
                         Write-ManagedJob -Path $jobFile -Job $failedJob
@@ -595,6 +755,52 @@ switch ($Action) {
             throw "Log does not exist yet: $($job.logPath)"
         }
         Get-Content -LiteralPath $job.logPath -Tail $Tail -Wait:$Follow
+    }
+    'capture' {
+        if (-not $Id) { throw '-Id is required for capture.' }
+        $context = Get-SharedTerminalContext -JobId $Id
+        $captured = Invoke-SharedTerminalCli -Context $context -Arguments @(
+            'capture-pane', '--target', $context.sessionId, '--max-lines', [string]$MaxLines
+        )
+        Write-Output -NoEnumerate $captured
+    }
+    'send-input' {
+        if (-not $Id) { throw '-Id is required for send-input.' }
+        if (-not $PSBoundParameters.ContainsKey('InputText')) { throw '-InputText is required for send-input.' }
+        Assert-SharedTerminalInputSafe -InputText $InputText
+        $context = Get-SharedTerminalContext -JobId $Id
+        $null = Invoke-SharedTerminalCli -Context $context -Arguments @(
+            'send-keys', '--target', $context.sessionId, '--raw', '--', $InputText
+        )
+        [pscustomobject]@{
+            id = $Id
+            action = 'send-input'
+            sent = $true
+            characterCount = $InputText.Length
+        } | ConvertTo-Json
+    }
+    'send-key' {
+        if (-not $Id) { throw '-Id is required for send-key.' }
+        if (-not $Key -or $Key.Count -eq 0) { throw '-Key is required for send-key.' }
+        $keyTokens = @($Key | ForEach-Object {
+            switch ($_) {
+                'Enter' { 'Enter' }
+                'Tab' { 'Tab' }
+                'Escape' { 'Escape' }
+                'Backspace' { 'BSpace' }
+                'Ctrl+C' { 'C-c' }
+            }
+        })
+        $context = Get-SharedTerminalContext -JobId $Id
+        $null = Invoke-SharedTerminalCli -Context $context -Arguments (
+            @('send-keys', '--target', $context.sessionId) + $keyTokens
+        )
+        [pscustomobject]@{
+            id = $Id
+            action = 'send-key'
+            sent = $true
+            keyCount = $keyTokens.Count
+        } | ConvertTo-Json
     }
     'stop' {
         if (-not $Id) { throw '-Id is required for stop.' }
@@ -722,6 +928,7 @@ switch ($Action) {
             $candidates += $job.id
             if ($PSCmdlet.ShouldProcess($job.id, 'Remove terminal managed-job record and its managed log')) {
                 try { Unregister-ManagedJobOwnerReference -Job $job } catch {}
+                Remove-ManagedJobControl -JobId $job.id
                 $record = Get-ManagedJobFile -Id $job.id
                 $managedLog = Join-Path (Join-Path (Get-ManagedJobRoot) 'logs') "$($job.id).log"
                 if (Test-Path -LiteralPath $managedLog) { Remove-Item -LiteralPath $managedLog -Force }

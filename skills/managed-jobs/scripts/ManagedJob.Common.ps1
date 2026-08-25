@@ -23,7 +23,7 @@ function Get-ManagedJobRoot {
         $root = Get-ManagedJobAutomaticCleanupRoot
     }
 
-    foreach ($directory in @('jobs', 'logs', 'launch', 'owners')) {
+    foreach ($directory in @('jobs', 'logs', 'launch', 'owners', 'control')) {
         $null = New-Item -ItemType Directory -Path (Join-Path $root $directory) -Force
     }
     return $root
@@ -35,6 +35,14 @@ function Get-ManagedJobFile {
         throw "Invalid managed job id: $Id"
     }
     return Join-Path (Join-Path (Get-ManagedJobRoot) 'jobs') "$Id.json"
+}
+
+function Get-ManagedJobControlFile {
+    param([Parameter(Mandatory)][string]$Id)
+    if ($Id -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]*$') {
+        throw "Invalid managed job id: $Id"
+    }
+    return Join-Path (Join-Path (Get-ManagedJobRoot) 'control') "$Id.json"
 }
 
 function Read-ManagedJob {
@@ -226,6 +234,49 @@ function Assert-SecretSafeInvocation {
             throw 'Arguments appear secret-bearing. Use inherited environment configuration, standard input, a response file outside the registry, or the target tool credential store.'
         }
     }
+}
+
+function Assert-SharedTerminalInputSafe {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$InputText)
+
+    if ($InputText -match '(?i)(authorization\s*:\s*(?:bearer|basic)|bearer\s+[a-z0-9._~-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -or
+        $InputText -match '(?i)(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential)\s*[:=]\s*\S+' -or
+        $InputText -match '(?i)^[a-z][a-z0-9+.-]*://[^/@\s]+:[^/@\s]+@') {
+        throw 'Input appears credential-bearing. Authentication secrets must be typed by the user directly in the visible shared terminal.'
+    }
+}
+
+function Resolve-IntelligentTerminalTools {
+    if (-not $IsWindows) {
+        throw 'Shared-terminal mode requires Windows.'
+    }
+
+    $packages = @(Get-AppxPackage -Name 'Microsoft.IntelligentTerminal' -ErrorAction Stop | Where-Object {
+        $_.PackageFamilyName -eq 'Microsoft.IntelligentTerminal_8wekyb3d8bbwe' -and
+        -not $_.IsFramework -and
+        -not $_.IsResourcePackage -and
+        [string]$_.Status -eq 'Ok'
+    })
+    $package = $packages | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1
+    if (-not $package) {
+        throw 'Shared-terminal mode requires the Microsoft.IntelligentTerminal package.'
+    }
+    if ([version]$package.Version -lt [version]'0.2.2192.0') {
+        throw "Shared-terminal mode requires Microsoft.IntelligentTerminal 0.2.2192.0 or newer; found $($package.Version)."
+    }
+
+    $packageRoot = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath([string]$package.InstallLocation))
+    $packagePrefix = $packageRoot + [IO.Path]::DirectorySeparatorChar
+    $resolved = [ordered]@{ packageVersion = [string]$package.Version }
+    foreach ($leaf in @('wtai.exe', 'wtcli.exe')) {
+        $candidate = [IO.Path]::GetFullPath((Join-Path $packageRoot $leaf))
+        if (-not $candidate.StartsWith($packagePrefix, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "The installed Microsoft.IntelligentTerminal package does not provide $leaf."
+        }
+        $resolved[[IO.Path]::GetFileNameWithoutExtension($leaf)] = $candidate
+    }
+    return [pscustomobject]$resolved
 }
 
 function Get-InvocationFingerprint {

@@ -128,6 +128,21 @@ while ($true) {
             'Ordinary logs must not expose terminal control identifiers.'
     }
 
+    $missingControlBackup = "$controlFile.missing-control-test"
+    Move-Item -LiteralPath $controlFile -Destination $missingControlBackup
+    try {
+        $missingControlError = $null
+        try {
+            & $controller capture -Id $shared.id -StateRoot $stateRoot -MaxLines 1 | Out-Null
+        } catch { $missingControlError = $_.Exception.Message }
+        Assert-True (
+            $missingControlError -match 'invalid shared-terminal control metadata' -and
+            $missingControlError -notmatch [regex]::Escape($controlFile)
+        ) 'Missing control metadata should fail without exposing its private path.'
+    } finally {
+        Move-Item -LiteralPath $missingControlBackup -Destination $controlFile
+    }
+
     $targetRejected = $false
     try {
         & $controller capture -Id $shared.id -StateRoot $stateRoot -Target ([guid]::NewGuid()) | Out-Null

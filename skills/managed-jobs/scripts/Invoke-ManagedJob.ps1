@@ -286,13 +286,23 @@ function Get-SharedTerminalContext {
         throw "Job $JobId has not confirmed Windows process-tree containment."
     }
 
+    if ($job.PSObject.Properties.Name -notcontains 'terminalControlState' -or
+        [string]$job.terminalControlState -ne 'registered') {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
     $controlFile = Get-ManagedJobControlFile -Id $JobId
-    $control = Read-ManagedJob -Path $controlFile
+    if (-not (Test-Path -LiteralPath $controlFile -PathType Leaf)) {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
+    try {
+        $control = Read-ManagedJob -Path $controlFile
+    } catch {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
     $requiredControlProperties = @(
         'schemaVersion', 'jobId', 'hostPid', 'hostStartedAtUtc', 'wtSession', 'wtComClsid'
     )
-    if ($job.terminalControlState -ne 'registered' -or
-        @($requiredControlProperties | Where-Object { $control.PSObject.Properties.Name -notcontains $_ }).Count -gt 0 -or
+    if (@($requiredControlProperties | Where-Object { $control.PSObject.Properties.Name -notcontains $_ }).Count -gt 0 -or
         [int]$control.schemaVersion -ne 1) {
         throw "Job $JobId has invalid shared-terminal control metadata."
     }

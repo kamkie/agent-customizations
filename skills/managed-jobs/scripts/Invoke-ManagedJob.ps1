@@ -429,6 +429,21 @@ function Start-ManagedJobBackgroundTerminalTab {
     }
 }
 
+function Stop-ManagedJobBackgroundTerminalTab {
+    param(
+        [Parameter(Mandatory)]$Connection,
+        [Parameter(Mandatory)][string]$SessionId
+    )
+
+    $result = Invoke-IntelligentTerminalCliProcess `
+        -Tools $Connection.tools `
+        -ComClsid $Connection.comClsid `
+        -Arguments @('kill-pane', '--target', $SessionId)
+    if ($result.exitCode -ne 0) {
+        throw 'The background shared-terminal tab could not be closed.'
+    }
+}
+
 function Write-JobCollection {
     param([object[]]$Jobs)
     $output = @(foreach ($job in @($Jobs)) {
@@ -785,6 +800,33 @@ switch ($Action) {
         # delete its launch handoff from a stale read; reconciliation owns the 30-second
         # unclaimed-start timeout and cleans the launch file when it marks an orphan.
         if ($job.status -eq 'starting') { $job = Read-ManagedJob -Path $jobFile }
+        if ($expectedTerminalSession -and $job.status -eq 'starting') {
+            $backgroundCloseError = $null
+            try {
+                Stop-ManagedJobBackgroundTerminalTab `
+                    -Connection $backgroundTerminalConnection `
+                    -SessionId $expectedTerminalSession
+            } catch {
+                $backgroundCloseError = $_.Exception.Message
+            }
+            if (Test-Path -LiteralPath $launchFile) {
+                Remove-Item -LiteralPath $launchFile -Force -ErrorAction SilentlyContinue
+            }
+            Remove-ManagedJobControl -JobId $job.id
+            $current = Read-ManagedJob -Path $jobFile
+            if ($current.status -eq 'starting') {
+                $current.status = 'failed'
+                Set-ManagedJobControlReleased -Job $current
+                $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                $current.error = 'Background terminal host did not publish its process identity before the startup deadline.'
+                Write-ManagedJob -Path $jobFile -Job $current
+                Unregister-ManagedJobOwnerReference -Job $current
+            }
+            if ($backgroundCloseError) {
+                throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
+            }
+            throw 'The background shared-terminal host did not start in time.'
+        }
         if ($expectedTerminalSession -and $job.status -eq 'running') {
             $registeredSession = [guid]::Empty
             $sessionMatches = $false

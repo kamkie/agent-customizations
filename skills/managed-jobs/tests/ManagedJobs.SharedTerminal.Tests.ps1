@@ -116,6 +116,13 @@ try {
         (Split-Path -Leaf $tools.wtcli) -eq 'wtcli.exe' -and
         [version]$tools.packageVersion -ge [version]'0.2.2192.0'
     ) 'Shared-terminal tools should resolve from the installed Microsoft package.'
+    $recordedTools = Resolve-RecordedIntelligentTerminalTools -Job ([pscustomobject]@{
+        terminalPackageVersion = $tools.packageVersion
+        terminalPackageRoot = $tools.packageRoot
+        terminalCliPath = $tools.wtcli
+    })
+    Assert-True ($recordedTools.wtcli -eq $tools.wtcli) `
+        'Recorded shared-terminal tool paths should revalidate without package discovery.'
     if (-not $backgroundConnection -and -not $AllowForegroundBootstrap) {
         $backgroundRequirementRejected = $false
         try {

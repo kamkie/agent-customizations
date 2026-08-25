@@ -284,6 +284,48 @@ function Resolve-IntelligentTerminalTools {
     return [pscustomobject]$resolved
 }
 
+function Resolve-RecordedIntelligentTerminalTools {
+    param([Parameter(Mandatory)]$Job)
+
+    foreach ($property in @('terminalPackageVersion', 'terminalPackageRoot', 'terminalCliPath')) {
+        if ($Job.PSObject.Properties.Name -notcontains $property -or
+            [string]::IsNullOrWhiteSpace([string]$Job.$property)) {
+            throw 'The shared-terminal package metadata is incomplete.'
+        }
+    }
+    try {
+        $version = [version][string]$Job.terminalPackageVersion
+        $packageRoot = [IO.Path]::TrimEndingDirectorySeparator(
+            [IO.Path]::GetFullPath([string]$Job.terminalPackageRoot)
+        )
+        $cliPath = [IO.Path]::GetFullPath([string]$Job.terminalCliPath)
+        $windowsAppsRoot = [IO.Path]::TrimEndingDirectorySeparator(
+            [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'WindowsApps'))
+        )
+    } catch {
+        throw 'The shared-terminal package metadata is invalid.'
+    }
+
+    $packageLeaf = [IO.Path]::GetFileName($packageRoot)
+    $expectedLeafPattern = '^Microsoft\.IntelligentTerminal_' +
+        [regex]::Escape($version.ToString()) +
+        '_(?:x64|arm64|x86)__8wekyb3d8bbwe$'
+    if (-not ([IO.Path]::GetDirectoryName($packageRoot)).Equals(
+            $windowsAppsRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        ) -or
+        $packageLeaf -notmatch $expectedLeafPattern -or
+        -not ([IO.Path]::GetDirectoryName($cliPath)).Equals(
+            $packageRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        ) -or
+        [IO.Path]::GetFileName($cliPath) -ne 'wtcli.exe' -or
+        -not (Test-Path -LiteralPath $cliPath -PathType Leaf)) {
+        throw 'The shared-terminal package metadata is invalid.'
+    }
+    return [pscustomobject]@{ wtcli = $cliPath }
+}
+
 function Invoke-IntelligentTerminalCliProcess {
     param(
         [Parameter(Mandatory)]$Tools,

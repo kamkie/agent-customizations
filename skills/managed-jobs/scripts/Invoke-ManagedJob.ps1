@@ -338,6 +338,7 @@ function Get-SharedTerminalContext {
         job = $job
         sessionId = $terminalSession.ToString('D')
         comClsid = $terminalComClsid.ToString('B')
+        tools = Resolve-RecordedIntelligentTerminalTools -Job $job
     }
 }
 
@@ -347,9 +348,8 @@ function Invoke-SharedTerminalCli {
         [Parameter(Mandatory)][string[]]$Arguments
     )
 
-    $tools = Resolve-IntelligentTerminalTools
     $result = Invoke-IntelligentTerminalCliProcess `
-        -Tools $tools `
+        -Tools $Context.tools `
         -ComClsid $Context.comClsid `
         -SessionId $Context.sessionId `
         -Arguments $Arguments
@@ -713,6 +713,8 @@ switch ($Action) {
             if ($SharedTerminal) {
                 $job['sharedTerminal'] = $true
                 $job['terminalPackageVersion'] = $terminalTools.packageVersion
+                $job['terminalPackageRoot'] = $terminalTools.packageRoot
+                $job['terminalCliPath'] = $terminalTools.wtcli
                 $job['terminalControlState'] = 'pending'
                 $job['terminalLaunchMode'] = $sharedTerminalLaunchMode
             }

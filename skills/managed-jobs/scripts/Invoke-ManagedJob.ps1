@@ -819,36 +819,53 @@ switch ($Action) {
             Start-Sleep -Milliseconds 100
             $job = Read-ManagedJob -Path $jobFile
         } while ($job.status -eq 'starting' -and [datetime]::UtcNow -lt $startupDeadline)
-        # A slow host may claim immediately after the final poll. Do not overwrite or
-        # delete its launch handoff from a stale read; reconciliation owns the 30-second
-        # unclaimed-start timeout and cleans the launch file when it marks an orphan.
+        # A slow host may claim immediately after the final poll. Re-read before
+        # deciding whether the background launch needs cancellation.
         if ($job.status -eq 'starting') { $job = Read-ManagedJob -Path $jobFile }
         if ($expectedTerminalSession -and $job.status -eq 'starting') {
-            $backgroundCloseError = $null
-            try {
-                Stop-ManagedJobBackgroundTerminalTab `
-                    -Connection $backgroundTerminalConnection `
-                    -SessionId $expectedTerminalSession
-            } catch {
-                $backgroundCloseError = $_.Exception.Message
-            }
+            # Cancel the unclaimed handoff first. If the host already removed it,
+            # give that concurrent claim time to publish its identity before acting.
             if (Test-Path -LiteralPath $launchFile) {
                 Remove-Item -LiteralPath $launchFile -Force -ErrorAction SilentlyContinue
             }
-            Remove-ManagedJobControl -JobId $job.id
-            $current = Read-ManagedJob -Path $jobFile
-            if ($current.status -eq 'starting') {
-                $current.status = 'failed'
-                Set-ManagedJobControlReleased -Job $current
-                $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
-                $current.error = 'Background terminal host did not publish its process identity before the startup deadline.'
-                Write-ManagedJob -Path $jobFile -Job $current
-                Unregister-ManagedJobOwnerReference -Job $current
+            $claimDeadline = [datetime]::UtcNow.AddSeconds(5)
+            do {
+                Start-Sleep -Milliseconds 100
+                $current = Read-ManagedJob -Path $jobFile
+            } while ($current.status -eq 'starting' -and [datetime]::UtcNow -lt $claimDeadline)
+            $job = $current
+            if ($job.status -ne 'running') {
+                $backgroundCloseError = $null
+                try {
+                    Stop-ManagedJobBackgroundTerminalTab `
+                        -Connection $backgroundTerminalConnection `
+                        -SessionId $expectedTerminalSession
+                } catch {
+                    $backgroundCloseError = $_.Exception.Message
+                }
+                if ($backgroundCloseError) {
+                    $afterClose = Read-ManagedJob -Path $jobFile
+                    if ($afterClose.status -eq 'running') {
+                        $job = $afterClose
+                        $backgroundCloseError = $null
+                    }
+                }
+                if ($job.status -ne 'running') {
+                    Remove-ManagedJobControl -JobId $job.id
+                    if ($job.status -eq 'starting') {
+                        $job.status = 'failed'
+                        Set-ManagedJobControlReleased -Job $job
+                        $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                        $job.error = 'Background terminal host did not publish its process identity before the startup deadline.'
+                        Write-ManagedJob -Path $jobFile -Job $job
+                        Unregister-ManagedJobOwnerReference -Job $job
+                    }
+                    if ($backgroundCloseError) {
+                        throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
+                    }
+                    throw 'The background shared-terminal host did not start in time.'
+                }
             }
-            if ($backgroundCloseError) {
-                throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
-            }
-            throw 'The background shared-terminal host did not start in time.'
         }
         if ($expectedTerminalSession -and $job.status -eq 'running') {
             $registeredSession = [guid]::Empty

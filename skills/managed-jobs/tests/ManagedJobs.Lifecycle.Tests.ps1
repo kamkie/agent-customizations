@@ -207,6 +207,52 @@ try {
     $keepOpenResult = Get-JobStatus -Id $keepOpenId
     Assert-True ($keepOpenResult.status -eq 'failed' -and $keepOpenResult.exitCode -eq 17) 'Keep-open record should preserve the real child failure.'
 
+    # The exact encoded command used after a cold wtai handoff must start the
+    # shared host, consume the launch file, register terminal metadata, and exit.
+    $encodedId = '20000101-000000-lifecycle-encoded-shared-000001'
+    $encodedJobPath = Join-Path $stateRoot "jobs\$encodedId.json"
+    $encodedLaunchPath = Join-Path $stateRoot "launch\$encodedId.json"
+    $encodedJob = [ordered]@{
+        schemaVersion = 4; id = $encodedId; name = 'lifecycle-encoded-shared'; kind = 'test'; status = 'starting'
+        lifetime = 'persistent'; ownerAgent = $null; ownerSessionId = $null; visible = $true; sharedTerminal = $true
+        terminalControlState = 'pending'; terminalLaunchMode = 'foreground-bootstrap'; keepTerminalOpen = $false
+        processContainment = 'pending'; createdAtUtc = [datetime]::UtcNow.ToString('o'); startedAtUtc = $null
+        finishedAtUtc = $null; hostPid = $null; hostStartedAtUtc = $null; executable = $pwsh; argumentCount = 3
+        environmentNames = @(); invocationFingerprint = ('5' * 64); workingDirectory = $testRoot
+        logPath = (Join-Path $stateRoot "logs\$encodedId.log"); exitCode = $null; error = $null
+    }
+    $encodedLaunch = [ordered]@{
+        executable = $pwsh
+        arguments = @('-NoProfile', '-Command', 'Write-Output encoded-shared-ok')
+        environment = @{}
+    }
+    $encodedJob | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $encodedJobPath -Encoding utf8
+    $encodedLaunch | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $encodedLaunchPath -Encoding utf8
+    $savedWtSession = $env:WT_SESSION
+    $savedWtComClsid = $env:WT_COM_CLSID
+    try {
+        $env:WT_SESSION = [guid]::NewGuid().ToString('D')
+        $env:WT_COM_CLSID = [guid]::NewGuid().ToString('B')
+        $encodedArguments = Get-ManagedJobHostPowerShellArguments `
+            -HostScript $hostScript `
+            -JobFile $encodedJobPath `
+            -LaunchFile $encodedLaunchPath
+        & $pwsh @encodedArguments *> $null
+        Assert-True ($LASTEXITCODE -eq 0) 'Encoded shared-host invocation should exit successfully.'
+    } finally {
+        if ($null -eq $savedWtSession) { Remove-Item Env:WT_SESSION -ErrorAction SilentlyContinue } else { $env:WT_SESSION = $savedWtSession }
+        if ($null -eq $savedWtComClsid) { Remove-Item Env:WT_COM_CLSID -ErrorAction SilentlyContinue } else { $env:WT_COM_CLSID = $savedWtComClsid }
+    }
+    $encodedResult = Get-JobStatus -Id $encodedId
+    Assert-True (
+        $encodedResult.status -eq 'completed' -and
+        $encodedResult.terminalControlState -eq 'released'
+    ) 'Encoded shared-host invocation should preserve its completed lifecycle state.'
+    Assert-True ((Get-Content -LiteralPath $encodedResult.logPath -Raw) -match 'encoded-shared-ok') `
+        'Encoded shared-host invocation should run the managed child.'
+    Assert-True (-not (Test-Path -LiteralPath $encodedLaunchPath)) `
+        'Encoded shared-host invocation should consume the launch handoff.'
+
     # Start, record redaction, structured list/status, logs, and reconcile.
     $completed = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-complete' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Write-Output lifecycle-ok') -Environment @{ LIFECYCLE_MARKER = 'not-recorded'; GIT_AUTHOR_NAME = 'Lifecycle Test' } | Out-String) | ConvertFrom-Json

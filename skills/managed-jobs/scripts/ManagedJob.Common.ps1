@@ -436,6 +436,28 @@ function Get-LiveIntelligentTerminalConnection {
     }
 }
 
+function Get-ManagedJobHostPowerShellArguments {
+    param(
+        [Parameter(Mandatory)][string]$HostScript,
+        [Parameter(Mandatory)][string]$JobFile,
+        [Parameter(Mandatory)][string]$LaunchFile,
+        [switch]$KeepOpen
+    )
+
+    $escapeLiteral = {
+        param([string]$Value)
+        return "'" + $Value.Replace("'", "''") + "'"
+    }
+    $hostInvocation = '& {0} -JobFile {1} -LaunchFile {2}' -f
+        (& $escapeLiteral $HostScript),
+        (& $escapeLiteral $JobFile),
+        (& $escapeLiteral $LaunchFile)
+    $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($hostInvocation))
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
+    if ($KeepOpen) { $arguments += '-NoExit' }
+    return $arguments + @('-EncodedCommand', $encodedCommand)
+}
+
 function Get-InvocationFingerprint {
     param(
         [Parameter(Mandatory)][string]$Executable,

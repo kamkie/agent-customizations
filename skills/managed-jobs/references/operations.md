@@ -65,6 +65,10 @@ by the managed host. With no live window, shared launch uses `wtai.exe` as a
 foreground bootstrap. Add `-RequireBackgroundTab` to reject that cold-start
 fallback when focus preservation is mandatory.
 
+The foreground bootstrap is used only when no process from the exact package is
+running. If a matching process exists but its protocol probe fails, launch fails
+closed instead of silently taking focus.
+
 The controller accepts only the managed job id. `capture`, `send-input`, and
 `send-key` load and validate that job's host identity, Job Object containment,
 and registered control file before invoking the packaged CLI. They never accept

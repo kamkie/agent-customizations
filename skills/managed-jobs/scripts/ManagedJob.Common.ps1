@@ -423,16 +423,16 @@ function Get-LiveIntelligentTerminalConnection {
             -ComClsid $Tools.comClsid `
             -Arguments @('--json', 'list-windows')
         if ($probe.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
-            return $null
+            throw 'protocol probe failed'
         }
         $payload = $probe.standardOutput | ConvertFrom-Json
-        if (@($payload.windows).Count -eq 0) { return $null }
+        if (@($payload.windows).Count -eq 0) { throw 'no live protocol windows were returned' }
         return [pscustomobject]@{
             tools = $Tools
             comClsid = ([guid]$Tools.comClsid).ToString('B')
         }
     } catch {
-        return $null
+        throw 'A running Microsoft Intelligent Terminal instance could not be verified; refusing a focus-stealing foreground fallback.'
     }
 }
 

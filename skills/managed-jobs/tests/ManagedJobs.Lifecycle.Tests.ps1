@@ -71,6 +71,31 @@ function Get-FreeTcpPort {
 try {
     $null = New-Item -ItemType Directory -Path $stateRoot -Force
     $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+    $previousTerminalSession = $env:WT_SESSION
+    $env:WT_SESSION = [guid]::NewGuid().ToString('D')
+    try {
+        $fakeTerminalTools = [pscustomobject]@{ wtcli = $pwsh }
+        $withoutSession = Invoke-IntelligentTerminalCliProcess `
+            -Tools $fakeTerminalTools `
+            -ComClsid ([guid]::NewGuid().ToString('B')) `
+            -Arguments @('-NoProfile', '-Command', '[Environment]::GetEnvironmentVariable("WT_SESSION", "Process")')
+        Assert-True ([string]::IsNullOrWhiteSpace($withoutSession.standardOutput)) `
+            'Non-pane Intelligent Terminal operations should clear an inherited WT_SESSION.'
+        $explicitSession = [guid]::NewGuid()
+        $withSession = Invoke-IntelligentTerminalCliProcess `
+            -Tools $fakeTerminalTools `
+            -ComClsid ([guid]::NewGuid().ToString('B')) `
+            -SessionId $explicitSession.ToString('D') `
+            -Arguments @('-NoProfile', '-Command', '[Environment]::GetEnvironmentVariable("WT_SESSION", "Process")')
+        Assert-True ($withSession.standardOutput.Trim() -eq $explicitSession.ToString('D')) `
+            'Pane operations should pass only their explicit WT_SESSION.'
+    } finally {
+        if ($null -eq $previousTerminalSession) {
+            Remove-Item Env:WT_SESSION -ErrorAction SilentlyContinue
+        } else {
+            $env:WT_SESSION = $previousTerminalSession
+        }
+    }
     $testSessionId = 'codex-lifecycle-session'
     $env:CODEX_HOME = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..')).Path
     $env:CODEX_THREAD_ID = $testSessionId

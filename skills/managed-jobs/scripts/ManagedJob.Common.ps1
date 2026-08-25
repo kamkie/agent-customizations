@@ -311,7 +311,11 @@ function Invoke-IntelligentTerminalCliProcess {
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
     $startInfo.Environment['WT_COM_CLSID'] = $parsedComClsid.ToString('B')
-    if ($SessionId) { $startInfo.Environment['WT_SESSION'] = $parsedSessionId.ToString('D') }
+    if ($SessionId) {
+        $startInfo.Environment['WT_SESSION'] = $parsedSessionId.ToString('D')
+    } else {
+        $startInfo.Environment.Remove('WT_SESSION') | Out-Null
+    }
     foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add([string]$argument) }
 
     $process = [Diagnostics.Process]::new()

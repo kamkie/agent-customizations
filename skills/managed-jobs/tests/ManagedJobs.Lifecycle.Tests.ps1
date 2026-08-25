@@ -408,6 +408,13 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     Assert-True $emptyRejected 'Empty records should fail with an explicit error.'
     Remove-Item -LiteralPath $emptyPath -Force
 
+    $invalidNamePath = Join-Path $stateRoot 'jobs\invalid job name.json'
+    Set-Content -LiteralPath $invalidNamePath -Value '{' -Encoding utf8
+    $invalidJobs = @((& $controller status -StateRoot $stateRoot -Status invalid -Json | Out-String) | ConvertFrom-Json)
+    Assert-True ($invalidJobs.id -contains 'invalid job name') `
+        'Invalid records with non-id-shaped filenames must not break reconciliation or listing.'
+    Remove-Item -LiteralPath $invalidNamePath -Force
+
     # A fresh unclaimed starting record remains active during its startup grace period.
     $freshId = '20000101-000000-lifecycle-starting-000001'
     $freshArguments = @('-NoProfile', '-Command', 'Start-Sleep -Seconds 29')

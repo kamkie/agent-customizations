@@ -82,10 +82,12 @@ function Get-AllManagedJobs {
 
 function Remove-ManagedJobControl {
     param([Parameter(Mandatory)][string]$JobId)
-    $controlFile = Get-ManagedJobControlFile -Id $JobId
-    if (Test-Path -LiteralPath $controlFile -PathType Leaf) {
-        Remove-Item -LiteralPath $controlFile -Force -ErrorAction SilentlyContinue
-    }
+    try {
+        $controlFile = Get-ManagedJobControlFile -Id $JobId
+        if (Test-Path -LiteralPath $controlFile -PathType Leaf) {
+            Remove-Item -LiteralPath $controlFile -Force -ErrorAction SilentlyContinue
+        }
+    } catch {}
 }
 
 function Update-ReconciledJob {

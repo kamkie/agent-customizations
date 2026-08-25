@@ -425,7 +425,11 @@ function Start-ManagedJobBackgroundTerminalTab {
         }
         return $sessionId.ToString('D')
     } catch {
-        throw 'The background shared-terminal tab returned an invalid result.'
+        $exception = [InvalidOperationException]::new(
+            'The background shared-terminal tab returned an invalid result.'
+        )
+        $exception.Data['ManagedBackgroundTabMayExist'] = $true
+        throw $exception
     }
 }
 
@@ -657,7 +661,7 @@ switch ($Action) {
         $jobFile = $null
         $jobId = $null
         $expectedTerminalSession = $null
-        $backgroundTabLaunchAttempted = $false
+        $backgroundTabMayExist = $false
         try {
             $deadline = [datetime]::UtcNow.AddSeconds(10)
             do {
@@ -745,12 +749,19 @@ switch ($Action) {
                     )
                 }
                 if ($SharedTerminal -and $backgroundTerminalConnection) {
-                    $backgroundTabLaunchAttempted = $true
-                    $expectedTerminalSession = Start-ManagedJobBackgroundTerminalTab `
-                        -Connection $backgroundTerminalConnection `
-                        -Name $Name `
-                        -WorkingDirectory $resolvedDirectory `
-                        -PowerShellArguments $pwshArguments
+                    try {
+                        $expectedTerminalSession = Start-ManagedJobBackgroundTerminalTab `
+                            -Connection $backgroundTerminalConnection `
+                            -Name $Name `
+                            -WorkingDirectory $resolvedDirectory `
+                            -PowerShellArguments $pwshArguments
+                        $backgroundTabMayExist = $true
+                    } catch {
+                        if ($_.Exception.Data['ManagedBackgroundTabMayExist']) {
+                            $backgroundTabMayExist = $true
+                        }
+                        throw
+                    }
                 } else {
                     $terminalExecutable = if ($SharedTerminal) {
                         $terminalTools.wtai
@@ -777,8 +788,9 @@ switch ($Action) {
         } catch {
             $launchFailure = $_.Exception.Message
             $backgroundTerminationError = $null
-            if ($backgroundTabLaunchAttempted -and $jobFile -and (Test-Path -LiteralPath $jobFile)) {
-                $recoveryDeadline = [datetime]::UtcNow.AddSeconds(5)
+            $preserveBackgroundOwnership = $false
+            if ($backgroundTabMayExist -and $jobFile -and (Test-Path -LiteralPath $jobFile)) {
+                $recoveryDeadline = [datetime]::UtcNow.AddSeconds(30)
                 do {
                     try { $backgroundJob = Read-ManagedJob -Path $jobFile } catch { $backgroundJob = $null }
                     if (-not $backgroundJob -or $backgroundJob.status -ne 'starting') { break }
@@ -790,15 +802,25 @@ switch ($Action) {
                         reason = 'Stopped because background tab launch did not return a valid result.'
                     }
                     $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
-                    if ($termination.error) { $backgroundTerminationError = [string]$termination.error }
+                    if ($termination.error) {
+                        $backgroundTerminationError = [string]$termination.error
+                        $preserveBackgroundOwnership = $true
+                    }
+                } elseif ($backgroundJob -and $backgroundJob.status -eq 'starting') {
+                    # The tab may still claim the launch after this invocation fails.
+                    # Cancel new claims but retain the owner reference so cleanup can
+                    # contain a host that already read the handoff.
+                    $backgroundJob.error = 'Background tab launch returned an invalid result before the host published its identity.'
+                    Write-ManagedJob -Path $jobFile -Job $backgroundJob
+                    $preserveBackgroundOwnership = $true
                 }
             }
             if ($launchFile -and (Test-Path -LiteralPath $launchFile)) { Remove-Item -LiteralPath $launchFile -Force -ErrorAction SilentlyContinue }
-            if ($jobId) { Remove-ManagedJobControl -JobId $jobId }
+            if ($jobId -and -not $preserveBackgroundOwnership) { Remove-ManagedJobControl -JobId $jobId }
             if ($jobFile -and (Test-Path -LiteralPath $jobFile)) {
                 try {
                     $failedJob = Read-ManagedJob -Path $jobFile
-                    if ($failedJob.status -eq 'starting') {
+                    if ($failedJob.status -eq 'starting' -and -not $preserveBackgroundOwnership) {
                         $failedJob.status = 'failed'
                         Set-ManagedJobControlReleased -Job $failedJob
                         $failedJob.finishedAtUtc = [datetime]::UtcNow.ToString('o')

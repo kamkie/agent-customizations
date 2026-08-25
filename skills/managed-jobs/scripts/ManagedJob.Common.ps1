@@ -240,8 +240,9 @@ function Assert-SharedTerminalInputSafe {
     param([Parameter(Mandatory)][AllowEmptyString()][string]$InputText)
 
     if ($InputText -match '(?i)(authorization\s*:\s*(?:bearer|basic)|bearer\s+[a-z0-9._~-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -or
+        $InputText -match '(?i)(?:^|\s)--?[^=\s]*(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential)(?:=|\s+)\S+' -or
         $InputText -match '(?i)(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential)\s*[:=]\s*\S+' -or
-        $InputText -match '(?i)^[a-z][a-z0-9+.-]*://[^/@\s]+:[^/@\s]+@') {
+        $InputText -match '(?i)[a-z][a-z0-9+.-]*://[^/@\s]+:[^/@\s]+@') {
         throw 'Input appears credential-bearing. Authentication secrets must be typed by the user directly in the visible shared terminal.'
     }
 }

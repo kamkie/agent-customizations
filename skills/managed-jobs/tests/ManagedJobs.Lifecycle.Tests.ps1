@@ -386,9 +386,16 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
         try { Assert-SecretSafeInvocation -Arguments @() -Environment @{ $safeKey = 'configuration' } } catch { $safeAccepted = $false }
         Assert-True $safeAccepted "Benign environment key should not be rejected: $safeKey"
     }
-    $terminalSecretRejected = $false
-    try { Assert-SharedTerminalInputSafe -InputText 'api-token=do-not-send' } catch { $terminalSecretRejected = $true }
-    Assert-True $terminalSecretRejected 'Shared-terminal input should reject likely credential material.'
+    foreach ($terminalSecretInput in @(
+        'api-token=do-not-send',
+        'tool --password do-not-send',
+        'git clone https://user:do-not-send@example.invalid/repository.git'
+    )) {
+        $terminalSecretRejected = $false
+        try { Assert-SharedTerminalInputSafe -InputText $terminalSecretInput } catch { $terminalSecretRejected = $true }
+        Assert-True $terminalSecretRejected `
+            'Shared-terminal input should reject likely credential material anywhere in the command line.'
+    }
     $terminalMarkerAccepted = $true
     try { Assert-SharedTerminalInputSafe -InputText 'run-safe-marker' } catch { $terminalMarkerAccepted = $false }
     Assert-True $terminalMarkerAccepted 'Shared-terminal input should accept ordinary non-secret literal text.'

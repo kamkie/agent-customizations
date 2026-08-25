@@ -554,6 +554,7 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     $orphanId = '20000101-000000-lifecycle-orphan-000001'
     $orphanRecord = [ordered]@{
         schemaVersion = 2; id = $orphanId; name = 'lifecycle-orphan'; kind = 'test'; status = 'running'; visible = $false
+        sharedTerminal = $true
         keepTerminalOpen = $false; createdAtUtc = '2000-01-01T00:00:00Z'; startedAtUtc = '2000-01-01T00:00:01Z'
         finishedAtUtc = $null; hostPid = 2147483647; hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'
         argumentCount = 0; environmentNames = @(); invocationFingerprint = ('0' * 64); workingDirectory = $testRoot
@@ -576,6 +577,8 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     $orphanSummary = (& $controller reconcile -StateRoot $stateRoot -Status orphaned | Out-String) | ConvertFrom-Json
     $orphan = @($orphanSummary.jobs | Where-Object id -eq $orphanId)[0]
     Assert-True ($orphan.status -eq 'orphaned') 'Reconcile should mark a missing recorded host orphaned.'
+    Assert-True ($orphan.terminalControlState -eq 'released') `
+        'Reconcile should add released control state to legacy shared-terminal records.'
     Assert-True (-not $orphan.processIdentity.matches) 'Orphan inspection should preserve and report identity mismatch.'
     Assert-True (-not (Test-Path -LiteralPath (Get-ManagedJobControlFile -Id $orphanId))) `
         'Orphan reconciliation should remove stale shared-terminal control metadata.'

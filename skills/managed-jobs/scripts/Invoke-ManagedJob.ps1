@@ -90,6 +90,18 @@ function Remove-ManagedJobControl {
     } catch {}
 }
 
+function Set-ManagedJobControlReleased {
+    param([Parameter(Mandatory)]$Job)
+    if ($Job.PSObject.Properties.Name -notcontains 'sharedTerminal' -or -not [bool]$Job.sharedTerminal) {
+        return
+    }
+    if ($Job.PSObject.Properties.Name -contains 'terminalControlState') {
+        $Job.terminalControlState = 'released'
+    } else {
+        $Job | Add-Member -NotePropertyName terminalControlState -NotePropertyValue 'released'
+    }
+}
+
 function Update-ReconciledJob {
     param($Job)
     if ($Job.status -notin @('starting', 'running')) {
@@ -123,9 +135,7 @@ function Update-ReconciledJob {
     }
     if (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc) { return $current }
     $current.status = 'orphaned'
-    if ($current.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$current.sharedTerminal) {
-        $current.terminalControlState = 'released'
-    }
+    Set-ManagedJobControlReleased -Job $current
     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
     $current.error = 'Recorded host process is no longer running and no terminal state was recorded.'
     Write-ManagedJob -Path $path -Job $current
@@ -425,9 +435,7 @@ function Stop-ManagedJobTrees {
             if (-not (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc)) {
                 if ($recordUnavailable) {
                     $current.status = 'stopped'
-                    if ($current.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$current.sharedTerminal) {
-                        $current.terminalControlState = 'released'
-                    }
+                    Set-ManagedJobControlReleased -Job $current
                     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                     $current.exitCode = $null
                     $current.error = [string]$item.reason
@@ -495,9 +503,7 @@ function Stop-ManagedJobTrees {
                 $current = $target.outcome.job
                 if ($target.recordUnavailable) {
                     $current.status = 'stopped'
-                    if ($current.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$current.sharedTerminal) {
-                        $current.terminalControlState = 'released'
-                    }
+                    Set-ManagedJobControlReleased -Job $current
                     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                     $current.exitCode = $null
                     $current.error = $target.reason
@@ -505,9 +511,7 @@ function Stop-ManagedJobTrees {
                     $current = Read-ManagedJob -Path $target.path
                     if ($current.status -in @('starting', 'running')) {
                         $current.status = 'stopped'
-                        if ($current.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$current.sharedTerminal) {
-                            $current.terminalControlState = 'released'
-                        }
+                        Set-ManagedJobControlReleased -Job $current
                         $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                         $current.exitCode = $null
                         $current.error = $target.reason
@@ -678,9 +682,7 @@ switch ($Action) {
                     $failedJob = Read-ManagedJob -Path $jobFile
                     if ($failedJob.status -eq 'starting') {
                         $failedJob.status = 'failed'
-                        if ($failedJob.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$failedJob.sharedTerminal) {
-                            $failedJob.terminalControlState = 'released'
-                        }
+                        Set-ManagedJobControlReleased -Job $failedJob
                         $failedJob.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                         $failedJob.error = 'Managed host launch failed before startup completed.'
                         Write-ManagedJob -Path $jobFile -Job $failedJob

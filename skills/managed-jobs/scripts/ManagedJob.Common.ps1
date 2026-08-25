@@ -320,13 +320,29 @@ function Invoke-IntelligentTerminalCliProcess {
 
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
+    $deadline = [datetime]::UtcNow.AddSeconds($TimeoutSeconds)
     try {
         if (-not $process.Start()) { throw 'The Intelligent Terminal CLI failed to start.' }
         $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
         $standardErrorTask = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        $exitBudget = [int][Math]::Max(1, ($deadline - [datetime]::UtcNow).TotalMilliseconds)
+        if (-not $process.WaitForExit($exitBudget)) {
             try { $process.Kill($true) } catch {}
             throw 'The Intelligent Terminal CLI timed out.'
+        }
+        $readBudget = [int][Math]::Max(1, ($deadline - [datetime]::UtcNow).TotalMilliseconds)
+        try {
+            $readsCompleted = [Threading.Tasks.Task]::WaitAll(
+                [Threading.Tasks.Task[]]@($standardOutputTask, $standardErrorTask),
+                $readBudget
+            )
+        } catch {
+            throw 'The Intelligent Terminal CLI output could not be read.'
+        }
+        if (-not $readsCompleted) {
+            try { $process.StandardOutput.Close() } catch {}
+            try { $process.StandardError.Close() } catch {}
+            throw 'The Intelligent Terminal CLI timed out while draining output.'
         }
         return [pscustomobject]@{
             exitCode = $process.ExitCode

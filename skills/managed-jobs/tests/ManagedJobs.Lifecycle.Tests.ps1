@@ -89,6 +89,33 @@ try {
             -Arguments @('-NoProfile', '-Command', '[Environment]::GetEnvironmentVariable("WT_SESSION", "Process")')
         Assert-True ($withSession.standardOutput.Trim() -eq $explicitSession.ToString('D')) `
             'Pane operations should pass only their explicit WT_SESSION.'
+
+        $pipeHolderCommand = @"
+`$startInfo = [Diagnostics.ProcessStartInfo]::new('$pwsh')
+`$startInfo.UseShellExecute = `$false
+`$startInfo.CreateNoWindow = `$true
+`$startInfo.ArgumentList.Add('-NoProfile')
+`$startInfo.ArgumentList.Add('-Command')
+`$startInfo.ArgumentList.Add('Start-Sleep -Seconds 2')
+`$grandchild = [Diagnostics.Process]::Start(`$startInfo)
+`$grandchild.Dispose()
+"@
+        $drainTimer = [Diagnostics.Stopwatch]::StartNew()
+        $drainTimeoutRejected = $false
+        try {
+            Invoke-IntelligentTerminalCliProcess `
+                -Tools $fakeTerminalTools `
+                -ComClsid ([guid]::NewGuid().ToString('B')) `
+                -Arguments @('-NoProfile', '-Command', $pipeHolderCommand) `
+                -TimeoutSeconds 1 | Out-Null
+        } catch {
+            $drainTimeoutRejected = $_.Exception.Message -match 'timed out while draining output'
+        }
+        $drainTimer.Stop()
+        Assert-True $drainTimeoutRejected `
+            'CLI output draining should remain bounded when a grandchild inherits the pipe.'
+        Assert-True ($drainTimer.Elapsed.TotalSeconds -lt 1.75) `
+            'CLI output draining should honor the shared controller timeout.'
     } finally {
         if ($null -eq $previousTerminalSession) {
             Remove-Item Env:WT_SESSION -ErrorAction SilentlyContinue

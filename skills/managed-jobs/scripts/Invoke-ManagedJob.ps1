@@ -657,6 +657,7 @@ switch ($Action) {
         $jobFile = $null
         $jobId = $null
         $expectedTerminalSession = $null
+        $backgroundTabLaunchAttempted = $false
         try {
             $deadline = [datetime]::UtcNow.AddSeconds(10)
             do {
@@ -742,6 +743,7 @@ switch ($Action) {
                     )
                 }
                 if ($SharedTerminal -and $backgroundTerminalConnection) {
+                    $backgroundTabLaunchAttempted = $true
                     $expectedTerminalSession = Start-ManagedJobBackgroundTerminalTab `
                         -Connection $backgroundTerminalConnection `
                         -Name $Name `
@@ -771,6 +773,24 @@ switch ($Action) {
                 $hostProcess.Dispose()
             }
         } catch {
+            $launchFailure = $_.Exception.Message
+            $backgroundTerminationError = $null
+            if ($backgroundTabLaunchAttempted -and $jobFile -and (Test-Path -LiteralPath $jobFile)) {
+                $recoveryDeadline = [datetime]::UtcNow.AddSeconds(5)
+                do {
+                    try { $backgroundJob = Read-ManagedJob -Path $jobFile } catch { $backgroundJob = $null }
+                    if (-not $backgroundJob -or $backgroundJob.status -ne 'starting') { break }
+                    Start-Sleep -Milliseconds 100
+                } while ([datetime]::UtcNow -lt $recoveryDeadline)
+                if ($backgroundJob -and $backgroundJob.status -eq 'running') {
+                    $terminationRequest = [pscustomobject]@{
+                        job = $backgroundJob
+                        reason = 'Stopped because background tab launch did not return a valid result.'
+                    }
+                    $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
+                    if ($termination.error) { $backgroundTerminationError = [string]$termination.error }
+                }
+            }
             if ($launchFile -and (Test-Path -LiteralPath $launchFile)) { Remove-Item -LiteralPath $launchFile -Force -ErrorAction SilentlyContinue }
             if ($jobId) { Remove-ManagedJobControl -JobId $jobId }
             if ($jobFile -and (Test-Path -LiteralPath $jobFile)) {
@@ -785,6 +805,9 @@ switch ($Action) {
                         Unregister-ManagedJobOwnerReference -Job $failedJob
                     }
                 } catch {}
+            }
+            if ($backgroundTerminationError) {
+                throw "$launchFailure Failed to contain the background terminal host: $backgroundTerminationError"
             }
             throw
         } finally {

@@ -599,3 +599,59 @@ public static class ManagedJobNativeProcessContainment
     # descendant still assigned to the containment job.
     return [ManagedJobNativeProcessContainment]::CreateForCurrentProcess()
 }
+
+function Enable-ManagedJobHostControlCGuard {
+    if (-not $IsWindows) {
+        throw 'Managed-job Ctrl+C protection requires Windows.'
+    }
+
+    if (-not ('ManagedJobNativeConsoleControl' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+public sealed class ManagedJobNativeConsoleControl : IDisposable
+{
+    private const uint CTRL_C_EVENT = 0;
+
+    private delegate bool HandlerRoutine(uint controlType);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetConsoleCtrlHandler(HandlerRoutine handler, bool add);
+
+    private HandlerRoutine handler;
+
+    public ManagedJobNativeConsoleControl()
+    {
+        handler = HandleControlEvent;
+        if (!SetConsoleCtrlHandler(handler, true))
+        {
+            handler = null;
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to protect the managed-job host from Ctrl+C.");
+        }
+    }
+
+    private static bool HandleControlEvent(uint controlType)
+    {
+        return controlType == CTRL_C_EVENT;
+    }
+
+    public void Dispose()
+    {
+        HandlerRoutine registered = handler;
+        handler = null;
+        if (registered != null)
+        {
+            SetConsoleCtrlHandler(registered, false);
+        }
+    }
+}
+'@
+    }
+
+    # Console handlers are process-local and are not inherited as handler
+    # functions by children. The host consumes Ctrl+C while its child retains
+    # the normal default interrupt behavior in the shared terminal.
+    return [ManagedJobNativeConsoleControl]::new()
+}

@@ -265,17 +265,7 @@ while ($true) {
     Assert-True (-not (Test-Path -LiteralPath $controlFile)) `
         'Explicit stop should remove shared-terminal control metadata.'
 
-    $interruptCommand = @'
-$previousControlCMode = [Console]::TreatControlCAsInput
-try {
-    [Console]::TreatControlCAsInput = $true
-    Write-Output 'interrupt-ready'
-    $pressedKey = [Console]::ReadKey($true)
-    Write-Output "interrupt-key-code=$([int]$pressedKey.KeyChar)"
-} finally {
-    [Console]::TreatControlCAsInput = $previousControlCMode
-}
-'@
+    $interruptCommand = 'Write-Output ''interrupt-ready''; while ($true) { Start-Sleep -Seconds 1 }'
     $interrupt = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-interrupt' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', $interruptCommand) `
         -Visible -SharedTerminal -Lifetime Persistent @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
@@ -286,10 +276,10 @@ try {
     $activeIds.Remove($interrupt.id) | Out-Null
     $interruptLog = Get-Content -LiteralPath $interrupt.logPath -Raw
     Assert-True (
-        $interrupt.status -eq 'completed' -and
-        $interruptLog -match 'interrupt-key-code=3' -and
+        $interrupt.status -in @('completed', 'failed') -and
+        $interruptLog -match 'finished with exit code' -and
         $interrupt.terminalControlState -eq 'released'
-    ) 'The named Ctrl+C key should reach the foreground process without orphaning the managed host.'
+    ) 'The named Ctrl+C key should interrupt the foreground process without orphaning the managed host.'
 
     $orphan = (& $controller start -StateRoot $stateRoot -Name 'shared-terminal-orphan' `
         -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'Write-Output "orphan-child-pid=$PID"; Start-Sleep -Seconds 30') `

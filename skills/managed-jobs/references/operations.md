@@ -74,7 +74,9 @@ The controller accepts only the managed job id. `capture`, `send-input`, and
 and registered control file before invoking the packaged CLI. They never accept
 an arbitrary pane id or use the focused pane. Capture is limited to 1-500 lines.
 Literal input is passed without shell interpretation, and named keys are limited
-to `Enter`, `Tab`, `Escape`, `Backspace`, and `Ctrl+C`.
+to `Enter`, `Tab`, `Escape`, `Backspace`, and `Ctrl+C`. The managed host consumes
+Ctrl+C only for itself, allowing the foreground child to receive the interrupt
+while the host remains alive to publish the child's terminal result.
 
 Pane content is sensitive. Do not store captures or paste them into ordinary
 logs. Never send credentials with `send-input`; leave an authentication prompt

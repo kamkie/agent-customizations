@@ -11,6 +11,7 @@ $job = Read-ManagedJob -Path $JobFile
 $keepTerminalOpen = [bool]$job.keepTerminalOpen
 $sharedTerminal = $job.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$job.sharedTerminal
 $controlFile = if ($sharedTerminal) { Get-ManagedJobControlFile -Id $job.id } else { $null }
+$controlCGuard = $null
 $logDirectory = Split-Path -Parent $job.logPath
 $null = New-Item -ItemType Directory -Path $logDirectory -Force
 $writer = [IO.StreamWriter]::new($job.logPath, $true, [Text.UTF8Encoding]::new($false))
@@ -37,6 +38,7 @@ try {
         if (-not [guid]::TryParse([string]$env:WT_COM_CLSID, [ref]$terminalComClsid)) {
             throw 'The shared-terminal host did not receive a valid WT_COM_CLSID.'
         }
+        $controlCGuard = Enable-ManagedJobHostControlCGuard
         $control = [ordered]@{
             schemaVersion = 1
             jobId = $job.id
@@ -112,6 +114,7 @@ try {
     if ($keepTerminalOpen) { return }
     exit 1
 } finally {
+    if ($controlCGuard) { $controlCGuard.Dispose() }
     $writer.Dispose()
     if ($controlFile -and (Test-Path -LiteralPath $controlFile)) {
         Remove-Item -LiteralPath $controlFile -Force -ErrorAction SilentlyContinue

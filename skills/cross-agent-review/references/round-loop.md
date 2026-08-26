@@ -73,6 +73,7 @@ hatch under the initial budget.
 | --- | --- | --- |
 | No-diff stop leaves an unresolved finding | The required later-round base equals `HEAD`, so there is no repair range | Escalate in that round |
 | Confirmed but outside task scope | It produces no authorized repair diff | Escalate; a verified defect must not pass silently |
+| Round-1 `to-claude` finding is disputed | The built-in PR reviewer receives no focus text, and later rounds see only repair commits | Escalate the disagreement in round 1 |
 | No reviewer path can enforce the later-round range | A full re-audit can invent findings in unchanged material | Stop and ask the user how to proceed |
 | A commit landed after the last completed review and no next round is permitted | The current head remains unreviewed | Block the handoff and escalate |
 

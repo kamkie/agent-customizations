@@ -23,7 +23,7 @@ function Get-ManagedJobRoot {
         $root = Get-ManagedJobAutomaticCleanupRoot
     }
 
-    foreach ($directory in @('jobs', 'logs', 'launch', 'owners')) {
+    foreach ($directory in @('jobs', 'logs', 'launch', 'owners', 'control')) {
         $null = New-Item -ItemType Directory -Path (Join-Path $root $directory) -Force
     }
     return $root
@@ -35,6 +35,14 @@ function Get-ManagedJobFile {
         throw "Invalid managed job id: $Id"
     }
     return Join-Path (Join-Path (Get-ManagedJobRoot) 'jobs') "$Id.json"
+}
+
+function Get-ManagedJobControlFile {
+    param([Parameter(Mandatory)][string]$Id)
+    if ($Id -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]*$') {
+        throw "Invalid managed job id: $Id"
+    }
+    return Join-Path (Join-Path (Get-ManagedJobRoot) 'control') "$Id.json"
 }
 
 function Read-ManagedJob {
@@ -228,6 +236,228 @@ function Assert-SecretSafeInvocation {
     }
 }
 
+function Assert-SharedTerminalInputSafe {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$InputText)
+
+    if ($InputText -match '(?i)(authorization\s*:\s*(?:bearer|basic)|bearer\s+[a-z0-9._~-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -or
+        $InputText -match '(?i)(?:^|\s)--?[^=\s]*(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential)(?:=|\s+)\S+' -or
+        $InputText -match '(?i)(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credential)\s*[:=]\s*\S+' -or
+        $InputText -match '(?i)[a-z][a-z0-9+.-]*://[^/@\s]+:[^/@\s]+@') {
+        throw 'Input appears credential-bearing. Authentication secrets must be typed by the user directly in the visible shared terminal.'
+    }
+}
+
+function Resolve-IntelligentTerminalTools {
+    if (-not $IsWindows) {
+        throw 'Shared-terminal mode requires Windows.'
+    }
+
+    $packages = @(Get-AppxPackage -Name 'Microsoft.IntelligentTerminal' -ErrorAction Stop | Where-Object {
+        $_.PackageFamilyName -eq 'Microsoft.IntelligentTerminal_8wekyb3d8bbwe' -and
+        -not $_.IsFramework -and
+        -not $_.IsResourcePackage -and
+        [string]$_.Status -eq 'Ok'
+    })
+    $package = $packages | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1
+    if (-not $package) {
+        throw 'Shared-terminal mode requires the Microsoft.IntelligentTerminal package.'
+    }
+    if ([version]$package.Version -lt [version]'0.2.2192.0') {
+        throw "Shared-terminal mode requires Microsoft.IntelligentTerminal 0.2.2192.0 or newer; found $($package.Version)."
+    }
+
+    $packageRoot = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath([string]$package.InstallLocation))
+    $packagePrefix = $packageRoot + [IO.Path]::DirectorySeparatorChar
+    $resolved = [ordered]@{
+        packageVersion = [string]$package.Version
+        packageRoot = $packageRoot
+        comClsid = '{A2E4F6B8-1C3D-4E5F-A6B7-C8D9E0F1A2B3}'
+    }
+    foreach ($leaf in @('wtai.exe', 'wtcli.exe')) {
+        $candidate = [IO.Path]::GetFullPath((Join-Path $packageRoot $leaf))
+        if (-not $candidate.StartsWith($packagePrefix, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "The installed Microsoft.IntelligentTerminal package does not provide $leaf."
+        }
+        $resolved[[IO.Path]::GetFileNameWithoutExtension($leaf)] = $candidate
+    }
+    return [pscustomobject]$resolved
+}
+
+function Resolve-RecordedIntelligentTerminalTools {
+    param([Parameter(Mandatory)]$Job)
+
+    foreach ($property in @('terminalPackageVersion', 'terminalPackageRoot', 'terminalCliPath')) {
+        if ($Job.PSObject.Properties.Name -notcontains $property -or
+            [string]::IsNullOrWhiteSpace([string]$Job.$property)) {
+            throw 'The shared-terminal package metadata is incomplete.'
+        }
+    }
+    try {
+        $version = [version][string]$Job.terminalPackageVersion
+        $packageRoot = [IO.Path]::TrimEndingDirectorySeparator(
+            [IO.Path]::GetFullPath([string]$Job.terminalPackageRoot)
+        )
+        $cliPath = [IO.Path]::GetFullPath([string]$Job.terminalCliPath)
+        $windowsAppsRoot = [IO.Path]::TrimEndingDirectorySeparator(
+            [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'WindowsApps'))
+        )
+    } catch {
+        throw 'The shared-terminal package metadata is invalid.'
+    }
+
+    $packageLeaf = [IO.Path]::GetFileName($packageRoot)
+    $expectedLeafPattern = '^Microsoft\.IntelligentTerminal_' +
+        [regex]::Escape($version.ToString()) +
+        '_(?:x64|arm64|x86)__8wekyb3d8bbwe$'
+    if (-not ([IO.Path]::GetDirectoryName($packageRoot)).Equals(
+            $windowsAppsRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        ) -or
+        $packageLeaf -notmatch $expectedLeafPattern -or
+        -not ([IO.Path]::GetDirectoryName($cliPath)).Equals(
+            $packageRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        ) -or
+        [IO.Path]::GetFileName($cliPath) -ne 'wtcli.exe' -or
+        -not (Test-Path -LiteralPath $cliPath -PathType Leaf)) {
+        throw 'The shared-terminal package metadata is invalid.'
+    }
+    return [pscustomobject]@{ wtcli = $cliPath }
+}
+
+function Invoke-IntelligentTerminalCliProcess {
+    param(
+        [Parameter(Mandatory)]$Tools,
+        [Parameter(Mandatory)][string]$ComClsid,
+        [string]$SessionId,
+        [Parameter(Mandatory)][string[]]$Arguments,
+        [ValidateRange(1, 30)][int]$TimeoutSeconds = 10
+    )
+
+    $parsedComClsid = [guid]::Empty
+    if (-not [guid]::TryParse($ComClsid, [ref]$parsedComClsid)) {
+        throw 'The Intelligent Terminal COM identifier is invalid.'
+    }
+    if ($SessionId) {
+        $parsedSessionId = [guid]::Empty
+        if (-not [guid]::TryParse($SessionId, [ref]$parsedSessionId)) {
+            throw 'The Intelligent Terminal session identifier is invalid.'
+        }
+    }
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $Tools.wtcli
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.Environment['WT_COM_CLSID'] = $parsedComClsid.ToString('B')
+    if ($SessionId) {
+        $startInfo.Environment['WT_SESSION'] = $parsedSessionId.ToString('D')
+    } else {
+        $startInfo.Environment.Remove('WT_SESSION') | Out-Null
+    }
+    foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add([string]$argument) }
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    $deadline = [datetime]::UtcNow.AddSeconds($TimeoutSeconds)
+    try {
+        if (-not $process.Start()) { throw 'The Intelligent Terminal CLI failed to start.' }
+        $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+        $standardErrorTask = $process.StandardError.ReadToEndAsync()
+        $exitBudget = [int][Math]::Max(1, ($deadline - [datetime]::UtcNow).TotalMilliseconds)
+        if (-not $process.WaitForExit($exitBudget)) {
+            try { $process.Kill($true) } catch {}
+            throw 'The Intelligent Terminal CLI timed out.'
+        }
+        $readBudget = [int][Math]::Max(1, ($deadline - [datetime]::UtcNow).TotalMilliseconds)
+        try {
+            $readsCompleted = [Threading.Tasks.Task]::WaitAll(
+                [Threading.Tasks.Task[]]@($standardOutputTask, $standardErrorTask),
+                $readBudget
+            )
+        } catch {
+            throw 'The Intelligent Terminal CLI output could not be read.'
+        }
+        if (-not $readsCompleted) {
+            try { $process.StandardOutput.Close() } catch {}
+            try { $process.StandardError.Close() } catch {}
+            throw 'The Intelligent Terminal CLI timed out while draining output.'
+        }
+        return [pscustomobject]@{
+            exitCode = $process.ExitCode
+            standardOutput = $standardOutputTask.GetAwaiter().GetResult()
+            standardError = $standardErrorTask.GetAwaiter().GetResult()
+        }
+    } finally {
+        $process.Dispose()
+    }
+}
+
+function Get-LiveIntelligentTerminalConnection {
+    param([Parameter(Mandatory)]$Tools)
+
+    $packagePrefix = [IO.Path]::TrimEndingDirectorySeparator(
+        [IO.Path]::GetFullPath([string]$Tools.packageRoot)
+    ) + [IO.Path]::DirectorySeparatorChar
+    $packageProcess = Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
+        Where-Object {
+            try {
+                $_.Path -and
+                [IO.Path]::GetFullPath([string]$_.Path).StartsWith(
+                    $packagePrefix,
+                    [StringComparison]::OrdinalIgnoreCase
+                )
+            } catch {
+                $false
+            }
+        } |
+        Select-Object -First 1
+    if (-not $packageProcess) { return $null }
+
+    try {
+        $probe = Invoke-IntelligentTerminalCliProcess `
+            -Tools $Tools `
+            -ComClsid $Tools.comClsid `
+            -Arguments @('--json', 'list-windows')
+        if ($probe.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
+            throw 'protocol probe failed'
+        }
+        $payload = $probe.standardOutput | ConvertFrom-Json
+        if (@($payload.windows).Count -eq 0) { throw 'no live protocol windows were returned' }
+        return [pscustomobject]@{
+            tools = $Tools
+            comClsid = ([guid]$Tools.comClsid).ToString('B')
+        }
+    } catch {
+        throw 'A running Microsoft Intelligent Terminal instance could not be verified; refusing a focus-stealing foreground fallback.'
+    }
+}
+
+function Get-ManagedJobHostPowerShellArguments {
+    param(
+        [Parameter(Mandatory)][string]$HostScript,
+        [Parameter(Mandatory)][string]$JobFile,
+        [Parameter(Mandatory)][string]$LaunchFile,
+        [switch]$KeepOpen
+    )
+
+    $escapeLiteral = {
+        param([string]$Value)
+        return "'" + $Value.Replace("'", "''") + "'"
+    }
+    $hostInvocation = '& {0} -JobFile {1} -LaunchFile {2}' -f
+        (& $escapeLiteral $HostScript),
+        (& $escapeLiteral $JobFile),
+        (& $escapeLiteral $LaunchFile)
+    $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($hostInvocation))
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
+    if ($KeepOpen) { $arguments += '-NoExit' }
+    return $arguments + @('-EncodedCommand', $encodedCommand)
+}
+
 function Get-InvocationFingerprint {
     param(
         [Parameter(Mandatory)][string]$Executable,
@@ -368,4 +598,60 @@ public static class ManagedJobNativeProcessContainment
     # closes it automatically on normal exit or a crash, which terminates every
     # descendant still assigned to the containment job.
     return [ManagedJobNativeProcessContainment]::CreateForCurrentProcess()
+}
+
+function Enable-ManagedJobHostControlCGuard {
+    if (-not $IsWindows) {
+        throw 'Managed-job Ctrl+C protection requires Windows.'
+    }
+
+    if (-not ('ManagedJobNativeConsoleControl' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+public sealed class ManagedJobNativeConsoleControl : IDisposable
+{
+    private const uint CTRL_C_EVENT = 0;
+
+    private delegate bool HandlerRoutine(uint controlType);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetConsoleCtrlHandler(HandlerRoutine handler, bool add);
+
+    private HandlerRoutine handler;
+
+    public ManagedJobNativeConsoleControl()
+    {
+        handler = HandleControlEvent;
+        if (!SetConsoleCtrlHandler(handler, true))
+        {
+            handler = null;
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to protect the managed-job host from Ctrl+C.");
+        }
+    }
+
+    private static bool HandleControlEvent(uint controlType)
+    {
+        return controlType == CTRL_C_EVENT;
+    }
+
+    public void Dispose()
+    {
+        HandlerRoutine registered = handler;
+        handler = null;
+        if (registered != null)
+        {
+            SetConsoleCtrlHandler(registered, false);
+        }
+    }
+}
+'@
+    }
+
+    # Console handlers are process-local and are not inherited as handler
+    # functions by children. The host consumes Ctrl+C while its child retains
+    # the normal default interrupt behavior in the shared terminal.
+    return [ManagedJobNativeConsoleControl]::new()
 }

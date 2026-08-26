@@ -47,6 +47,57 @@ Add `-KeepTerminalOpen` only when the user wants the terminal to remain open
 after completion. The user must close that terminal manually; `stop` manages
 active jobs and does not close a kept-open terminal after its job is complete.
 
+### Shared terminal
+
+Add `-SharedTerminal` only with `-Visible` when both the user and agent need the
+same managed pane. Shared mode resolves `wtai.exe` and `wtcli.exe` directly from
+the installed `Microsoft.IntelligentTerminal` Store package (version
+0.2.2192.0 or newer); it does not trust a PATH alias. The in-pane host records
+its `WT_SESSION` and `WT_COM_CLSID` in the job's separate local control file.
+Those identifiers are never returned by `start` or `status` and are never
+written to the ordinary managed log.
+
+If that exact package already has a live window, shared launch uses its packaged
+`wtcli new-tab` protocol path. Version 0.2 creates protocol tabs in the
+background, so the user's foreground window and active pane remain unchanged.
+The controller verifies the returned session id against the session registered
+by the managed host. With no live window, shared launch uses `wtai.exe` as a
+foreground bootstrap. Add `-RequireBackgroundTab` to reject that cold-start
+fallback when focus preservation is mandatory.
+
+The foreground bootstrap is used only when no process from the exact package is
+running. If a matching process exists but its protocol probe fails, launch fails
+closed instead of silently taking focus.
+
+The controller accepts only the managed job id. `capture`, `send-input`, and
+`send-key` load and validate that job's host identity, Job Object containment,
+and registered control file before invoking the packaged CLI. They never accept
+an arbitrary pane id or use the focused pane. Capture is limited to 1-500 lines.
+Literal input is passed without shell interpretation, and named keys are limited
+to `Enter`, `Tab`, `Escape`, `Backspace`, and `Ctrl+C`. The managed host consumes
+Ctrl+C only for itself, allowing the foreground child to receive the interrupt
+while the host remains alive to publish the child's terminal result.
+
+Pane content is sensitive. Do not store captures or paste them into ordinary
+logs. Never send credentials with `send-input`; leave an authentication prompt
+visible for the user to answer directly, and do not poll capture while that
+secret prompt is waiting. Resume capture only after the user says the secret
+entry is complete.
+
+Normal completion, explicit stop, turn/session cleanup, failed launch, prune,
+and orphan reconciliation remove the job-scoped control file. Control metadata
+does not survive as a general pane registry.
+
+Run the focused integration test on a desktop session where visible Windows
+Terminal windows are allowed:
+
+```powershell
+pwsh ./skills/managed-jobs/tests/ManagedJobs.SharedTerminal.Tests.ps1
+# The default run skips if no live window exists, so it never cold-starts into focus.
+# Add -AllowForegroundBootstrap only for an explicitly attended cold-start run.
+# Add -RequireUserInput to verify direct non-secret user typing after selecting the background tab.
+```
+
 ## Duplicate detection
 
 Equivalent active invocations are rejected using a stable fingerprint under a

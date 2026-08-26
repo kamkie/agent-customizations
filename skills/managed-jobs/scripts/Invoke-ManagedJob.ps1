@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory)]
-    [ValidateSet('start', 'list', 'status', 'wait-ready', 'logs', 'stop', 'cleanup', 'reconcile', 'prune')]
+    [ValidateSet('start', 'list', 'status', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'prune')]
     [string]$Action,
 
     [string]$Id,
@@ -12,6 +12,8 @@ param(
     [string]$WorkingDirectory = (Get-Location).Path,
     [hashtable]$Environment = @{},
     [switch]$Visible,
+    [switch]$SharedTerminal,
+    [switch]$RequireBackgroundTab,
     [switch]$KeepTerminalOpen,
     [ValidateSet('Auto', 'Turn', 'Session', 'Persistent')]
     [string]$Lifetime = 'Auto',
@@ -24,6 +26,12 @@ param(
     [int]$ReadinessTimeoutSeconds = 30,
     [int]$Tail = 100,
     [switch]$Follow,
+    [AllowEmptyString()]
+    [string]$InputText,
+    [ValidateSet('Enter', 'Tab', 'Escape', 'Backspace', 'Ctrl+C')]
+    [string[]]$Key,
+    [ValidateRange(1, 500)]
+    [int]$MaxLines = 100,
     [int]$OlderThanDays = 14,
     [string]$StateRoot,
     [ValidateSet('starting', 'running', 'completed', 'failed', 'stopped', 'orphaned', 'invalid')]
@@ -36,6 +44,21 @@ $readinessParametersUsed = $PSBoundParameters.ContainsKey('ReadinessUri') -or
     $PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds')
 if ($Action -notin @('start', 'wait-ready') -and $readinessParametersUsed) {
     throw '-ReadinessUri and -ReadinessTimeoutSeconds are valid only for start and wait-ready.'
+}
+if ($Action -ne 'start' -and $PSBoundParameters.ContainsKey('SharedTerminal')) {
+    throw '-SharedTerminal is valid only for start.'
+}
+if ($Action -ne 'start' -and $PSBoundParameters.ContainsKey('RequireBackgroundTab')) {
+    throw '-RequireBackgroundTab is valid only for start.'
+}
+if ($Action -ne 'send-input' -and $PSBoundParameters.ContainsKey('InputText')) {
+    throw '-InputText is valid only for send-input.'
+}
+if ($Action -ne 'send-key' -and $PSBoundParameters.ContainsKey('Key')) {
+    throw '-Key is valid only for send-key.'
+}
+if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
+    throw '-MaxLines is valid only for capture.'
 }
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
@@ -61,9 +84,32 @@ function Get-AllManagedJobs {
     }
 }
 
+function Remove-ManagedJobControl {
+    param([Parameter(Mandatory)][string]$JobId)
+    try {
+        $controlFile = Get-ManagedJobControlFile -Id $JobId
+        if (Test-Path -LiteralPath $controlFile -PathType Leaf) {
+            Remove-Item -LiteralPath $controlFile -Force -ErrorAction SilentlyContinue
+        }
+    } catch {}
+}
+
+function Set-ManagedJobControlReleased {
+    param([Parameter(Mandatory)]$Job)
+    if ($Job.PSObject.Properties.Name -notcontains 'sharedTerminal' -or -not [bool]$Job.sharedTerminal) {
+        return
+    }
+    if ($Job.PSObject.Properties.Name -contains 'terminalControlState') {
+        $Job.terminalControlState = 'released'
+    } else {
+        $Job | Add-Member -NotePropertyName terminalControlState -NotePropertyValue 'released'
+    }
+}
+
 function Update-ReconciledJob {
     param($Job)
     if ($Job.status -notin @('starting', 'running')) {
+        Remove-ManagedJobControl -JobId $Job.id
         try { Unregister-ManagedJobOwnerReference -Job $Job } catch {}
         return $Job
     }
@@ -79,6 +125,7 @@ function Update-ReconciledJob {
     $path = Get-ManagedJobFile -Id $Job.id
     $current = Read-ManagedJob -Path $path
     if ($current.status -notin @('starting', 'running')) {
+        Remove-ManagedJobControl -JobId $current.id
         try { Unregister-ManagedJobOwnerReference -Job $current } catch {}
         return $current
     }
@@ -92,9 +139,11 @@ function Update-ReconciledJob {
     }
     if (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc) { return $current }
     $current.status = 'orphaned'
+    Set-ManagedJobControlReleased -Job $current
     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
     $current.error = 'Recorded host process is no longer running and no terminal state was recorded.'
     Write-ManagedJob -Path $path -Job $current
+    Remove-ManagedJobControl -JobId $current.id
     Unregister-ManagedJobOwnerReference -Job $current
     $unclaimedLaunch = Join-Path (Join-Path (Get-ManagedJobRoot) 'launch') "$($Job.id).json"
     if (Test-Path -LiteralPath $unclaimedLaunch) { Remove-Item -LiteralPath $unclaimedLaunch -Force }
@@ -233,6 +282,149 @@ function Add-ManagedJobReadiness {
     return [pscustomobject]$copy
 }
 
+function Get-SharedTerminalContext {
+    param([Parameter(Mandatory)][string]$JobId)
+
+    $job = Update-ReconciledJob -Job (Read-ManagedJob -Path (Get-ManagedJobFile -Id $JobId))
+    if ($job.PSObject.Properties.Name -notcontains 'sharedTerminal' -or -not [bool]$job.sharedTerminal) {
+        throw "Job $JobId was not started in shared-terminal mode."
+    }
+    if ($job.status -ne 'running') {
+        throw "Job $JobId is not available for shared-terminal control; current status is $($job.status)."
+    }
+    if (-not (Test-ManagedProcessIdentity -ProcessId $job.hostPid -ExpectedStartTimeUtc $job.hostStartedAtUtc)) {
+        throw "Job $JobId does not have a matching managed-host identity."
+    }
+    if ($job.PSObject.Properties.Name -notcontains 'processContainment' -or
+        [string]$job.processContainment -ne 'windows-job-object-kill-on-close') {
+        throw "Job $JobId has not confirmed Windows process-tree containment."
+    }
+
+    if ($job.PSObject.Properties.Name -notcontains 'terminalControlState' -or
+        [string]$job.terminalControlState -ne 'registered') {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
+    $controlFile = Get-ManagedJobControlFile -Id $JobId
+    if (-not (Test-Path -LiteralPath $controlFile -PathType Leaf)) {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
+    try {
+        $control = Read-ManagedJob -Path $controlFile
+    } catch {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
+    $requiredControlProperties = @(
+        'schemaVersion', 'jobId', 'hostPid', 'hostStartedAtUtc', 'wtSession', 'wtComClsid'
+    )
+    if (@($requiredControlProperties | Where-Object { $control.PSObject.Properties.Name -notcontains $_ }).Count -gt 0 -or
+        [int]$control.schemaVersion -ne 1) {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
+    $terminalSession = [guid]::Empty
+    $terminalComClsid = [guid]::Empty
+    $controlStart = $null
+    try { $controlStart = [datetimeoffset]::Parse([string]$control.hostStartedAtUtc).UtcDateTime } catch {}
+    $jobStart = [datetimeoffset]::Parse([string]$job.hostStartedAtUtc).UtcDateTime
+    if ([string]$control.jobId -ne $JobId -or
+        [int]$control.hostPid -ne [int]$job.hostPid -or
+        -not $controlStart -or
+        [math]::Abs(($controlStart - $jobStart).TotalSeconds) -ge 2 -or
+        -not [guid]::TryParse([string]$control.wtSession, [ref]$terminalSession) -or
+        -not [guid]::TryParse([string]$control.wtComClsid, [ref]$terminalComClsid)) {
+        throw "Job $JobId has invalid shared-terminal control metadata."
+    }
+
+    return [pscustomobject]@{
+        job = $job
+        sessionId = $terminalSession.ToString('D')
+        comClsid = $terminalComClsid.ToString('B')
+        tools = Resolve-RecordedIntelligentTerminalTools -Job $job
+    }
+}
+
+function Invoke-SharedTerminalCli {
+    param(
+        [Parameter(Mandatory)]$Context,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $result = Invoke-IntelligentTerminalCliProcess `
+        -Tools $Context.tools `
+        -ComClsid $Context.comClsid `
+        -SessionId $Context.sessionId `
+        -Arguments $Arguments
+    if ($result.exitCode -ne 0) {
+        $detail = $result.standardError.Trim()
+        try {
+            foreach ($privateValue in @(
+                [string]$Context.sessionId,
+                ([guid]$Context.sessionId).ToString('B'),
+                [string]$Context.comClsid,
+                ([guid]$Context.comClsid).ToString('D')
+            )) {
+                if ($privateValue) {
+                    $detail = $detail -replace [regex]::Escape($privateValue), '<redacted>'
+                }
+            }
+        } catch {}
+        if ($detail.Length -gt 1000) { $detail = $detail.Substring(0, 1000) }
+        if ($detail) { throw "The shared-terminal controller failed: $detail" }
+        throw "The shared-terminal controller failed with exit code $($result.exitCode)."
+    }
+    return $result.standardOutput
+}
+
+function Start-ManagedJobBackgroundTerminalTab {
+    param(
+        [Parameter(Mandatory)]$Connection,
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$WorkingDirectory,
+        [Parameter(Mandatory)][string[]]$PowerShellArguments
+    )
+
+    $commandLine = (@('pwsh.exe') + $PowerShellArguments) -join ' '
+    $result = Invoke-IntelligentTerminalCliProcess `
+        -Tools $Connection.tools `
+        -ComClsid $Connection.comClsid `
+        -Arguments @(
+            '--json', 'new-tab',
+            '--command', $commandLine,
+            '--title', $Name,
+            '--cwd', $WorkingDirectory
+        )
+    if ($result.exitCode -ne 0) {
+        throw 'The background shared-terminal tab failed to launch.'
+    }
+    try {
+        $payload = $result.standardOutput | ConvertFrom-Json
+        $sessionId = [guid]::Empty
+        if (-not [guid]::TryParse([string]$payload.session_id, [ref]$sessionId)) {
+            throw 'missing session identifier'
+        }
+        return $sessionId.ToString('D')
+    } catch {
+        throw [InvalidOperationException]::new(
+            'The background shared-terminal tab returned an invalid result.',
+            $_.Exception
+        )
+    }
+}
+
+function Stop-ManagedJobBackgroundTerminalTab {
+    param(
+        [Parameter(Mandatory)]$Connection,
+        [Parameter(Mandatory)][string]$SessionId
+    )
+
+    $result = Invoke-IntelligentTerminalCliProcess `
+        -Tools $Connection.tools `
+        -ComClsid $Connection.comClsid `
+        -Arguments @('kill-pane', '--target', $SessionId)
+    if ($result.exitCode -ne 0) {
+        throw 'The background shared-terminal tab could not be closed.'
+    }
+}
+
 function Write-JobCollection {
     param([object[]]$Jobs)
     $output = @(foreach ($job in @($Jobs)) {
@@ -273,15 +465,18 @@ function Stop-ManagedJobTrees {
             }
             $outcome.job = $current
             if ($current.status -notin @('starting', 'running')) {
+                Remove-ManagedJobControl -JobId $current.id
                 try { Unregister-ManagedJobOwnerReference -Job $current } catch {}
                 continue
             }
             if (-not (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc)) {
                 if ($recordUnavailable) {
                     $current.status = 'stopped'
+                    Set-ManagedJobControlReleased -Job $current
                     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                     $current.exitCode = $null
                     $current.error = [string]$item.reason
+                    Remove-ManagedJobControl -JobId $current.id
                     Unregister-ManagedJobOwnerReference -Job $current
                     $outcome.job = $current
                     continue
@@ -345,6 +540,7 @@ function Stop-ManagedJobTrees {
                 $current = $target.outcome.job
                 if ($target.recordUnavailable) {
                     $current.status = 'stopped'
+                    Set-ManagedJobControlReleased -Job $current
                     $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                     $current.exitCode = $null
                     $current.error = $target.reason
@@ -352,12 +548,14 @@ function Stop-ManagedJobTrees {
                     $current = Read-ManagedJob -Path $target.path
                     if ($current.status -in @('starting', 'running')) {
                         $current.status = 'stopped'
+                        Set-ManagedJobControlReleased -Job $current
                         $current.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                         $current.exitCode = $null
                         $current.error = $target.reason
                         Write-ManagedJob -Path $target.path -Job $current
                     }
                 }
+                Remove-ManagedJobControl -JobId $current.id
                 Unregister-ManagedJobOwnerReference -Job $current
                 $target.outcome.job = $current
             } catch {
@@ -374,10 +572,30 @@ switch ($Action) {
         if (-not $Name) { throw '-Name is required for start.' }
         if (-not $Executable) { throw '-Executable is required for start.' }
         if ($KeepTerminalOpen -and -not $Visible) { throw '-KeepTerminalOpen requires -Visible.' }
+        if ($SharedTerminal -and -not $Visible) { throw '-SharedTerminal requires -Visible.' }
+        if ($RequireBackgroundTab -and -not $SharedTerminal) {
+            throw '-RequireBackgroundTab requires -SharedTerminal.'
+        }
         if ($PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds') -and -not $ReadinessUri) {
             throw '-ReadinessTimeoutSeconds requires -ReadinessUri.'
         }
         $resolvedReadinessUri = if ($ReadinessUri) { Resolve-ManagedJobReadinessUri -Uri $ReadinessUri } else { $null }
+        $terminalTools = if ($SharedTerminal) { Resolve-IntelligentTerminalTools } else { $null }
+        $backgroundTerminalConnection = if ($SharedTerminal) {
+            Get-LiveIntelligentTerminalConnection -Tools $terminalTools
+        } else {
+            $null
+        }
+        if ($RequireBackgroundTab -and -not $backgroundTerminalConnection) {
+            throw '-RequireBackgroundTab needs an already-running Microsoft Intelligent Terminal window.'
+        }
+        $sharedTerminalLaunchMode = if (-not $SharedTerminal) {
+            $null
+        } elseif ($backgroundTerminalConnection) {
+            'background-tab'
+        } else {
+            'foreground-bootstrap'
+        }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
         $resolvedOwnerAgent = if ($OwnerAgent) {
             $OwnerAgent.Trim().ToLowerInvariant()
@@ -418,6 +636,9 @@ switch ($Action) {
         $lock = $null
         $launchFile = $null
         $jobFile = $null
+        $jobId = $null
+        $expectedTerminalSession = $null
+        $backgroundTabMayExist = $false
         try {
             $deadline = [datetime]::UtcNow.AddSeconds(10)
             do {
@@ -441,9 +662,11 @@ switch ($Action) {
             $logPath = Join-Path (Join-Path $root 'logs') "$jobId.log"
             $launchFile = Join-Path (Join-Path $root 'launch') "$jobId.json"
             $environmentObject = [ordered]@{}
-            foreach ($key in $Environment.Keys) { $environmentObject[[string]$key] = [string]$Environment[$key] }
+            foreach ($environmentKey in $Environment.Keys) {
+                $environmentObject[[string]$environmentKey] = [string]$Environment[$environmentKey]
+            }
             $job = [ordered]@{
-                schemaVersion = 3
+                schemaVersion = if ($SharedTerminal) { 4 } else { 3 }
                 id = $jobId
                 name = $Name
                 kind = $Kind
@@ -468,6 +691,14 @@ switch ($Action) {
                 exitCode = $null
                 error = $null
             }
+            if ($SharedTerminal) {
+                $job['sharedTerminal'] = $true
+                $job['terminalPackageVersion'] = $terminalTools.packageVersion
+                $job['terminalPackageRoot'] = $terminalTools.packageRoot
+                $job['terminalCliPath'] = $terminalTools.wtcli
+                $job['terminalControlState'] = 'pending'
+                $job['terminalLaunchMode'] = $sharedTerminalLaunchMode
+            }
             $launch = [ordered]@{
                 executable = $Executable
                 arguments = @($Arguments)
@@ -479,12 +710,39 @@ switch ($Action) {
             $hostScript = Join-Path $PSScriptRoot 'ManagedJob.Host.ps1'
 
             if ($Visible) {
-                $wt = Get-Command wt.exe -ErrorAction Stop
-                $pwshArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
-                if ($KeepTerminalOpen) { $pwshArguments += '-NoExit' }
-                $pwshArguments += @('-File', ('"' + $hostScript + '"'), '-JobFile', ('"' + $jobFile + '"'), '-LaunchFile', ('"' + $launchFile + '"'))
-                $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
-                Start-Process -FilePath $wt.Source -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
+                $pwshArguments = if ($SharedTerminal) {
+                    Get-ManagedJobHostPowerShellArguments `
+                        -HostScript $hostScript `
+                        -JobFile $jobFile `
+                        -LaunchFile $launchFile `
+                        -KeepOpen:$KeepTerminalOpen
+                } else {
+                    $ordinaryVisibleArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
+                    if ($KeepTerminalOpen) { $ordinaryVisibleArguments += '-NoExit' }
+                    $ordinaryVisibleArguments + @(
+                        '-File', ('"' + $hostScript + '"'),
+                        '-JobFile', ('"' + $jobFile + '"'),
+                        '-LaunchFile', ('"' + $launchFile + '"')
+                    )
+                }
+                if ($SharedTerminal -and $backgroundTerminalConnection) {
+                    # Once control reaches wtcli, any failure can be ambiguous: the
+                    # tab may have been created before the client timed out or exited.
+                    $backgroundTabMayExist = $true
+                    $expectedTerminalSession = Start-ManagedJobBackgroundTerminalTab `
+                        -Connection $backgroundTerminalConnection `
+                        -Name $Name `
+                        -WorkingDirectory $resolvedDirectory `
+                        -PowerShellArguments $pwshArguments
+                } else {
+                    $terminalExecutable = if ($SharedTerminal) {
+                        $terminalTools.wtai
+                    } else {
+                        (Get-Command wt.exe -ErrorAction Stop).Source
+                    }
+                    $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
+                    Start-Process -FilePath $terminalExecutable -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
+                }
             } else {
                 # Start-Process -WindowStyle Hidden is ignored when Windows Terminal is
                 # the default terminal app, so hidden hosts launch with CreateNoWindow.
@@ -500,18 +758,58 @@ switch ($Action) {
                 $hostProcess.Dispose()
             }
         } catch {
+            # Recovery can wait for an ambiguously-created terminal host. Do not
+            # block unrelated launches while that job-scoped recovery runs.
+            if ($lock) {
+                $lock.Dispose()
+                $lock = $null
+            }
+            $launchFailure = $_.Exception.Message
+            $backgroundTerminationError = $null
+            $preserveBackgroundOwnership = $false
+            if ($backgroundTabMayExist -and $jobFile -and (Test-Path -LiteralPath $jobFile)) {
+                $recoveryDeadline = [datetime]::UtcNow.AddSeconds(30)
+                do {
+                    try { $backgroundJob = Read-ManagedJob -Path $jobFile } catch { $backgroundJob = $null }
+                    if (-not $backgroundJob -or $backgroundJob.status -ne 'starting') { break }
+                    Start-Sleep -Milliseconds 100
+                } while ([datetime]::UtcNow -lt $recoveryDeadline)
+                if ($backgroundJob -and $backgroundJob.status -eq 'running') {
+                    $terminationRequest = [pscustomobject]@{
+                        job = $backgroundJob
+                        reason = 'Stopped because background tab launch did not return a valid result.'
+                    }
+                    $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
+                    if ($termination.error) {
+                        $backgroundTerminationError = [string]$termination.error
+                        $preserveBackgroundOwnership = $true
+                    }
+                } elseif ($backgroundJob -and $backgroundJob.status -eq 'starting') {
+                    # The tab may still claim the launch after this invocation fails.
+                    # Cancel new claims but retain the owner reference so cleanup can
+                    # contain a host that already read the handoff.
+                    $backgroundJob.error = 'Background tab launch returned an invalid result before the host published its identity.'
+                    Write-ManagedJob -Path $jobFile -Job $backgroundJob
+                    $preserveBackgroundOwnership = $true
+                }
+            }
             if ($launchFile -and (Test-Path -LiteralPath $launchFile)) { Remove-Item -LiteralPath $launchFile -Force -ErrorAction SilentlyContinue }
+            if ($jobId -and -not $preserveBackgroundOwnership) { Remove-ManagedJobControl -JobId $jobId }
             if ($jobFile -and (Test-Path -LiteralPath $jobFile)) {
                 try {
                     $failedJob = Read-ManagedJob -Path $jobFile
-                    if ($failedJob.status -eq 'starting') {
+                    if ($failedJob.status -eq 'starting' -and -not $preserveBackgroundOwnership) {
                         $failedJob.status = 'failed'
+                        Set-ManagedJobControlReleased -Job $failedJob
                         $failedJob.finishedAtUtc = [datetime]::UtcNow.ToString('o')
                         $failedJob.error = 'Managed host launch failed before startup completed.'
                         Write-ManagedJob -Path $jobFile -Job $failedJob
                         Unregister-ManagedJobOwnerReference -Job $failedJob
                     }
                 } catch {}
+            }
+            if ($backgroundTerminationError) {
+                throw "$launchFailure Failed to contain the background terminal host: $backgroundTerminationError"
             }
             throw
         } finally {
@@ -523,10 +821,85 @@ switch ($Action) {
             Start-Sleep -Milliseconds 100
             $job = Read-ManagedJob -Path $jobFile
         } while ($job.status -eq 'starting' -and [datetime]::UtcNow -lt $startupDeadline)
-        # A slow host may claim immediately after the final poll. Do not overwrite or
-        # delete its launch handoff from a stale read; reconciliation owns the 30-second
-        # unclaimed-start timeout and cleans the launch file when it marks an orphan.
+        # A slow host may claim immediately after the final poll. Re-read before
+        # deciding whether the background launch needs cancellation.
         if ($job.status -eq 'starting') { $job = Read-ManagedJob -Path $jobFile }
+        if ($expectedTerminalSession -and $job.status -eq 'starting') {
+            # Cancel the unclaimed handoff first. If the host already removed it,
+            # give that concurrent claim time to publish its identity before acting.
+            if (Test-Path -LiteralPath $launchFile) {
+                Remove-Item -LiteralPath $launchFile -Force -ErrorAction SilentlyContinue
+            }
+            $claimDeadline = [datetime]::UtcNow.AddSeconds(5)
+            do {
+                Start-Sleep -Milliseconds 100
+                $current = Read-ManagedJob -Path $jobFile
+            } while ($current.status -eq 'starting' -and [datetime]::UtcNow -lt $claimDeadline)
+            $job = $current
+            if ($job.status -eq 'starting') {
+                $backgroundCloseError = $null
+                try {
+                    Stop-ManagedJobBackgroundTerminalTab `
+                        -Connection $backgroundTerminalConnection `
+                        -SessionId $expectedTerminalSession
+                } catch {
+                    $backgroundCloseError = $_.Exception.Message
+                }
+                $afterClose = Read-ManagedJob -Path $jobFile
+                if ($afterClose.status -ne 'starting') {
+                    # The host can publish and finish while cancellation is in
+                    # flight. Preserve any running or terminal result it recorded.
+                    $job = $afterClose
+                    $backgroundCloseError = $null
+                } elseif ($backgroundCloseError) {
+                    # The pane may still publish a host identity. Keep the active
+                    # owner reference so turn/session cleanup can contain it.
+                    $afterClose.error = 'Background terminal host missed its startup deadline and its pane could not be confirmed closed.'
+                    Write-ManagedJob -Path $jobFile -Job $afterClose
+                    throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
+                }
+                if ($job.status -eq 'starting') {
+                    Remove-ManagedJobControl -JobId $job.id
+                    $job.status = 'failed'
+                    Set-ManagedJobControlReleased -Job $job
+                    $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                    $job.error = 'Background terminal host did not publish its process identity before the startup deadline.'
+                    Write-ManagedJob -Path $jobFile -Job $job
+                    Unregister-ManagedJobOwnerReference -Job $job
+                    if ($backgroundCloseError) {
+                        throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
+                    }
+                    throw 'The background shared-terminal host did not start in time.'
+                }
+            }
+        }
+        if ($expectedTerminalSession -and $job.status -eq 'running') {
+            $registeredSession = [guid]::Empty
+            $sessionMatches = $false
+            try {
+                $control = Read-ManagedJob -Path (Get-ManagedJobControlFile -Id $job.id)
+                $sessionMatches = [guid]::TryParse([string]$control.wtSession, [ref]$registeredSession) -and
+                    $registeredSession.ToString('D') -eq $expectedTerminalSession
+            } catch {}
+            if (-not $sessionMatches) {
+                $latest = Update-ReconciledJob -Job (Read-ManagedJob -Path $jobFile)
+                if ($latest.status -ne 'running') {
+                    # Normal completion can remove the control file between the
+                    # status read and identity check. Preserve that terminal result.
+                    $job = $latest
+                } else {
+                    $terminationRequest = [pscustomobject]@{
+                        job = $latest
+                        reason = 'Stopped because its background terminal session identity did not match.'
+                    }
+                    $termination = @(Stop-ManagedJobTrees -Request @($terminationRequest))[0]
+                    if ($termination.error) {
+                        throw "The background shared-terminal host registered an unexpected pane and could not be stopped safely: $($termination.error)"
+                    }
+                    throw 'The background shared-terminal host registered an unexpected pane.'
+                }
+            }
+        }
         $jobOutput = Add-ManagedJobIdentity -Job $job
         if ($resolvedReadinessUri) {
             try {
@@ -595,6 +968,52 @@ switch ($Action) {
             throw "Log does not exist yet: $($job.logPath)"
         }
         Get-Content -LiteralPath $job.logPath -Tail $Tail -Wait:$Follow
+    }
+    'capture' {
+        if (-not $Id) { throw '-Id is required for capture.' }
+        $context = Get-SharedTerminalContext -JobId $Id
+        $captured = Invoke-SharedTerminalCli -Context $context -Arguments @(
+            'capture-pane', '--target', $context.sessionId, '--max-lines', [string]$MaxLines
+        )
+        Write-Output -NoEnumerate $captured
+    }
+    'send-input' {
+        if (-not $Id) { throw '-Id is required for send-input.' }
+        if (-not $PSBoundParameters.ContainsKey('InputText')) { throw '-InputText is required for send-input.' }
+        Assert-SharedTerminalInputSafe -InputText $InputText
+        $context = Get-SharedTerminalContext -JobId $Id
+        $null = Invoke-SharedTerminalCli -Context $context -Arguments @(
+            'send-keys', '--target', $context.sessionId, '--raw', '--', $InputText
+        )
+        [pscustomobject]@{
+            id = $Id
+            action = 'send-input'
+            sent = $true
+            characterCount = $InputText.Length
+        } | ConvertTo-Json
+    }
+    'send-key' {
+        if (-not $Id) { throw '-Id is required for send-key.' }
+        if (-not $Key -or $Key.Count -eq 0) { throw '-Key is required for send-key.' }
+        $keyTokens = @($Key | ForEach-Object {
+            switch ($_) {
+                'Enter' { 'Enter' }
+                'Tab' { 'Tab' }
+                'Escape' { 'Escape' }
+                'Backspace' { 'BSpace' }
+                'Ctrl+C' { 'C-c' }
+            }
+        })
+        $context = Get-SharedTerminalContext -JobId $Id
+        $null = Invoke-SharedTerminalCli -Context $context -Arguments (
+            @('send-keys', '--target', $context.sessionId) + $keyTokens
+        )
+        [pscustomobject]@{
+            id = $Id
+            action = 'send-key'
+            sent = $true
+            keyCount = $keyTokens.Count
+        } | ConvertTo-Json
     }
     'stop' {
         if (-not $Id) { throw '-Id is required for stop.' }
@@ -722,6 +1141,7 @@ switch ($Action) {
             $candidates += $job.id
             if ($PSCmdlet.ShouldProcess($job.id, 'Remove terminal managed-job record and its managed log')) {
                 try { Unregister-ManagedJobOwnerReference -Job $job } catch {}
+                Remove-ManagedJobControl -JobId $job.id
                 $record = Get-ManagedJobFile -Id $job.id
                 $managedLog = Join-Path (Join-Path (Get-ManagedJobRoot) 'logs') "$($job.id).log"
                 if (Test-Path -LiteralPath $managedLog) { Remove-Item -LiteralPath $managedLog -Force }

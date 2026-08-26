@@ -71,6 +71,58 @@ function Get-FreeTcpPort {
 try {
     $null = New-Item -ItemType Directory -Path $stateRoot -Force
     $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+    $previousTerminalSession = $env:WT_SESSION
+    $env:WT_SESSION = [guid]::NewGuid().ToString('D')
+    try {
+        $fakeTerminalTools = [pscustomobject]@{ wtcli = $pwsh }
+        $withoutSession = Invoke-IntelligentTerminalCliProcess `
+            -Tools $fakeTerminalTools `
+            -ComClsid ([guid]::NewGuid().ToString('B')) `
+            -Arguments @('-NoProfile', '-Command', '[Environment]::GetEnvironmentVariable("WT_SESSION", "Process")')
+        Assert-True ([string]::IsNullOrWhiteSpace($withoutSession.standardOutput)) `
+            'Non-pane Intelligent Terminal operations should clear an inherited WT_SESSION.'
+        $explicitSession = [guid]::NewGuid()
+        $withSession = Invoke-IntelligentTerminalCliProcess `
+            -Tools $fakeTerminalTools `
+            -ComClsid ([guid]::NewGuid().ToString('B')) `
+            -SessionId $explicitSession.ToString('D') `
+            -Arguments @('-NoProfile', '-Command', '[Environment]::GetEnvironmentVariable("WT_SESSION", "Process")')
+        Assert-True ($withSession.standardOutput.Trim() -eq $explicitSession.ToString('D')) `
+            'Pane operations should pass only their explicit WT_SESSION.'
+
+        $pipeHolderCommand = @"
+`$startInfo = [Diagnostics.ProcessStartInfo]::new('$pwsh')
+`$startInfo.UseShellExecute = `$false
+`$startInfo.CreateNoWindow = `$true
+`$startInfo.ArgumentList.Add('-NoProfile')
+`$startInfo.ArgumentList.Add('-Command')
+`$startInfo.ArgumentList.Add('Start-Sleep -Seconds 2')
+`$grandchild = [Diagnostics.Process]::Start(`$startInfo)
+`$grandchild.Dispose()
+"@
+        $drainTimer = [Diagnostics.Stopwatch]::StartNew()
+        $drainTimeoutRejected = $false
+        try {
+            Invoke-IntelligentTerminalCliProcess `
+                -Tools $fakeTerminalTools `
+                -ComClsid ([guid]::NewGuid().ToString('B')) `
+                -Arguments @('-NoProfile', '-Command', $pipeHolderCommand) `
+                -TimeoutSeconds 1 | Out-Null
+        } catch {
+            $drainTimeoutRejected = $_.Exception.Message -match 'timed out while draining output'
+        }
+        $drainTimer.Stop()
+        Assert-True $drainTimeoutRejected `
+            'CLI output draining should remain bounded when a grandchild inherits the pipe.'
+        Assert-True ($drainTimer.Elapsed.TotalSeconds -lt 1.75) `
+            'CLI output draining should honor the shared controller timeout.'
+    } finally {
+        if ($null -eq $previousTerminalSession) {
+            Remove-Item Env:WT_SESSION -ErrorAction SilentlyContinue
+        } else {
+            $env:WT_SESSION = $previousTerminalSession
+        }
+    }
     $testSessionId = 'codex-lifecycle-session'
     $env:CODEX_HOME = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..')).Path
     $env:CODEX_THREAD_ID = $testSessionId
@@ -121,6 +173,19 @@ try {
     } catch { $hiddenKeepOpenRejected = $_.Exception.Message -match 'requires -Visible' }
     Assert-True $hiddenKeepOpenRejected 'KeepTerminalOpen should require visible execution.'
 
+    $hiddenSharedRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'invalid-hidden-shared' -Executable $pwsh -SharedTerminal | Out-Null
+    } catch { $hiddenSharedRejected = $_.Exception.Message -match 'requires -Visible' }
+    Assert-True $hiddenSharedRejected 'SharedTerminal should require visible execution.'
+
+    $backgroundWithoutSharedRejected = $false
+    try {
+        & $controller start -StateRoot $stateRoot -Name 'invalid-background-without-shared' `
+            -Executable $pwsh -Visible -RequireBackgroundTab | Out-Null
+    } catch { $backgroundWithoutSharedRejected = $_.Exception.Message -match 'requires -SharedTerminal' }
+    Assert-True $backgroundWithoutSharedRejected 'RequireBackgroundTab should require shared-terminal mode.'
+
     # The host must return instead of propagating the child exit when -NoExit is
     # responsible for keeping a visible terminal open. The durable record retains
     # the real child result.
@@ -142,13 +207,61 @@ try {
     $keepOpenResult = Get-JobStatus -Id $keepOpenId
     Assert-True ($keepOpenResult.status -eq 'failed' -and $keepOpenResult.exitCode -eq 17) 'Keep-open record should preserve the real child failure.'
 
+    # The exact encoded command used after a cold wtai handoff must start the
+    # shared host, consume the launch file, register terminal metadata, and exit.
+    $encodedId = '20000101-000000-lifecycle-encoded-shared-000001'
+    $encodedJobPath = Join-Path $stateRoot "jobs\$encodedId.json"
+    $encodedLaunchPath = Join-Path $stateRoot "launch\$encodedId.json"
+    $encodedJob = [ordered]@{
+        schemaVersion = 4; id = $encodedId; name = 'lifecycle-encoded-shared'; kind = 'test'; status = 'starting'
+        lifetime = 'persistent'; ownerAgent = $null; ownerSessionId = $null; visible = $true; sharedTerminal = $true
+        terminalControlState = 'pending'; terminalLaunchMode = 'foreground-bootstrap'; keepTerminalOpen = $false
+        processContainment = 'pending'; createdAtUtc = [datetime]::UtcNow.ToString('o'); startedAtUtc = $null
+        finishedAtUtc = $null; hostPid = $null; hostStartedAtUtc = $null; executable = $pwsh; argumentCount = 3
+        environmentNames = @(); invocationFingerprint = ('5' * 64); workingDirectory = $testRoot
+        logPath = (Join-Path $stateRoot "logs\$encodedId.log"); exitCode = $null; error = $null
+    }
+    $encodedLaunch = [ordered]@{
+        executable = $pwsh
+        arguments = @('-NoProfile', '-Command', 'Write-Output encoded-shared-ok')
+        environment = @{}
+    }
+    $encodedJob | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $encodedJobPath -Encoding utf8
+    $encodedLaunch | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $encodedLaunchPath -Encoding utf8
+    $savedWtSession = $env:WT_SESSION
+    $savedWtComClsid = $env:WT_COM_CLSID
+    try {
+        $env:WT_SESSION = [guid]::NewGuid().ToString('D')
+        $env:WT_COM_CLSID = [guid]::NewGuid().ToString('B')
+        $encodedArguments = Get-ManagedJobHostPowerShellArguments `
+            -HostScript $hostScript `
+            -JobFile $encodedJobPath `
+            -LaunchFile $encodedLaunchPath
+        & $pwsh @encodedArguments *> $null
+        Assert-True ($LASTEXITCODE -eq 0) 'Encoded shared-host invocation should exit successfully.'
+    } finally {
+        if ($null -eq $savedWtSession) { Remove-Item Env:WT_SESSION -ErrorAction SilentlyContinue } else { $env:WT_SESSION = $savedWtSession }
+        if ($null -eq $savedWtComClsid) { Remove-Item Env:WT_COM_CLSID -ErrorAction SilentlyContinue } else { $env:WT_COM_CLSID = $savedWtComClsid }
+    }
+    $encodedResult = Get-JobStatus -Id $encodedId
+    Assert-True (
+        $encodedResult.status -eq 'completed' -and
+        $encodedResult.terminalControlState -eq 'released'
+    ) 'Encoded shared-host invocation should preserve its completed lifecycle state.'
+    Assert-True ((Get-Content -LiteralPath $encodedResult.logPath -Raw) -match 'encoded-shared-ok') `
+        'Encoded shared-host invocation should run the managed child.'
+    Assert-True (-not (Test-Path -LiteralPath $encodedLaunchPath)) `
+        'Encoded shared-host invocation should consume the launch handoff.'
+
     # Start, record redaction, structured list/status, logs, and reconcile.
     $completed = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-complete' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Write-Output lifecycle-ok') -Environment @{ LIFECYCLE_MARKER = 'not-recorded'; GIT_AUTHOR_NAME = 'Lifecycle Test' } | Out-String) | ConvertFrom-Json
     $completed = Wait-JobStatus -Id $completed.id -Expected @('completed')
     $recordText = Get-Content -LiteralPath (Join-Path $stateRoot "jobs\$($completed.id).json") -Raw
     Assert-True ($recordText -notmatch 'lifecycle-ok|not-recorded|Lifecycle Test') 'Permanent records must omit argument text and environment values.'
-    Assert-True ($completed.schemaVersion -eq 3) 'New records should use schema version 3.'
+    Assert-True ($completed.schemaVersion -eq 3) 'Existing start callers should retain schema version 3.'
+    Assert-True ($completed.PSObject.Properties.Name -notcontains 'sharedTerminal') `
+        'Existing start callers should retain their durable record shape.'
     Assert-True ($completed.ownerAgent -eq 'codex' -and $completed.ownerSessionId -eq $testSessionId) 'Codex records should capture their owning session even when a Claude session id is inherited.'
     Assert-True ($completed.lifetime -eq 'turn') 'Codex Auto lifetime should resolve to turn.'
     Assert-True ($completed.processContainment -eq 'windows-job-object-kill-on-close') 'Managed hosts should enable Windows process-tree containment.'
@@ -378,6 +491,19 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
         try { Assert-SecretSafeInvocation -Arguments @() -Environment @{ $safeKey = 'configuration' } } catch { $safeAccepted = $false }
         Assert-True $safeAccepted "Benign environment key should not be rejected: $safeKey"
     }
+    foreach ($terminalSecretInput in @(
+        'api-token=do-not-send',
+        'tool --password do-not-send',
+        'git clone https://user:do-not-send@example.invalid/repository.git'
+    )) {
+        $terminalSecretRejected = $false
+        try { Assert-SharedTerminalInputSafe -InputText $terminalSecretInput } catch { $terminalSecretRejected = $true }
+        Assert-True $terminalSecretRejected `
+            'Shared-terminal input should reject likely credential material anywhere in the command line.'
+    }
+    $terminalMarkerAccepted = $true
+    try { Assert-SharedTerminalInputSafe -InputText 'run-safe-marker' } catch { $terminalMarkerAccepted = $false }
+    Assert-True $terminalMarkerAccepted 'Shared-terminal input should accept ordinary non-secret literal text.'
     $firstFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments @('-NoProfile') -WorkingDirectory (Get-Location).Path -Environment @{ PORT = '3000' }
     $secondFingerprint = Get-InvocationFingerprint -Executable $pwsh -Arguments @('-NoProfile') -WorkingDirectory (Get-Location).Path -Environment @{ PORT = '4000' }
     Assert-True ($firstFingerprint -ne $secondFingerprint) 'Environment values should distinguish invocation fingerprints.'
@@ -393,6 +519,13 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     try { & $controller status -StateRoot $stateRoot -Id $emptyId | Out-Null } catch { $emptyRejected = $_.Exception.Message -match 'record is empty' }
     Assert-True $emptyRejected 'Empty records should fail with an explicit error.'
     Remove-Item -LiteralPath $emptyPath -Force
+
+    $invalidNamePath = Join-Path $stateRoot 'jobs\invalid job name.json'
+    Set-Content -LiteralPath $invalidNamePath -Value '{' -Encoding utf8
+    $invalidJobs = @((& $controller status -StateRoot $stateRoot -Status invalid -Json | Out-String) | ConvertFrom-Json)
+    Assert-True ($invalidJobs.id -contains 'invalid job name') `
+        'Invalid records with non-id-shaped filenames must not break reconciliation or listing.'
+    Remove-Item -LiteralPath $invalidNamePath -Force
 
     # A fresh unclaimed starting record remains active during its startup grace period.
     $freshId = '20000101-000000-lifecycle-starting-000001'
@@ -526,12 +659,15 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     $orphanId = '20000101-000000-lifecycle-orphan-000001'
     $orphanRecord = [ordered]@{
         schemaVersion = 2; id = $orphanId; name = 'lifecycle-orphan'; kind = 'test'; status = 'running'; visible = $false
+        sharedTerminal = $true
         keepTerminalOpen = $false; createdAtUtc = '2000-01-01T00:00:00Z'; startedAtUtc = '2000-01-01T00:00:01Z'
         finishedAtUtc = $null; hostPid = 2147483647; hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'
         argumentCount = 0; environmentNames = @(); invocationFingerprint = ('0' * 64); workingDirectory = $testRoot
         logPath = (Join-Path $stateRoot "logs\$orphanId.log"); exitCode = $null; error = $null
     }
     $orphanRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$orphanId.json") -Encoding utf8
+    @{ schemaVersion = 1; jobId = $orphanId; hostPid = 2147483647; wtSession = [guid]::NewGuid(); wtComClsid = [guid]::NewGuid() } |
+        ConvertTo-Json | Set-Content -LiteralPath (Get-ManagedJobControlFile -Id $orphanId) -Encoding utf8
     $staleId = '20000101-000000-lifecycle-stale-start-000001'
     $staleLaunch = Join-Path $stateRoot "launch\$staleId.json"
     $staleRecord = [ordered]@{
@@ -546,7 +682,11 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     $orphanSummary = (& $controller reconcile -StateRoot $stateRoot -Status orphaned | Out-String) | ConvertFrom-Json
     $orphan = @($orphanSummary.jobs | Where-Object id -eq $orphanId)[0]
     Assert-True ($orphan.status -eq 'orphaned') 'Reconcile should mark a missing recorded host orphaned.'
+    Assert-True ($orphan.terminalControlState -eq 'released') `
+        'Reconcile should add released control state to legacy shared-terminal records.'
     Assert-True (-not $orphan.processIdentity.matches) 'Orphan inspection should preserve and report identity mismatch.'
+    Assert-True (-not (Test-Path -LiteralPath (Get-ManagedJobControlFile -Id $orphanId))) `
+        'Orphan reconciliation should remove stale shared-terminal control metadata.'
     Assert-True (@($orphanSummary.jobs).id -contains $staleId) 'Reconcile should orphan a stale unclaimed start after its grace period.'
     Assert-True (-not (Test-Path -LiteralPath $staleLaunch)) 'Orphan reconciliation should remove an unclaimed launch handoff.'
 

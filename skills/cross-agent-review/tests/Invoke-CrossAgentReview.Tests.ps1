@@ -130,6 +130,7 @@ exit 0
     Assert-True ($roundOneJson.scope -eq 'pull-request') 'Round 1 did not report pull-request scope.'
     Assert-True ($roundOneRecord.ReviewPr -eq 85) 'Round 1 did not use the built-in PR reviewer.'
     Assert-True ([string]::IsNullOrWhiteSpace([string]$roundOneRecord.PromptFile)) 'Round 1 unexpectedly used a range prompt.'
+    Assert-True ($roundOne.Stderr.Contains('cannot receive the focus file or vote request')) 'Round 1 did not disclose its focus limitation.'
 
     'round two' | Set-Content -LiteralPath (Join-Path $target 'change.txt') -Encoding utf8NoBOM
     Invoke-Git $target @('add', 'change.txt') | Out-Null

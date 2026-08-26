@@ -230,6 +230,9 @@ if ($Direction -eq 'to-codex') {
     Assert-PullRequestHead -Number $pullRequest -ExpectedHead $reviewHead
     if (-not $baseWasSupplied) {
         $reviewScope = 'pull-request'
+        [Console]::Error.WriteLine(
+            '[cross-agent-review] Round-1 Claude PR review cannot receive the focus file or vote request; record no reviewer vote.'
+        )
         & $runner -WorkingDirectory $repo -ReviewPr $pullRequest -ModelAlias $ModelAlias -Effort $Effort *>&1 |
             ForEach-Object { [Console]::Error.WriteLine([string]$_) }
         $reviewerExit = $LASTEXITCODE

@@ -49,9 +49,9 @@ bash "$skill/scripts/invoke-cross-agent-review.sh" \
   exact head the previous round reviewed.
 - `to-claude` requires an open pull request. Round 1 uses Claude's built-in PR
   review, which cannot receive the focus file or vote request; record no vote
-  and use the escalation rule for any disagreement. Later rounds use a read-only
-  prompt restricted to `base..HEAD`, and the focus file carries unresolved
-  findings into that range review.
+  and escalate a disagreement only when no later scoped round will carry it.
+  Later rounds use a read-only prompt restricted to `base..HEAD`, and the focus
+  file carries unresolved findings into that range review.
 - In a later round, reject any new finding outside `base..HEAD` unless the
   reviewer names the changed line in that range that causes it. If the reviewer
   substantially ignores the range, the round failed and consumes no budget.

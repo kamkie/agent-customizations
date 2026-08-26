@@ -403,11 +403,10 @@ function Start-ManagedJobBackgroundTerminalTab {
         }
         return $sessionId.ToString('D')
     } catch {
-        $exception = [InvalidOperationException]::new(
-            'The background shared-terminal tab returned an invalid result.'
+        throw [InvalidOperationException]::new(
+            'The background shared-terminal tab returned an invalid result.',
+            $_.Exception
         )
-        $exception.Data['ManagedBackgroundTabMayExist'] = $true
-        throw $exception
     }
 }
 
@@ -727,19 +726,14 @@ switch ($Action) {
                     )
                 }
                 if ($SharedTerminal -and $backgroundTerminalConnection) {
-                    try {
-                        $expectedTerminalSession = Start-ManagedJobBackgroundTerminalTab `
-                            -Connection $backgroundTerminalConnection `
-                            -Name $Name `
-                            -WorkingDirectory $resolvedDirectory `
-                            -PowerShellArguments $pwshArguments
-                        $backgroundTabMayExist = $true
-                    } catch {
-                        if ($_.Exception.Data['ManagedBackgroundTabMayExist']) {
-                            $backgroundTabMayExist = $true
-                        }
-                        throw
-                    }
+                    # Once control reaches wtcli, any failure can be ambiguous: the
+                    # tab may have been created before the client timed out or exited.
+                    $backgroundTabMayExist = $true
+                    $expectedTerminalSession = Start-ManagedJobBackgroundTerminalTab `
+                        -Connection $backgroundTerminalConnection `
+                        -Name $Name `
+                        -WorkingDirectory $resolvedDirectory `
+                        -PowerShellArguments $pwshArguments
                 } else {
                     $terminalExecutable = if ($SharedTerminal) {
                         $terminalTools.wtai
@@ -764,6 +758,12 @@ switch ($Action) {
                 $hostProcess.Dispose()
             }
         } catch {
+            # Recovery can wait for an ambiguously-created terminal host. Do not
+            # block unrelated launches while that job-scoped recovery runs.
+            if ($lock) {
+                $lock.Dispose()
+                $lock = $null
+            }
             $launchFailure = $_.Exception.Message
             $backgroundTerminationError = $null
             $preserveBackgroundOwnership = $false
@@ -836,7 +836,7 @@ switch ($Action) {
                 $current = Read-ManagedJob -Path $jobFile
             } while ($current.status -eq 'starting' -and [datetime]::UtcNow -lt $claimDeadline)
             $job = $current
-            if ($job.status -ne 'running') {
+            if ($job.status -eq 'starting') {
                 $backgroundCloseError = $null
                 try {
                     Stop-ManagedJobBackgroundTerminalTab `
@@ -845,29 +845,27 @@ switch ($Action) {
                 } catch {
                     $backgroundCloseError = $_.Exception.Message
                 }
-                if ($backgroundCloseError) {
-                    $afterClose = Read-ManagedJob -Path $jobFile
-                    if ($afterClose.status -eq 'running') {
-                        $job = $afterClose
-                        $backgroundCloseError = $null
-                    } elseif ($afterClose.status -eq 'starting') {
-                        # The pane may still publish a host identity. Keep the active
-                        # owner reference so turn/session cleanup can contain it.
-                        $afterClose.error = 'Background terminal host missed its startup deadline and its pane could not be confirmed closed.'
-                        Write-ManagedJob -Path $jobFile -Job $afterClose
-                        throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
-                    }
+                $afterClose = Read-ManagedJob -Path $jobFile
+                if ($afterClose.status -ne 'starting') {
+                    # The host can publish and finish while cancellation is in
+                    # flight. Preserve any running or terminal result it recorded.
+                    $job = $afterClose
+                    $backgroundCloseError = $null
+                } elseif ($backgroundCloseError) {
+                    # The pane may still publish a host identity. Keep the active
+                    # owner reference so turn/session cleanup can contain it.
+                    $afterClose.error = 'Background terminal host missed its startup deadline and its pane could not be confirmed closed.'
+                    Write-ManagedJob -Path $jobFile -Job $afterClose
+                    throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
                 }
-                if ($job.status -ne 'running') {
+                if ($job.status -eq 'starting') {
                     Remove-ManagedJobControl -JobId $job.id
-                    if ($job.status -eq 'starting') {
-                        $job.status = 'failed'
-                        Set-ManagedJobControlReleased -Job $job
-                        $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
-                        $job.error = 'Background terminal host did not publish its process identity before the startup deadline.'
-                        Write-ManagedJob -Path $jobFile -Job $job
-                        Unregister-ManagedJobOwnerReference -Job $job
-                    }
+                    $job.status = 'failed'
+                    Set-ManagedJobControlReleased -Job $job
+                    $job.finishedAtUtc = [datetime]::UtcNow.ToString('o')
+                    $job.error = 'Background terminal host did not publish its process identity before the startup deadline.'
+                    Write-ManagedJob -Path $jobFile -Job $job
+                    Unregister-ManagedJobOwnerReference -Job $job
                     if ($backgroundCloseError) {
                         throw "The background shared-terminal host did not start in time, and its tab could not be closed safely: $backgroundCloseError"
                     }

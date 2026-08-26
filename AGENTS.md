@@ -107,7 +107,9 @@ is not `kamkie`, stop before the mutation and report the exact blocker.
 
 - Every agent-authored PR receives opposite-agent review before it is marked
   ready. A Codex-authored PR uses the `claude-runner` skill with the Opus reviewer
-  at medium effort and `/review <PR number>` from the authoring checkout. A
+  at medium effort: round 1 uses `/review <PR number>` from the authoring
+  checkout, and each later round uses a read-only prompt restricted to the exact
+  repair range from the previously reviewed head to the current head. A
   Claude-authored PR receives Codex review by branch name without moving the work
   out of its assigned checkout.
 - The `cross-agent-review` skill owns the executable loop for that review:
@@ -117,6 +119,10 @@ is not `kamkie`, stop before the mutation and report the exact blocker.
 - Ensure the review result is recorded on the PR. If the reviewer returns
   findings without posting them, add a concise PR comment naming the reviewer,
   findings, and triage decision.
+- In a later round, reject a new finding outside the repair range unless the
+  reviewer identifies the changed line in that range that causes it. A reviewer
+  run that substantially ignores the range is invalid and does not consume a
+  round.
 - Triage every finding: fix it or answer it on the PR. Commits that implement a
   review finding credit the reviewer with `Co-Authored-By: Claude
   <noreply@anthropic.com>` or `Co-Authored-By: Codex <noreply@openai.com>`.

@@ -46,12 +46,17 @@ bash "$skill/scripts/invoke-cross-agent-review.sh" \
 - **Drop the second line in round 1** — nothing is carried forward yet. Sending
   the placeholder as literal text produces a bogus prompt.
 - Omit the base in round 1. In every later round pass `-Base`/`--base` with the
-  head the previous round reviewed, so the reviewer sees only the fixes.
-- `to-claude` requires an open pull request and reviews the whole PR. It takes no
-  supplementary prompt, so the focus file does not reach that reviewer — see the
-  escalation rule in the reference below. It also cannot post to the pull
-  request: record the result yourself when the repository expects review
-  evidence on the PR.
+  exact head the previous round reviewed.
+- `to-claude` requires an open pull request. Round 1 uses Claude's built-in PR
+  review, which cannot receive the focus file or vote request; record no vote
+  and escalate a disagreement only when no later scoped round will carry it.
+  Later rounds use a read-only prompt restricted to `base..HEAD`, and the focus
+  file carries unresolved findings into that range review.
+- In a later round, reject any new finding outside `base..HEAD` unless the
+  reviewer names the changed line in that range that causes it. If the reviewer
+  substantially ignores the range, the round failed and consumes no budget.
+- Claude cannot post the review to the pull request; record the result yourself
+  when the repository expects review evidence there.
 - Keep the focus file outside the repository.
 
 The script pins the range, verifies the reviewed head on both sides of the
@@ -59,10 +64,10 @@ invocation, and fails the round if the reviewer exits nonzero or the head moved.
 A failed round is not a review; do not count it.
 
 Reviewer output goes to **stderr**; stdout is exactly one JSON object with the
-`base`, `head`, and `pullRequest` actually reviewed. On the `to-codex` contract
-the round vote has no schema field, so read `ANOTHER ROUND` from the reviewer's
-`summary` or `next_steps` text — and when it is absent or unparseable, record no
-vote rather than inferring one from the verdict.
+`base`, `head`, `scope`, and `pullRequest` actually reviewed. On the `to-codex`
+contract the round vote has no schema field, so read `ANOTHER ROUND` from the
+reviewer's `summary` or `next_steps` text — and when it is absent or unparseable,
+record no vote rather than inferring one from the verdict.
 
 ## Then judge
 
@@ -77,8 +82,11 @@ report format. In short:
   repository defines, or `Co-Authored-By: Codex <noreply@openai.com>` /
   `Co-Authored-By: Claude <noreply@anthropic.com>`.
 - Run the repository's own validation commands before the round ends.
-- Another round only if this one produced a confirmed finding **and** the fixes
-  changed the diff. Both sides vote; the implementer decides; three rounds max.
+- The initial budget is three successful, correctly scoped rounds. Failed or
+  scope-invalid runs consume nothing. A user-requested round adds one to the
+  budget and runs; only the user can increase the budget. Otherwise continue
+  only after a confirmed finding produced a repair diff; both sides vote and the
+  implementer decides.
 - Anything the loop cannot resolve is escalated to the user, not dropped. A
   commit landing after the last review blocks the handoff.
 

@@ -1,97 +1,99 @@
-# Round loop, escalation, and report contract
+# Round loop, scope, escalation, and report contract
 
 Load this when a round returns findings. The entrypoint covers running a round;
 this covers deciding what happens next.
 
-## Classify every finding yourself
+## Enforce later-round scope
 
-Do not accept the reviewer's verdict. Read the code behind each finding.
+Round 1 reviews the whole committed change. Every later round reviews exactly
+`previous-reviewed-head..current-head`.
+
+The reviewer may read unchanged files for context, but a new later-round finding
+is in scope only when the current range introduced it. When the reported line is
+unchanged, the reviewer must name the changed line that causes the defect. An
+older finding is also in scope when the focus file explicitly carried it forward.
+
+Reject a new concern about earlier commits or unrelated pre-existing behavior.
+Do not fix it, carry it forward, or count it as a reason for another round. If
+the reviewer substantially ignores the range, discard the entire run as invalid;
+it consumes no budget. Rerun only with a reviewer path that enforces the range,
+or escalate when none is available.
+
+## Classify every in-scope finding yourself
+
+Do not accept the reviewer's verdict. Read the changed range and its necessary
+context.
 
 | Class | Meaning | Action |
 | --- | --- | --- |
-| confirmed | You verified the defect is real | Fix it, or escalate if out of scope |
-| plausible | Could be real, not cheaply verifiable | Fix only if small, safe, obviously harmless |
-| false positive | You can state a one-line reason it is wrong | Never "fix" it |
+| confirmed | You verified the range introduced the defect | Fix it, or escalate if out of task scope |
+| plausible | Could be range-caused but is not cheaply verifiable | Fix only if small, safe, and obviously harmless |
+| false positive | You can state a one-line reason the alleged defect is wrong | Never "fix" it |
+| review-scope violation | The range did not cause it and it was not carried forward | Reject it; do not modify the change |
 
 ## Carry unresolved findings forward
 
-An unresolved finding is any finding you did not fix: plausible ones you left,
-false positives, and confirmed ones you ruled out of scope.
-
-On a reviewer that takes an explicit range, later rounds see only the fixes, so
-an unfixed finding leaves the diff and cannot be raised again. Restate each one
-in the next round's focus text with your reasoning, and ask the reviewer to
-accept or contest it.
+An unresolved in-scope finding is one you did not fix: plausible ones you left,
+false positives, and confirmed ones you ruled out of task scope. Later rounds
+see only repair commits, so restate each unresolved finding in the next focus
+file with your reasoning and ask the reviewer to accept or contest it.
 
 A finding is resolved when it is fixed, when the reviewer accepts your reasoning,
 or when it is escalated to the user.
 
 ## Decide on another round
 
-Rounds are bounded at three and never automatic.
+Review starts with a budget of three successful, correctly scoped rounds. Each
+such round consumes one. Failed or scope-invalid runs consume nothing.
 
-1. A next round happens only when this round produced a confirmed finding **and**
-   the fixes changed the diff.
-2. Both sides vote. Ask for the reviewer's vote inside the review that already
-   runs. When no usable vote comes back, record the absence; never infer one from
-   the verdict.
-3. **The implementer decides.** If the reviewer voted to continue and the
-   implementer stops, say so explicitly in the report.
-4. A finding surviving two rounds of disagreement is escalated, not re-litigated.
+A direct user request to run another review round adds one to the budget and
+requests that round. It runs without a reviewer vote or implementer decision. A
+request to increase the budget by N adds N without by itself requesting a run.
+Completed rounds remain counted; the implementer cannot reset or increase the
+budget.
 
-Small or low-risk changes finish in one round. Round 3 is an escape hatch.
+For agent-initiated continuation:
 
-### What resets the counter
+1. Continue only when the current round produced a confirmed finding and its fix
+   changed the diff.
+2. Require remaining budget. If none remains, ask how many rounds the user wants
+   to add; a positive whole-number answer adds that amount.
+3. Ask for the reviewer's vote inside the review that already runs. Record an
+   absent or unparseable vote instead of inferring one.
+4. The implementer decides. Report any decision to stop against a reviewer vote
+   to continue.
+5. Escalate a finding that survives two rounds of disagreement.
 
-The counter resets in exactly two cases:
-
-1. The user explicitly asks for another round or a new review budget.
-2. You ask the user directly whether the budget resets, and they say yes.
-
-**Every other message continues the current count** — questions, corrections,
-approvals, scope clarifications, and requested rewrites alike. Changes an agent
-starts on its own initiative always continue it.
-
-The implementer has no discretion here, deliberately. An earlier version reset
-whenever the request was "obviously" new work, which left the decision with the
-party that benefits from it: an implementer at the ceiling could call a requested
-rewrite an obvious reset and take three more rounds without ever asking. Since
-the ceiling exists to bound that party, it cannot also be enforced by them.
-
-If you think a reset is warranted and the user has not said so, ask. Asking costs
-one sentence; a self-granted reset makes the ceiling unenforceable.
+Small or low-risk changes normally finish in one round. Round 3 is an escape
+hatch under the initial budget.
 
 ## Escalate instead of swallowing
 
 | Situation | Why the loop cannot resolve it | Required action |
 | --- | --- | --- |
-| No-diff stop leaves any unfixed finding | Without a diff there is no next round to carry it into | Escalate to the user in that round |
-| Confirmed but out of scope | Produces no repair diff, so rule 1 stops the loop | Escalate; a verified defect must not pass silently |
-| Reviewer mode takes no supplementary prompt | Carry-forward text and the vote request never reach it | Escalate a disagreement immediately; no later round can retest it |
-| Commit landed after the last completed review | The ceiling is reached; nothing can review it | Block the handoff (below) |
+| No-diff stop leaves an unresolved finding | The required later-round base equals `HEAD`, so there is no repair range | Escalate in that round |
+| Confirmed but outside task scope | It produces no authorized repair diff | Escalate; a verified defect must not pass silently |
+| Round-1 `to-claude` finding is disputed and no later round is permitted | The built-in PR reviewer never saw your reasoning, and no later focus can carry it | Escalate the disagreement in round 1 |
+| No reviewer path can enforce the later-round range | A full re-audit can invent findings in unchanged material | Stop and ask the user how to proceed |
+| A commit landed after the last completed review and no next round is permitted | The current head remains unreviewed | Block the handoff and escalate |
 
 ## Post-review commits block the handoff
 
-Fixes made in the final round are not themselves reviewed. Naming them in the
-report is not enough — a regression in the last repair would ship having been
-merely mentioned.
-
-When any commit lands after the last completed review, the change is **not
-review-complete**. Do not mark it ready, done, or reviewed. Escalate with the
-exact unreviewed commits and let the user accept the risk explicitly.
-
-This keeps the ceiling hard. The loop still stops at three rounds; it stops as
-*blocked* rather than as *finished* when the last word belonged to an unreviewed
-repair.
+Any commit after the last completed review makes the change not review-complete
+until a successful scoped round reviews that range. Do not mark the change ready,
+done, or reviewed while its head is unreviewed. If no next round is permitted,
+escalate with the exact unreviewed commits; higher-precedence repository policy
+decides whether explicit risk acceptance is allowed.
 
 ## Report contract
 
-1. A table: severity | file:line | class | action (fixed/skipped/escalated) |
-   fix commit.
-2. Rounds run, and why the loop stopped: clean round, no diff change, ceiling
-   reached, or unresolved disagreement.
-3. Commits that landed after the last review, named and declared unreviewed.
-4. Any reviewer-versus-implementer vote disagreement, and any round with no
-   usable vote.
-5. Every unresolved finding, with its class and why it was left.
-6. Validation commands that ran, and any that could not run and why.
+1. A table: severity | file:line | class | action | fix commit.
+2. Every reviewed `base..head`, its scope, and whether it consumed budget.
+3. Rounds used / current budget, every user-authorized increase, and why the loop
+   stopped.
+4. Every rejected scope violation and the reason the current range did not cause
+   it.
+5. Commits after the last completed review, named and declared unreviewed.
+6. Reviewer-versus-implementer vote disagreements and rounds with no usable vote.
+7. Every unresolved finding, with its class and why it was left.
+8. Validation commands that ran, and any that could not run and why.

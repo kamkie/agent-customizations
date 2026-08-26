@@ -1,8 +1,8 @@
-# Reviewer stance for a prompt-driven review
+# Reviewer stance for a prompt-driven range review
 
-Use this only when the reviewing engine has no built-in adversarial reviewer for
-the target. The Claude-implementing direction does not need it: the Codex plugin
-supplies its own stance, schema, and calibration.
+Use this when manually constructing a range-scoped review because no controller
+path is available. The controller already builds an equivalent prompt for later
+`to-claude` rounds; the Codex reviewer receives its range directly.
 
 Write the prompt to a file outside the repository (for example under `$env:TEMP`)
 and pass it with `-PromptFile`. Never inline a multi-line prompt as a quoted
@@ -31,6 +31,14 @@ Stance:
 - When you cannot support a concern from the actual code, say the change looks
   safe and report nothing. An empty result is a valid outcome.
 
+Scope:
+- Start with `git diff --find-renames --unified=80 <base sha>..<head sha>`.
+- Read unchanged code only as context for that range.
+- Report a new finding only when the range introduced it.
+- For a finding on an unchanged line, name the changed line that causes it.
+- Discuss an older finding only when the focus text explicitly carries it.
+- Do not re-review earlier commits or unrelated pre-existing behavior.
+
 Prioritise expensive, dangerous, or hard-to-detect failures:
 auth and trust boundaries; data loss, corruption, or irreversible state;
 rollback, retry, partial failure, and idempotency gaps; races, ordering, and
@@ -48,7 +56,8 @@ For each finding give:
 3. confidence: 0.0 to 1.0
 4. one sentence stating the defect
 5. a concrete failure scenario: specific input or state, and the wrong result
-6. a concrete recommendation
+6. the changed line or carried finding that puts it in scope
+7. a concrete recommendation
 
 Every finding must be defensible from the code you actually read. If a
 conclusion rests on an inference, say so and keep the confidence honest. Do not

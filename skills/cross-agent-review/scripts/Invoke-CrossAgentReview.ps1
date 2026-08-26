@@ -7,6 +7,10 @@ Run one cross-agent review round against a committed range.
 Resolves and pins the review range, invokes the opposite engine's reviewer, and
 fails the round rather than reporting a review that did not happen.
 
+For to-claude, an omitted base selects the built-in whole-PR reviewer for round
+1. An explicit base selects a prompt-driven, read-only review of exactly
+base..HEAD for every later round.
+
 The reviewer's own output goes to stderr; stdout carries exactly one JSON object
 describing the round, so a caller can parse the range that was actually
 reviewed. Judgment - triage, fixes, and the round decision - stays with the
@@ -14,12 +18,13 @@ calling agent.
 
 Exit codes: 0 reviewed, 1 round failed, 2 invalid invocation.
 
-Arguments are parsed by hand rather than through a param() block, matching
-invoke-cross-agent-review.sh token for token. PowerShell's parameter binder runs
-before any script code, so with binding enabled `-?` printed syntax help to
-stdout and exited 0 - claiming a completed review that never ran and breaking
-the machine-readable stdout contract. Binding also accepted an unlabelled
-trailing SHA into -Base, reviewing a range the caller never asked for.
+Arguments are parsed by hand rather than through a param() block. PowerShell's
+parameter binder runs before any script code, so with binding enabled `-?`
+printed syntax help to stdout and exited 0 - claiming a completed review that
+never ran and breaking the machine-readable stdout contract. Binding also
+accepted an unlabelled trailing SHA into -Base, reviewing a range the caller
+never asked for. The Bash entrypoint delegates here to keep one parser and one
+review-routing implementation.
 
 Both long and PowerShell-style spellings are accepted: -Direction and
 --direction are equivalent.
@@ -61,7 +66,52 @@ function Assert-PullRequestHead {
     }
 }
 
-# --- invocation validation (exit 2), matching invoke-cross-agent-review.sh ----
+function New-ClaudeRangeReviewPrompt {
+    param(
+        [Parameter(Mandatory)][string]$ReviewBase,
+        [Parameter(Mandatory)][string]$ReviewHead,
+        [Parameter(Mandatory)][string]$Focus
+    )
+
+    $promptPath = Join-Path ([IO.Path]::GetTempPath()) (
+        'cross-agent-review-{0}-{1}.md' -f $PID, [guid]::NewGuid().ToString('N')
+    )
+    $prompt = @"
+You are performing an adversarial review of one committed repair range.
+
+Review only: $ReviewBase..$ReviewHead
+
+Intent and carried findings:
+$Focus
+
+Scope rules:
+- Start with `git diff --find-renames --unified=80 $ReviewBase..$ReviewHead`.
+- Read unchanged code only as context for the changed range.
+- Report a new finding only when the defect is introduced by this range.
+- If the reported file:line is unchanged, name the exact changed line that causes the defect.
+- You may discuss an older finding only when it is explicitly carried above.
+- Do not re-review the pull request, earlier commits, or unrelated pre-existing behavior.
+- If the range introduces no defensible defect, report no findings.
+
+You are review-only. Do not modify files.
+
+For each finding give:
+1. file:line
+2. severity: critical, high, medium, or low
+3. confidence: 0.0 to 1.0
+4. one sentence stating the defect
+5. a concrete failure scenario
+6. the changed line or carried finding that puts it in scope
+7. a concrete recommendation
+
+Finish with one line:
+ANOTHER ROUND: yes or no, and one sentence of justification.
+"@
+    [IO.File]::WriteAllText($promptPath, $prompt, [Text.UTF8Encoding]::new($false))
+    return $promptPath
+}
+
+# --- invocation validation (exit 2) ------------------------------------------
 $Direction = ''
 $FocusFile = ''
 $Base = ''
@@ -108,6 +158,7 @@ if ([string]::IsNullOrWhiteSpace($FocusFile)) { Exit-Invalid 'A focus file is re
 if (-not (Test-Path -LiteralPath $FocusFile -PathType Leaf)) { Exit-Invalid "Focus file not found: $FocusFile" }
 $focus = (Get-Content -LiteralPath $FocusFile -Raw).Trim()
 if ([string]::IsNullOrWhiteSpace($focus)) { Exit-Invalid 'The focus file is empty. State the change intent at minimum.' }
+$baseWasSupplied = -not [string]::IsNullOrWhiteSpace($Base)
 
 # --- preflight, in the same order as the shell implementation ----------------
 Assert-Dependency -Name 'git' -Purpose 'range resolution'
@@ -139,6 +190,7 @@ $reviewHead = Invoke-CheckedGit @('rev-parse', 'HEAD') 'Cannot resolve HEAD.'
 if ($reviewBase -eq $reviewHead) { Exit-Failed 'Nothing committed to review in this range.' }
 
 $pullRequest = 0
+$reviewScope = 'range'
 
 if ($Direction -eq 'to-codex') {
     # Resolve the plugin through the authoritative installed-plugin manifest.
@@ -176,9 +228,31 @@ if ($Direction -eq 'to-codex') {
     # The reviewer reads the pull request's remote head, so a local HEAD check
     # alone would miss unpushed repairs or another actor's push.
     Assert-PullRequestHead -Number $pullRequest -ExpectedHead $reviewHead
-    & $runner -WorkingDirectory $repo -ReviewPr $pullRequest -ModelAlias $ModelAlias -Effort $Effort *>&1 |
-        ForEach-Object { [Console]::Error.WriteLine([string]$_) }
-    $reviewerExit = $LASTEXITCODE
+    if (-not $baseWasSupplied) {
+        $reviewScope = 'pull-request'
+        [Console]::Error.WriteLine(
+            '[cross-agent-review] Round-1 Claude PR review cannot receive the focus file or vote request; record no reviewer vote.'
+        )
+        & $runner -WorkingDirectory $repo -ReviewPr $pullRequest -ModelAlias $ModelAlias -Effort $Effort *>&1 |
+            ForEach-Object { [Console]::Error.WriteLine([string]$_) }
+        $reviewerExit = $LASTEXITCODE
+    } else {
+        $rangePrompt = New-ClaudeRangeReviewPrompt -ReviewBase $reviewBase -ReviewHead $reviewHead -Focus $focus
+        $rangeAllowedTools = @(
+            'Read', 'Glob', 'Grep',
+            'Bash(git diff *)', 'Bash(git log *)', 'Bash(git rev-parse *)', 'Bash(git show *)', 'Bash(git status *)',
+            'PowerShell(git diff *)', 'PowerShell(git log *)', 'PowerShell(git rev-parse *)',
+            'PowerShell(git show *)', 'PowerShell(git status *)'
+        )
+        try {
+            & $runner -WorkingDirectory $repo -PromptFile $rangePrompt -ModelAlias $ModelAlias -Effort $Effort `
+                -PermissionMode dontAsk -AllowedTools $rangeAllowedTools -Name "review-pr-$pullRequest-range" *>&1 |
+                ForEach-Object { [Console]::Error.WriteLine([string]$_) }
+            $reviewerExit = $LASTEXITCODE
+        } finally {
+            Remove-Item -LiteralPath $rangePrompt -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 # Check the reviewer's status before any other command runs: a later failure
@@ -200,6 +274,7 @@ if ($currentHead -ne $reviewHead) {
     repository   = $repo
     base         = $reviewBase
     head         = $reviewHead
+    scope        = $reviewScope
     pullRequest  = $pullRequest
     reviewerExit = $reviewerExit
     result       = 'reviewed'

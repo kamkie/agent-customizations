@@ -146,17 +146,22 @@ function Test-CustomizationHookDefinition {
     if ($actualMatcher -cne $expectedMatcher) { return $false }
 
     $expectedCommand = Get-CustomizationHookCommand -HomePath $HomePath -Entry $Entry
+    $expectedAsync = $Entry.PSObject.Properties.Name -contains 'async' -and [bool]$Entry.async
     if ($Format -eq 'claude') {
-        # A managed Claude Code handler is exactly type/command/timeout; any
-        # other field changes Claude's execution semantics or fails its
-        # settings validation, so its presence is drift that repair rewrites.
+        # A managed Claude Code handler contains only the reviewed execution
+        # fields; any other field changes semantics or fails settings validation.
+        $allowedProperties = @('type', 'command', 'timeout')
+        if ($expectedAsync) { $allowedProperties += 'async' }
         foreach ($property in $Handler.PSObject.Properties) {
-            if ($property.Name -notin @('type', 'command', 'timeout')) { return $false }
+            if ($property.Name -notin $allowedProperties) { return $false }
         }
         $typeProperty = $Handler.PSObject.Properties['type']
         $commandProperty = $Handler.PSObject.Properties['command']
         $timeoutProperty = $Handler.PSObject.Properties['timeout']
         if (-not $typeProperty -or -not $commandProperty -or -not $timeoutProperty) { return $false }
+        $asyncProperty = $Handler.PSObject.Properties['async']
+        if ($expectedAsync -and (-not $asyncProperty -or
+            $asyncProperty.Value -isnot [bool] -or -not [bool]$asyncProperty.Value)) { return $false }
         return ([string]$typeProperty.Value -ceq 'command' -and
             [string]$commandProperty.Value -ceq $expectedCommand -and
             [int]$timeoutProperty.Value -eq [int]$Entry.timeout)
@@ -166,6 +171,13 @@ function Test-CustomizationHookDefinition {
         [string]$Handler.command -cne $expectedCommand -or
         [string]$Handler.commandWindows -cne $expectedCommand -or
         [int]$Handler.timeout -ne [int]$Entry.timeout) {
+        return $false
+    }
+
+    $asyncProperty = $Handler.PSObject.Properties['async']
+    if (($expectedAsync -and (-not $asyncProperty -or
+            $asyncProperty.Value -isnot [bool] -or -not [bool]$asyncProperty.Value)) -or
+        (-not $expectedAsync -and $asyncProperty)) {
         return $false
     }
 
@@ -281,6 +293,9 @@ function Update-CustomizationHookFile {
             $handler['commandWindows'] = $command
         }
         $handler['timeout'] = [int]$entry.timeout
+        if ($entry.PSObject.Properties.Name -contains 'async' -and [bool]$entry.async) {
+            $handler['async'] = $true
+        }
         if ($Format -ne 'claude' -and $entry.PSObject.Properties.Name -contains 'statusMessage') {
             $handler['statusMessage'] = [string]$entry.statusMessage
         }

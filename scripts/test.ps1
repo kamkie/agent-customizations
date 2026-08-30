@@ -125,10 +125,16 @@ try {
     if (@($codexHooks.hooks.UserPromptSubmit[0].hooks).command -notcontains $lookalikeStopCommand) {
         throw 'Codex hook installation must not claim a different command that merely mentions a managed script path.'
     }
-    foreach ($event in @('PreToolUse', 'Stop', 'SessionEnd')) {
+    foreach ($event in @('SessionStart', 'PreToolUse', 'Stop', 'SessionEnd')) {
         if (-not $codexHooks.hooks.PSObject.Properties[$event]) {
             throw "Codex hook installation did not register $event."
         }
+    }
+    $codexSessionStart = $codexHooks.hooks.SessionStart[0]
+    if ([string]$codexSessionStart.matcher -ne '^(startup|resume)$' -or
+        -not [bool]$codexSessionStart.hooks[0].async -or
+        [string]$codexSessionStart.hooks[0].command -notmatch 'ManagedHookId "managed-jobs-session-start"') {
+        throw 'Codex SessionStart hook must asynchronously schedule managed reconciliation for startup and resume.'
     }
     $preToolHandlers = @($codexHooks.hooks.PreToolUse | ForEach-Object { $_.hooks })
     if ($preToolHandlers.Count -ne 1 -or
@@ -139,6 +145,9 @@ try {
         if (-not (Test-Path -LiteralPath (Join-Path $codexSandbox "hooks\managed-jobs\$script") -PathType Leaf)) {
             throw "Codex hook installation did not copy $script."
         }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $codexSandbox 'skills\managed-jobs\scripts\ManagedJob.SessionStartHook.ps1') -PathType Leaf)) {
+        throw 'Codex hook installation did not install the shared SessionStart scheduler.'
     }
     if (Test-Path -LiteralPath (Join-Path $claudeSandbox 'hooks.json')) {
         throw 'Claude hook installation must register in settings.json, not a Codex-style hooks.json.'
@@ -153,20 +162,28 @@ try {
         [string]$claudeSettings.hooks.UserPromptSubmit[0].hooks[0].command -ne 'claude-unrelated-hook') {
         throw 'Claude hook installation must preserve unrelated hook entries.'
     }
-    foreach ($event in @('PreToolUse', 'Stop', 'StopFailure', 'SessionEnd')) {
+    foreach ($event in @('SessionStart', 'PreToolUse', 'Stop', 'StopFailure', 'SessionEnd')) {
         if (-not $claudeSettings.hooks.PSObject.Properties[$event]) {
             throw "Claude hook installation did not register $event."
         }
+    }
+    $claudeSessionStart = $claudeSettings.hooks.SessionStart[0]
+    if ([string]$claudeSessionStart.matcher -ne '^(startup|resume|fork)$' -or
+        -not [bool]$claudeSessionStart.hooks[0].async -or
+        [string]$claudeSessionStart.hooks[0].command -notmatch 'ManagedHookId "managed-jobs-session-start"') {
+        throw 'Claude SessionStart hook must asynchronously schedule managed reconciliation for startup, resume, and fork.'
     }
     $claudePreToolHandlers = @($claudeSettings.hooks.PreToolUse | ForEach-Object { $_.hooks })
     if ($claudePreToolHandlers.Count -ne 1 -or
         [string]$claudePreToolHandlers[0].command -notmatch 'ManagedHookId "managed-jobs-pre-tool-use"') {
         throw 'Claude hook installation did not replace the exact legacy PreToolUse command with one marked managed definition.'
     }
-    foreach ($event in @('PreToolUse', 'Stop', 'StopFailure', 'SessionEnd')) {
+    foreach ($event in @('SessionStart', 'PreToolUse', 'Stop', 'StopFailure', 'SessionEnd')) {
         foreach ($handler in @($claudeSettings.hooks.$event | ForEach-Object { $_.hooks })) {
-            if ($handler.PSObject.Properties['commandWindows'] -or $handler.PSObject.Properties['statusMessage']) {
-                throw 'Claude hook handlers must carry only fields that Claude Code settings accept.'
+            $allowedFields = @('type', 'command', 'timeout')
+            if ($event -eq 'SessionStart') { $allowedFields += 'async' }
+            if (@($handler.PSObject.Properties.Name | Where-Object { $_ -notin $allowedFields }).Count -gt 0) {
+                throw "Claude $event hook handlers must carry only reviewed fields that Claude Code settings accept."
             }
         }
     }
@@ -180,9 +197,13 @@ try {
             throw "Claude installed $script must come from hooks/claude, not the Codex variant."
         }
     }
+    if (-not (Test-Path -LiteralPath (Join-Path $claudeSandbox 'skills\managed-jobs\scripts\ManagedJob.SessionStartHook.ps1') -PathType Leaf)) {
+        throw 'Claude hook installation did not install the shared SessionStart scheduler.'
+    }
 
     $sessionEndDefinitionBeforeRepair = $codexHooks.hooks.SessionEnd | ConvertTo-Json -Depth 10 -Compress
     $codexHooks.hooks.Stop[0].hooks[0].timeout = 1
+    $codexHooks.hooks.SessionStart[0].hooks[0].async = $false
     $codexHooks | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $codexHooksPath -Encoding utf8
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
         -Target Codex `
@@ -199,6 +220,9 @@ try {
     $repairedHooks = Get-Content -LiteralPath $codexHooksPath -Raw | ConvertFrom-Json
     if ([int]$repairedHooks.hooks.Stop[0].hooks[0].timeout -ne 15) {
         throw 'Codex hook repair did not restore the reviewed timeout.'
+    }
+    if (-not [bool]$repairedHooks.hooks.SessionStart[0].hooks[0].async) {
+        throw 'Codex hook repair did not restore asynchronous SessionStart reconciliation.'
     }
     if (($repairedHooks.hooks.SessionEnd | ConvertTo-Json -Depth 10 -Compress) -cne $sessionEndDefinitionBeforeRepair) {
         throw 'Repairing one managed hook must not rewrite an in-sync managed hook definition.'
@@ -245,6 +269,7 @@ try {
 
     $claudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
     $claudeSettings.hooks.Stop[0].hooks[0].timeout = 1
+    $claudeSettings.hooks.SessionStart[0].hooks[0].async = $false
     $claudeSettings.hooks.SessionEnd[0].hooks[0] |
         Add-Member -NotePropertyName async -NotePropertyValue $true
     $claudeSettings | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $claudeSettingsPath -Encoding utf8
@@ -263,6 +288,9 @@ try {
     $repairedClaudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
     if ([int]$repairedClaudeSettings.hooks.Stop[0].hooks[0].timeout -ne 15) {
         throw 'Claude hook repair did not restore the reviewed timeout.'
+    }
+    if (-not [bool]$repairedClaudeSettings.hooks.SessionStart[0].hooks[0].async) {
+        throw 'Claude hook repair did not restore asynchronous SessionStart reconciliation.'
     }
     if ($repairedClaudeSettings.hooks.SessionEnd[0].hooks[0].PSObject.Properties['async']) {
         throw 'Claude hook repair must strip execution-changing extra fields from a managed handler.'

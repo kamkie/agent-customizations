@@ -6,6 +6,7 @@ $hookRoot = Split-Path -Parent $PSScriptRoot
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..\..')).Path
 $controller = Join-Path $repositoryRoot 'skills\managed-jobs\scripts\Invoke-ManagedJob.ps1'
 $common = Join-Path $repositoryRoot 'skills\managed-jobs\scripts\ManagedJob.Common.ps1'
+$sessionStartHook = Join-Path $repositoryRoot 'skills\managed-jobs\scripts\ManagedJob.SessionStartHook.ps1'
 $stopHook = Join-Path $hookRoot 'ManagedJob.StopHook.ps1'
 $sessionEndHook = Join-Path $hookRoot 'ManagedJob.SessionEndHook.ps1'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('codex-managed-job-hooks-' + [guid]::NewGuid().ToString('N'))
@@ -33,9 +34,36 @@ function Wait-JobRunning {
     do {
         $job = Get-JobStatus -Id $Id
         if ($job.status -eq 'running') { return $job }
+        if ($job.status -in @('completed', 'failed', 'stopped', 'orphaned')) {
+            $log = if (Test-Path -LiteralPath $job.logPath -PathType Leaf) {
+                Get-Content -LiteralPath $job.logPath -Raw
+            } else { '<missing>' }
+            throw "Job $Id reached $($job.status) before running. Error: $($job.error) Log: $log"
+        }
         Start-Sleep -Milliseconds 100
     } while ([datetime]::UtcNow -lt $deadline)
     throw "Timed out waiting for $Id to run; last status was $($job.status)."
+}
+
+function Start-SessionStartHookProcess {
+    param([Parameter(Mandatory)][string]$Payload)
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $pwsh
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $sessionStartHook)) {
+        $startInfo.ArgumentList.Add($argument)
+    }
+    $process = [Diagnostics.Process]::Start($startInfo)
+    $outputTask = $process.StandardOutput.ReadToEndAsync()
+    $errorTask = $process.StandardError.ReadToEndAsync()
+    $process.StandardInput.Write($Payload)
+    $process.StandardInput.Close()
+    [pscustomobject]@{ process = $process; outputTask = $outputTask; errorTask = $errorTask }
 }
 
 try {
@@ -47,6 +75,52 @@ try {
     $env:MANAGED_JOBS_ROOT = $stateRoot
     . $common
     Set-ManagedJobStateRoot -Path $stateRoot
+    $null = Get-ManagedJobRoot
+
+    $staleId = '20000101-000000-hook-stale-completed-000001'
+    $staleRecord = [ordered]@{
+        schemaVersion = 4; id = $staleId; name = 'hook-stale-completed'; kind = 'test'; status = 'completed'
+        lifetime = 'turn'; ownerAgent = 'codex'; ownerSessionId = $sessionId; visible = $true; sharedTerminal = $true
+        terminalControlState = 'released'; keepTerminalOpen = $false; processContainment = 'windows-job-object-kill-on-close'
+        createdAtUtc = '2000-01-01T00:00:00Z'; startedAtUtc = '2000-01-01T00:00:01Z'; finishedAtUtc = '2000-01-01T00:00:02Z'
+        hostPid = 2147483647; hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'; argumentCount = 0
+        environmentNames = @(); invocationFingerprint = ('9' * 64); workingDirectory = $testRoot
+        logPath = (Join-Path $stateRoot "logs\$staleId.log"); exitCode = 0; error = $null
+    }
+    $staleRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$staleId.json") -Encoding utf8
+    Register-ManagedJobOwnerReference -Job ([pscustomobject]$staleRecord)
+    @{ schemaVersion = 1; jobId = $staleId; hostPid = 2147483647; wtSession = [guid]::NewGuid(); wtComClsid = [guid]::NewGuid() } |
+        ConvertTo-Json | Set-Content -LiteralPath (Get-ManagedJobControlFile -Id $staleId) -Encoding utf8
+    $startPayload = [ordered]@{
+        hook_event_name = 'SessionStart'; session_id = $sessionId; cwd = $testRoot; source = 'startup'
+    } | ConvertTo-Json -Compress
+    $startOutput = ($startPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook -ManagedHookId managed-jobs-session-start 2>&1 | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($startOutput)) 'SessionStart should silently reconcile in its background handler.'
+    Assert-True (-not (Test-Path -LiteralPath (Get-ManagedJobControlFile -Id $staleId))) `
+        'Hook-scheduled reconciliation should remove stale shared-terminal control metadata.'
+    Assert-True (@(Get-ManagedJobOwnerReferenceIds -OwnerAgent codex -OwnerSessionId $sessionId -Lifetime turn) -notcontains $staleId) `
+        'Hook-scheduled reconciliation should remove stale owner references.'
+
+    $heldMaintenanceLock = [IO.File]::Open((Join-Path $stateRoot '.maintenance.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    try {
+        $queuedHook = Start-SessionStartHookProcess -Payload $startPayload
+        Start-Sleep -Milliseconds 500
+        Assert-True (-not $queuedHook.process.HasExited) `
+            'SessionStart reconciliation should wait when another maintenance operation holds the lock.'
+    } finally {
+        $heldMaintenanceLock.Dispose()
+    }
+    if (-not $queuedHook.process.WaitForExit(10000)) {
+        try { $queuedHook.process.Kill($true) } catch {}
+        throw 'Queued SessionStart reconciliation did not finish after the maintenance lock was released.'
+    }
+    $queuedOutput = $queuedHook.outputTask.GetAwaiter().GetResult()
+    $queuedError = $queuedHook.errorTask.GetAwaiter().GetResult()
+    Assert-True ($queuedHook.process.ExitCode -eq 0 -and
+        [string]::IsNullOrWhiteSpace($queuedOutput) -and
+        [string]::IsNullOrWhiteSpace($queuedError)) `
+        'Queued SessionStart reconciliation should finish silently after the maintenance lock is released.'
+    $queuedHook.process.Dispose()
 
     $turnJob = (& $controller start -StateRoot $stateRoot -Name 'hook-turn-owned' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json

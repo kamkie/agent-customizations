@@ -171,10 +171,13 @@ structured logs when stream separation matters.
 
 Normal `start`, `list`, and collection `status` calls reconcile records whose
 stored state is `starting` or `running`; they do not repair inactive historical
-records. Run the explicit `reconcile` action after an interruption or restart
-when inactive owner references or shared-terminal control records may also need
-cleanup. Prefer `status -Id <job-id>` when the caller already has the returned
-job id because it reads and reconciles only that record.
+records. On session startup or resume, the installed `SessionStart` hook
+automatically runs reconciliation in its native asynchronous handler, so
+inactive owner references and shared-terminal control records are repaired
+without blocking launches or depending on agent memory. Use explicit
+reconciliation only to retry a reported hook failure or request an additional
+repair. Prefer `status -Id <job-id>` when the caller already has the returned job
+id because it reads and reconciles only that record.
 
 Structured status includes the expected PID/start time, current snapshot when
 relevant, and identity-match result.
@@ -187,6 +190,15 @@ contract: inspect it with `status -Id`, read its JSON result with `logs -Id`,
 and stop it through the controller if cancellation is explicitly requested.
 An exclusive maintenance lock permits only one reconcile or prune mutation at
 a time; an overlapping operation fails without doing partial work.
+
+Codex and Claude Code register the reconciliation scheduler as an asynchronous
+`SessionStart` command hook. Codex matches `startup|resume`; Claude Code also
+matches `fork`. The hook performs full reconciliation in its background command
+process, so the agent continues immediately without spawning an unmanaged child.
+When another maintenance operation holds the lock, the hook waits there and
+runs next instead of being dropped. Turn and session cleanup remain separate
+targeted hook operations over owner references. Manual `reconcile -Async` keeps
+the supervised persistent-job contract described above.
 
 Async prune snapshots its candidate ids and cutoff into a one-time runtime plan
 before dispatch. The worker consumes that plan under the maintenance lock,

@@ -35,6 +35,7 @@ param(
     [int]$OlderThanDays = 14,
     [switch]$Async,
     [string]$MaintenancePlan,
+    [switch]$WaitForMaintenanceLock,
     [string]$StateRoot,
     [ValidateSet('starting', 'running', 'completed', 'failed', 'stopped', 'orphaned', 'invalid')]
     [string[]]$Status,
@@ -70,6 +71,12 @@ if ($Action -ne 'prune' -and $PSBoundParameters.ContainsKey('MaintenancePlan')) 
 }
 if ($Async -and $PSBoundParameters.ContainsKey('MaintenancePlan')) {
     throw '-Async cannot be combined with -MaintenancePlan.'
+}
+if ($Action -ne 'reconcile' -and $PSBoundParameters.ContainsKey('WaitForMaintenanceLock')) {
+    throw '-WaitForMaintenanceLock is valid only for reconcile.'
+}
+if ($Async -and $PSBoundParameters.ContainsKey('WaitForMaintenanceLock')) {
+    throw '-Async cannot be combined with -WaitForMaintenanceLock.'
 }
 if ($Async -and $WhatIfPreference) {
     throw '-Async cannot be combined with -WhatIf. Preview prune synchronously before scheduling it.'
@@ -197,12 +204,19 @@ function Get-ManagedJobsWithActiveReconciliation {
 }
 
 function Enter-ManagedJobMaintenanceLock {
+    param([switch]$Wait)
+
     $lockPath = Join-Path (Get-ManagedJobRoot) '.maintenance.lock'
-    try {
-        return [IO.File]::Open($lockPath, 'OpenOrCreate', 'ReadWrite', 'None')
-    } catch [IO.IOException] {
-        throw 'Another managed-jobs maintenance operation is already running.'
-    }
+    do {
+        try {
+            return [IO.File]::Open($lockPath, 'OpenOrCreate', 'ReadWrite', 'None')
+        } catch [IO.IOException] {
+            if (-not $Wait) {
+                throw 'Another managed-jobs maintenance operation is already running.'
+            }
+            Start-Sleep -Milliseconds 250
+        }
+    } while ($true)
 }
 
 function Get-PruneCandidates {
@@ -1337,7 +1351,7 @@ switch ($Action) {
         } | ConvertTo-Json -Depth 8
     }
     'reconcile' {
-        $maintenanceLock = Enter-ManagedJobMaintenanceLock
+        $maintenanceLock = Enter-ManagedJobMaintenanceLock -Wait:$WaitForMaintenanceLock
         try {
             $jobs = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ })
             $selected = Select-ManagedJobs -Jobs $jobs

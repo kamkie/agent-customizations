@@ -91,6 +91,13 @@ foreach ($targetName in $targetNames) {
             if ([int]$entry.timeout -le 0) {
                 $errors.Add("Target '$targetName' hook '$($entry.id)' must have a positive timeout")
             }
+            if ($entry.PSObject.Properties.Name -contains 'async' -and $entry.async -isnot [bool]) {
+                $errors.Add("Target '$targetName' hook '$($entry.id)' async value must be boolean")
+            }
+            if ([string]$entry.event -eq 'SessionEnd' -and
+                $entry.PSObject.Properties.Name -contains 'async' -and [bool]$entry.async) {
+                $errors.Add("Target '$targetName' SessionEnd hook '$($entry.id)' cannot be asynchronous")
+            }
             if ([string]$entry.event -notin $supportedHookEvents) {
                 $errors.Add("Target '$targetName' hook '$($entry.id)' has unsupported event '$($entry.event)'")
             }

@@ -126,6 +126,15 @@ try {
     if ($LASTEXITCODE -eq 0 -or ($nullOutput -join ' ') -notmatch 'mode must be string, got null') {
         throw 'The instruction behavior scorer did not report a null response value as a contract violation.'
     }
+
+    $mutated.mode = 'investigation'
+    $mutated.publicationAuthorized = $true
+    $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $firstResponse -Encoding utf8
+    $valueOutput = @(& pwsh -NoProfile -File $runner -Target $firstTarget -CaseId $firstCase.id -ResponseDirectory $responseRoot 2>&1)
+    if ($LASTEXITCODE -eq 0 -or
+        ($valueOutput -join ' ') -notmatch "publicationAuthorized: expected 'False', got 'True'") {
+        throw 'The instruction behavior scorer did not reject a correctly typed wrong value.'
+    }
 } finally {
     if (Test-Path -LiteralPath $responseRoot -PathType Container) {
         Remove-Item -LiteralPath $responseRoot -Recurse -Force

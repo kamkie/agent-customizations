@@ -594,13 +594,8 @@ switch ($Action) {
         } elseif ($backgroundTerminalConnection) {
             'background-tab'
         } else {
-            'foreground-bootstrap'
-        }
-        if ($SharedTerminal -and -not $backgroundTerminalConnection) {
-            # Cold start: activate a new terminal window (foreground) and wait for
-            # its protocol registration; the managed tab is then created through
-            # the same verified protocol path as a warm background-tab launch.
-            $backgroundTerminalConnection = Start-IntelligentTerminalWindow -Tools $terminalTools
+            # Resolved by the cold-start bootstrap after validation succeeds.
+            $null
         }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
         $resolvedOwnerAgent = if ($OwnerAgent) {
@@ -638,6 +633,39 @@ switch ($Action) {
         $resolvedDirectory = (Resolve-Path -LiteralPath $WorkingDirectory).Path
         $fingerprint = Get-InvocationFingerprint -Executable $Executable -Arguments $Arguments -WorkingDirectory $resolvedDirectory -Environment $Environment
         $root = Get-ManagedJobRoot
+        if ($SharedTerminal -and -not $backgroundTerminalConnection) {
+            # Cold start opens a user-visible window, so it runs only after every
+            # validation above and a duplicate screen, and is serialized by its
+            # own lock: the holder re-probes first, so concurrent cold starts
+            # reuse one activated window instead of opening several.
+            $activeBeforeBootstrap = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ } | Where-Object status -in @('starting', 'running'))
+            $duplicateBeforeBootstrap = $activeBeforeBootstrap | Where-Object {
+                $_.PSObject.Properties.Name -contains 'invocationFingerprint' -and $_.invocationFingerprint -eq $fingerprint
+            } | Select-Object -First 1
+            if ($duplicateBeforeBootstrap) {
+                throw "Equivalent managed job is already active: $($duplicateBeforeBootstrap.id) [$($duplicateBeforeBootstrap.status)] $($duplicateBeforeBootstrap.name)"
+            }
+            $bootstrapLockPath = Join-Path $root '.bootstrap.lock'
+            $bootstrapLock = $null
+            $bootstrapDeadline = [datetime]::UtcNow.AddSeconds(60)
+            do {
+                try { $bootstrapLock = [IO.File]::Open($bootstrapLockPath, 'OpenOrCreate', 'ReadWrite', 'None') } catch [IO.IOException] {
+                    if ([datetime]::UtcNow -ge $bootstrapDeadline) { throw 'Timed out waiting for the shared-terminal bootstrap lock.' }
+                    Start-Sleep -Milliseconds 200
+                }
+            } until ($bootstrapLock)
+            try {
+                $backgroundTerminalConnection = Get-LiveIntelligentTerminalConnection -Tools $terminalTools
+                if ($backgroundTerminalConnection) {
+                    $sharedTerminalLaunchMode = 'background-tab'
+                } else {
+                    $backgroundTerminalConnection = Start-IntelligentTerminalWindow -Tools $terminalTools
+                    $sharedTerminalLaunchMode = 'foreground-bootstrap'
+                }
+            } finally {
+                $bootstrapLock.Dispose()
+            }
+        }
         $lockPath = Join-Path $root '.launch.lock'
         $lock = $null
         $launchFile = $null

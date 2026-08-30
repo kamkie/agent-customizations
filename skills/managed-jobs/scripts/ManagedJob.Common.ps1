@@ -423,28 +423,40 @@ function Get-LiveIntelligentTerminalConnection {
     $packageProcesses = Get-IntelligentTerminalPackageProcesses -Tools $Tools
     if (-not $packageProcesses) { return $null }
 
-    $windowCount = $null
-    try {
-        $probe = Invoke-IntelligentTerminalCliProcess `
-            -Tools $Tools `
-            -ComClsid $Tools.comClsid `
-            -Arguments @('--json', 'list-windows')
-        if ($probe.exitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
+    # Only an explicit successful zero-window response may report the terminal
+    # as absent: a timed-out, failed, or malformed probe against a running
+    # process must not trigger the focus-taking cold start.
+    $lastProbeError = $null
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        if ($attempt -gt 1) { Start-Sleep -Milliseconds 300 }
+        try {
+            $probe = Invoke-IntelligentTerminalCliProcess `
+                -Tools $Tools `
+                -ComClsid $Tools.comClsid `
+                -Arguments @('--json', 'list-windows') `
+                -TimeoutSeconds 5
+            if ($probe.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
+                throw ('the list-windows probe exited with code {0}' -f $probe.exitCode)
+            }
             $windowCount = @(($probe.standardOutput | ConvertFrom-Json).windows).Count
+        } catch {
+            $lastProbeError = $_.Exception.Message
+            continue
         }
-    } catch {}
-    if ($windowCount -ge 1) {
-        return [pscustomobject]@{
-            tools = $Tools
-            comClsid = ([guid]$Tools.comClsid).ToString('B')
+        if ($windowCount -ge 1) {
+            return [pscustomobject]@{
+                tools = $Tools
+                comClsid = ([guid]$Tools.comClsid).ToString('B')
+            }
         }
+        # Verified: the protocol answered with zero windows. Process-level
+        # signals (main window handle, window title) are unreliable for
+        # WindowsTerminal.exe, so the controller never guesses which process is
+        # live and never stops one; the cold-start bootstrap resolves this
+        # state without touching existing processes.
+        return $null
     }
-
-    # No protocol-registered window. Process-level signals (main window handle,
-    # window title) are unreliable for WindowsTerminal.exe, so the controller
-    # never guesses which process is live and never stops one. The cold-start
-    # bootstrap resolves this state without touching existing processes.
-    return $null
+    throw ('The Intelligent Terminal protocol probe kept failing while package processes are running: {0}' -f $lastProbeError)
 }
 
 function Start-IntelligentTerminalWindow {
@@ -459,16 +471,25 @@ function Start-IntelligentTerminalWindow {
     Start-Process -FilePath 'explorer.exe' `
         -ArgumentList ('shell:AppsFolder\{0}!App' -f $Tools.packageFamilyName) | Out-Null
     $deadline = [datetime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $lastProbeError = $null
     do {
         Start-Sleep -Milliseconds 500
-        $connection = Get-LiveIntelligentTerminalConnection -Tools $Tools
-        if ($connection) { return $connection }
+        try {
+            $connection = Get-LiveIntelligentTerminalConnection -Tools $Tools
+            if ($connection) { return $connection }
+        } catch {
+            # The window may still be starting its protocol server; keep the
+            # last probe failure for the final diagnostic.
+            $lastProbeError = $_.Exception.Message
+        }
     } while ([datetime]::UtcNow -lt $deadline)
     $leftoverIds = @(Get-IntelligentTerminalPackageProcesses -Tools $Tools | ForEach-Object { $_.Id })
-    $detail = if ($leftoverIds) {
-        ' A leftover terminal process may be blocking activation; close or stop PID {0} and retry.' -f ($leftoverIds -join ', ')
-    } else {
-        ''
+    $detail = ''
+    if ($leftoverIds) {
+        $detail += ' A leftover terminal process may be blocking activation; close or stop PID {0} and retry.' -f ($leftoverIds -join ', ')
+    }
+    if ($lastProbeError) {
+        $detail += " Last probe failure: $lastProbeError"
     }
     throw "The Microsoft Intelligent Terminal window did not register with the terminal protocol before the bootstrap deadline.$detail"
 }

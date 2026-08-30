@@ -129,6 +129,65 @@ try {
     })
     Assert-True ($recordedTools.wtcli -eq $tools.wtcli) `
         'Recorded shared-terminal tool paths should revalidate without package discovery.'
+
+    # Probe classification: only an explicit successful zero-window response may
+    # report the terminal as absent; probe faults must throw, not bootstrap.
+    $realPackageProcesses = ${function:Get-IntelligentTerminalPackageProcesses}
+    $realCliProcess = ${function:Invoke-IntelligentTerminalCliProcess}
+    try {
+        $probeTools = [pscustomobject]@{
+            packageRoot = $tools.packageRoot
+            comClsid = $tools.comClsid
+            wtcli = $tools.wtcli
+        }
+        function Get-IntelligentTerminalPackageProcesses { param($Tools) @([pscustomobject]@{ Id = 424242 }) }
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{ exitCode = 0; standardOutput = '{"windows":[{"window_id":1}]}'; standardError = '' }
+        }
+        Assert-True ($null -ne (Get-LiveIntelligentTerminalConnection -Tools $probeTools)) `
+            'A successful probe with a window should produce a connection.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{ exitCode = 0; standardOutput = '{"windows":[]}'; standardError = '' }
+        }
+        Assert-True ($null -eq (Get-LiveIntelligentTerminalConnection -Tools $probeTools)) `
+            'A verified zero-window response should report the terminal as absent.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{ exitCode = 1; standardOutput = ''; standardError = 'probe-broke' }
+        }
+        $probeFailure = $null
+        try { Get-LiveIntelligentTerminalConnection -Tools $probeTools | Out-Null } catch { $probeFailure = $_.Exception.Message }
+        Assert-True ($probeFailure -match 'probe kept failing') `
+            'A persistent nonzero probe exit should throw instead of reporting absence.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{ exitCode = 0; standardOutput = 'not-json{'; standardError = '' }
+        }
+        $probeFailure = $null
+        try { Get-LiveIntelligentTerminalConnection -Tools $probeTools | Out-Null } catch { $probeFailure = $_.Exception.Message }
+        Assert-True ($probeFailure -match 'probe kept failing') `
+            'Malformed probe output should throw instead of reporting absence.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            throw 'The Intelligent Terminal CLI timed out.'
+        }
+        $probeFailure = $null
+        try { Get-LiveIntelligentTerminalConnection -Tools $probeTools | Out-Null } catch { $probeFailure = $_.Exception.Message }
+        Assert-True ($probeFailure -match 'probe kept failing') `
+            'A persistent probe timeout should throw instead of reporting absence.'
+
+        function Get-IntelligentTerminalPackageProcesses { param($Tools) @() }
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            throw 'the probe must not run without package processes'
+        }
+        Assert-True ($null -eq (Get-LiveIntelligentTerminalConnection -Tools $probeTools)) `
+            'No package process should report absence without probing the protocol.'
+    } finally {
+        Set-Item -Path function:Get-IntelligentTerminalPackageProcesses -Value $realPackageProcesses
+        Set-Item -Path function:Invoke-IntelligentTerminalCliProcess -Value $realCliProcess
+    }
     if (-not $backgroundConnection -and -not $AllowForegroundBootstrap) {
         $backgroundRequirementRejected = $false
         try {

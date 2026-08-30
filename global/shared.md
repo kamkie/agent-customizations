@@ -53,6 +53,28 @@ when they change behavior; report phases, not commands. Progress labels never
 grant authority. After two materially similar failures, recheck assumptions and
 run one discriminating diagnostic before another attempt.
 
+### Autonomous readiness
+
+Before activating autonomous persistence, map the complete authorized path and
+resolve every foreseeable user-owned dependency needed to finish it: decisions,
+answers, approvals, credentials or authenticated access, external capabilities,
+and recovery choices. Gather discoverable facts yourself, then ask once for the
+remaining user input instead of starting work that is expected to stop later.
+
+Verify required access without exposing secrets. When a credential or session
+may expire before completion, establish an authorized refresh or
+re-authentication path that can be used without new user input, and preserve
+non-secret recovery state across that transition. Never print, copy into prompts
+or files, or retain credentials merely to make the run autonomous. Do not bypass
+authentication or refresh access beyond the granted authority.
+
+A request for autonomy does not activate the modifier until this readiness check
+passes. If continuity cannot be established, remain non-autonomous at a
+recoverable preflight checkpoint and request the exact missing input or
+authority. If access still expires unexpectedly after activation, use only the
+pre-authorized recovery path; otherwise preserve state and report the blocker
+rather than improvising an unsafe workaround.
+
 ## Questions, design, and authorization
 
 Treat a capability question such as "Can you do X?" as a question, not as

@@ -94,8 +94,9 @@ return only the JSON object required by the response schema.
 publicationAuthorized means the request and active instructions authorize a
 remote branch plus a pull or merge request. It does not mean merge or deployment
 is authorized. The autonomous field reports whether the independent persistence
-modifier is active. Choose the narrowest primaryAction that matches the required
-next behavior.
+modifier is active after readiness passes; a requested but blocked or unresolved
+autonomous preflight reports false. Choose the narrowest primaryAction that
+matches the required next behavior.
 
 Request:
 $($Case.prompt)

@@ -51,11 +51,24 @@
     },
     "autonomous-request": {
       "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "autonomous-readiness-checkpoint",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "autonomous-ready": {
+      "mode": "standard",
       "autonomous": true,
       "primaryAction": "implement-and-deliver",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
+    },
+    "autonomous-expiring-session": {
+      "mode": "careful",
+      "autonomous": false,
+      "primaryAction": "autonomous-readiness-checkpoint"
     },
     "campaign-inventory-only": {
       "mode": "standard",

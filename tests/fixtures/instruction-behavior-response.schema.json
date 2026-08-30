@@ -23,6 +23,7 @@
         "implement-and-deliver",
         "commit-validated-work",
         "recheck-and-diagnose",
+        "autonomous-readiness-checkpoint",
         "inventory-authority-checkpoint",
         "deliver-pilot-before-fanout"
       ]

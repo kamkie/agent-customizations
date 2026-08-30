@@ -81,6 +81,9 @@ unless a portable, reviewable installation mechanism is added deliberately.
 
 ### Apply the temporary pull-request policy when active
 
+The [temporary bot-unavailable policy](docs/temporary-bot-unavailable.md) is
+active until this notice is removed.
+
 Immediately before pull-request creation or another author-side mutation, read
 the complete [temporary bot-unavailable policy](docs/temporary-bot-unavailable.md).
 It owns the current GitHub actor, credential boundary, draft creation rule, and

@@ -58,6 +58,8 @@
       "deploymentAuthorized": false
     },
     "campaign-inventory-only": {
+      "mode": "standard",
+      "autonomous": false,
       "primaryAction": "inventory-authority-checkpoint",
       "publicationAuthorized": false,
       "mergeAuthorized": false,

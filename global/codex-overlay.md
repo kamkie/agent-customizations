@@ -26,6 +26,7 @@ credentials, or require new authority.
 `Start delivery campaign <tracker>` authorizes the bounded campaign inventory,
 visible task/worktree/branch creation, local commits, remote branch pushes,
 draft pull or merge requests, tracker links and status updates, CI monitoring,
-and required opposite-agent review with finding fixes and re-review. Use the
-`orchestrate-work-campaigns` workflow and discover each repository's delivery
-rules at runtime. This trigger does not authorize merge or deployment.
+required opposite-agent review with finding fixes and re-review, and each
+repository-gated readiness transition. Use the `orchestrate-work-campaigns`
+workflow and discover each repository's delivery rules at runtime. This trigger
+does not authorize merge or deployment.

@@ -28,7 +28,7 @@ if (@($ids | Where-Object { $_ -notin $expectedIds }).Count -gt 0 -or
 
 $allowedTargets = @('codex', 'claude')
 $allowedInstructionSets = @('global', 'campaign')
-$requiredProperties = @($schema.required)
+$knownProperties = @($schema.properties.PSObject.Properties.Name)
 $allowedValues = @{}
 foreach ($property in $schema.properties.PSObject.Properties) {
     if ($property.Value.PSObject.Properties.Name -contains 'enum') {
@@ -54,11 +54,14 @@ foreach ($case in $cases.cases) {
     }
 
     $expected = $expectations.expectations.PSObject.Properties[$case.id].Value
-    foreach ($propertyName in $requiredProperties) {
-        $property = $expected.PSObject.Properties[$propertyName]
-        if (-not $property) { throw "Expectation '$($case.id)' is missing '$propertyName'." }
-        if ($allowedValues.ContainsKey($propertyName) -and $property.Value -notin $allowedValues[$propertyName]) {
-            throw "Expectation '$($case.id)' has invalid '$propertyName' value '$($property.Value)'."
+    $expectedProperties = @($expected.PSObject.Properties)
+    if ($expectedProperties.Count -eq 0) { throw "Expectation '$($case.id)' is empty." }
+    foreach ($property in $expectedProperties) {
+        if ($property.Name -notin $knownProperties) {
+            throw "Expectation '$($case.id)' contains unknown property '$($property.Name)'."
+        }
+        if ($allowedValues.ContainsKey($property.Name) -and $property.Value -notin $allowedValues[$property.Name]) {
+            throw "Expectation '$($case.id)' has invalid '$($property.Name)' value '$($property.Value)'."
         }
     }
 }

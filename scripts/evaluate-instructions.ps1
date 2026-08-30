@@ -223,7 +223,9 @@ function Compare-ExpectedBehavior {
             $mismatches.Add("missing '$($property.Name)'")
             continue
         }
-        if ($actualProperty.Value.GetType() -ne $property.Value.GetType()) {
+        if ($null -eq $actualProperty.Value) {
+            $mismatches.Add("$($property.Name): expected type '$($property.Value.GetType().Name)', got 'null'")
+        } elseif ($actualProperty.Value.GetType() -ne $property.Value.GetType()) {
             $mismatches.Add("$($property.Name): expected type '$($property.Value.GetType().Name)', got '$($actualProperty.Value.GetType().Name)'")
         } elseif (-not [object]::Equals($actualProperty.Value, $property.Value)) {
             $mismatches.Add("$($property.Name): expected '$($property.Value)', got '$($actualProperty.Value)'")

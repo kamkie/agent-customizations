@@ -118,6 +118,14 @@ try {
     if (($failOutput -join ' ') -notmatch 'publicationAuthorized must be boolean') {
         throw 'The instruction behavior scorer did not report the supplied response type violation.'
     }
+
+    $mutated.publicationAuthorized = $false
+    $mutated.mode = $null
+    $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $firstResponse -Encoding utf8
+    $nullOutput = @(& pwsh -NoProfile -File $runner -Target $firstTarget -CaseId $firstCase.id -ResponseDirectory $responseRoot 2>&1)
+    if ($LASTEXITCODE -eq 0 -or ($nullOutput -join ' ') -notmatch 'mode must be string, got null') {
+        throw 'The instruction behavior scorer did not report a null response value as a contract violation.'
+    }
 } finally {
     if (Test-Path -LiteralPath $responseRoot -PathType Container) {
         Remove-Item -LiteralPath $responseRoot -Recurse -Force

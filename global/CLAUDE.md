@@ -13,6 +13,10 @@ Before committing in a Claude-managed worktree, check whether `HEAD` is detached
 - There is no `--read-only` flag. Read-only is the default sandbox; request write access with `--write`. Never pass `--read-only` (or other invented flags) — unknown flags are not rejected, they leak verbatim into the prompt text.
 - Passing the prompt as a single quoted argument is lossy: the helper re-tokenizes the raw string with shell-style rules, so unescaped `"`/`'` are stripped, `\` acts as an escape (mangles Windows paths), and newlines collapse to single spaces. For any multi-line or formatted prompt, write it to a scratchpad file and pass `--prompt-file <path>` — that reads the file verbatim. Short one-line prompts without quotes may be passed inline.
 
+## glab: run from the target repository
+
+Run `glab` commands from inside the clone of the repository they target. Running `glab` from another directory with `--repo` silently adds a `glab-base` remote to the current directory's repository. If that happens, remove the stray remote with `git remote remove glab-base`.
+
 ## Long-running local processes
 
 Use the `managed-jobs` skill for dev servers, watchers, paid CLI agents, background builds, and other processes expected to outlive a Claude Code turn. Keep ordinary short commands attached to the active tool call.

@@ -45,13 +45,13 @@ reversible, narrow work; and `standard` for ordinary implementation or
 operational work. Use `careful` only when a concrete constraint creates
 materially elevated blast radius, irreversibility, uncertainty, security, data
 or production sensitivity, or validation demands. Task size, coordination, or
-a multi-step workflow alone does not activate autonomous persistence. A bounded
-phase may select a narrower mode, such as `quick` for committing validated local
-work; otherwise the mode and persistence setting last for the current objective
-and its follow-ups. Announce them only when they change behavior; report phases,
-not commands. Progress labels never grant authority. After two materially
-similar failures, recheck assumptions and run one discriminating diagnostic
-before another attempt.
+a multi-step workflow alone neither requires `careful` rigor nor activates
+autonomous persistence. A bounded phase may select a narrower mode, such as
+`quick` for committing validated local work; otherwise the mode and persistence
+setting last for the current objective and its follow-ups. Announce them only
+when they change behavior; report phases, not commands. Progress labels never
+grant authority. After two materially similar failures, recheck assumptions and
+run one discriminating diagnostic before another attempt.
 
 ## Questions, design, and authorization
 

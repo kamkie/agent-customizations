@@ -57,6 +57,34 @@ Stop only after the work is complete or when the user explicitly asks:
 & $jobs stop -Id <job-id>
 ```
 
+## Asynchronous maintenance
+
+Run a large reconciliation as a hidden supervised maintenance job so the caller
+can continue immediately:
+
+```powershell
+$operation = (& $jobs reconcile -Async | Out-String) | ConvertFrom-Json
+& $jobs status -Id $operation.id
+& $jobs logs -Id $operation.id -Tail 100
+```
+
+Preview pruning synchronously, obtain explicit authorization for the reported
+scope, then schedule the destructive pass. Async prune freezes the exact
+candidate ids before returning and revalidates them before deletion; it never
+adds newly eligible records in the background.
+
+```powershell
+& $jobs prune -OlderThanDays 14 -WhatIf
+$operation = (& $jobs prune -OlderThanDays 14 -Async | Out-String) | ConvertFrom-Json
+& $jobs status -Id $operation.id
+& $jobs logs -Id $operation.id -Tail 100
+```
+
+Async maintenance uses persistent managed-job containment so it can finish
+after the initiating turn. Hand off its id and log path, and stop it only when
+the user asks or the operation is no longer needed. `reconcile` and `prune`
+without `-Async` remain synchronous for scripts, previews, and tests.
+
 ## Shared terminal
 
 Shared-terminal mode is an explicit visible-only option. It uses the installed

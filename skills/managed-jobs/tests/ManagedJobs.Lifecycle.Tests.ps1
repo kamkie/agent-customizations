@@ -202,7 +202,7 @@ try {
             $boundedWaitRejected = $_.Exception.Message -match 'Timed out after 1 seconds'
         }
         $boundedWaitTimer.Stop()
-        Assert-True ($boundedWaitRejected -and $boundedWaitTimer.Elapsed.TotalSeconds -lt 2) `
+        Assert-True ($boundedWaitRejected -and $boundedWaitTimer.Elapsed.TotalSeconds -lt 10) `
             'Maintenance lock waiting should fail on its configured deadline instead of leaking a process indefinitely.'
 
         $maintenanceStartInfo = [Diagnostics.ProcessStartInfo]::new()

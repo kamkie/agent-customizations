@@ -237,7 +237,7 @@ try {
             -HostScript $hostScript `
             -JobFile $encodedJobPath `
             -LaunchFile $encodedLaunchPath
-        & $pwsh @encodedArguments *> $null
+        $encodedOutput = (& $pwsh @encodedArguments 2>&1 | Out-String)
         Assert-True ($LASTEXITCODE -eq 0) 'Encoded shared-host invocation should exit successfully.'
     } finally {
         if ($null -eq $savedWtSession) { Remove-Item Env:WT_SESSION -ErrorAction SilentlyContinue } else { $env:WT_SESSION = $savedWtSession }
@@ -248,7 +248,7 @@ try {
         $encodedResult.status -eq 'completed' -and
         $encodedResult.terminalControlState -eq 'released'
     ) 'Encoded shared-host invocation should preserve its completed lifecycle state.'
-    Assert-True ((Get-Content -LiteralPath $encodedResult.logPath -Raw) -match 'encoded-shared-ok') `
+    Assert-True ($encodedOutput -match 'encoded-shared-ok') `
         'Encoded shared-host invocation should run the managed child.'
     Assert-True (-not (Test-Path -LiteralPath $encodedLaunchPath)) `
         'Encoded shared-host invocation should consume the launch handoff.'

@@ -74,10 +74,17 @@ try {
     $previousErrorPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        & $launch.executable @($launch.arguments) 2>&1 | ForEach-Object {
-            $line = $_.ToString()
-            Write-Host $line
-            $writer.WriteLine($line)
+        if ($sharedTerminal) {
+            # Interactive children must inherit the terminal streams directly.
+            # Piping their output delays prompts that do not end in a newline and
+            # rewrites terminal control sequences, corrupting the visible pane.
+            & $launch.executable @($launch.arguments)
+        } else {
+            & $launch.executable @($launch.arguments) 2>&1 | ForEach-Object {
+                $line = $_.ToString()
+                Write-Host $line
+                $writer.WriteLine($line)
+            }
         }
         $exitCode = if (Test-Path variable:LASTEXITCODE) { [int]$LASTEXITCODE } elseif ($?) { 0 } else { 1 }
     } finally {

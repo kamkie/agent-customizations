@@ -53,15 +53,11 @@ function Wait-PanePattern {
     throw "Timed out waiting for expected shared-terminal output for $Id."
 }
 
-function Wait-LoggedProcessId {
-    param([string]$LogPath, [string]$Pattern, [int]$Seconds = 10)
-    $deadline = [datetime]::UtcNow.AddSeconds($Seconds)
-    do {
-        $log = if (Test-Path -LiteralPath $LogPath) { Get-Content -LiteralPath $LogPath -Raw } else { '' }
-        if ($log -match $Pattern) { return [int]$Matches[1] }
-        Start-Sleep -Milliseconds 100
-    } while ([datetime]::UtcNow -lt $deadline)
-    throw 'Timed out waiting for the managed child process id.'
+function Wait-PaneProcessId {
+    param([string]$Id, [string]$Pattern, [int]$Seconds = 10)
+    $captured = Wait-PanePattern -Id $Id -Pattern $Pattern -Seconds $Seconds
+    if ($captured -notmatch $Pattern) { throw 'The shared-terminal process id was not captured.' }
+    return [int]$Matches[1]
 }
 
 function Wait-ProcessExit {
@@ -238,6 +234,7 @@ try {
 
     $interactiveCommand = @'
 Write-Output "shared-child-pid=$PID"
+Write-Output "shared-profile-id=$env:WT_PROFILE_ID"
 Write-Output 'shared-ready'
 while ($true) {
     $value = Read-Host 'shared-input'
@@ -310,6 +307,10 @@ while ($true) {
     $captured = Wait-PanePattern -Id $shared.id -Pattern 'agent-marker-observed'
     Assert-True ($captured -match 'agent-marker-observed') `
         'Literal input plus the named Enter key should reach only the registered pane.'
+    Assert-True ($captured -match 'shared-profile-id=\{574e775e-4f2a-5b96-ac1e-a2962a402336\}') `
+        'The shared tab should use the PowerShell profile.'
+    Assert-True ($captured -match 'shared-input:\s*agent-literal-marker') `
+        'The interactive prompt should render before the submitted input.'
 
     $null = & $controller send-input -Id $shared.id -StateRoot $stateRoot -InputText 'secure-test'
     $null = & $controller send-key -Id $shared.id -StateRoot $stateRoot -Key Enter
@@ -329,7 +330,7 @@ while ($true) {
             'Direct user input should reach the visible managed pane.'
     }
 
-    $sharedChildPid = Wait-LoggedProcessId -LogPath $shared.logPath -Pattern 'shared-child-pid=(\d+)'
+    $sharedChildPid = Wait-PaneProcessId -Id $shared.id -Pattern 'shared-child-pid=(\d+)'
     $stopped = (& $controller stop -Id $shared.id -StateRoot $stateRoot | Out-String) | ConvertFrom-Json
     $activeIds.Remove($shared.id) | Out-Null
     Assert-True ($stopped.status -eq 'stopped' -and $stopped.terminalControlState -eq 'released') `
@@ -361,7 +362,7 @@ while ($true) {
     $activeIds.Add($orphan.id)
     $orphan = Wait-JobStatus -Id $orphan.id -Expected @('running')
     $orphanControlFile = Get-ManagedJobControlFile -Id $orphan.id
-    $orphanChildPid = Wait-LoggedProcessId -LogPath $orphan.logPath -Pattern 'orphan-child-pid=(\d+)'
+    $orphanChildPid = Wait-PaneProcessId -Id $orphan.id -Pattern 'orphan-child-pid=(\d+)'
     Stop-Process -Id $orphan.hostPid -Force
     $activeIds.Remove($orphan.id) | Out-Null
     Assert-True (Wait-ProcessExit -TargetProcessId $orphanChildPid) `
@@ -377,7 +378,7 @@ while ($true) {
         -Visible -SharedTerminal @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($turnOwned.id)
     $turnOwned = Wait-JobStatus -Id $turnOwned.id -Expected @('running')
-    $turnChildPid = Wait-LoggedProcessId -LogPath $turnOwned.logPath -Pattern 'turn-child-pid=(\d+)'
+    $turnChildPid = Wait-PaneProcessId -Id $turnOwned.id -Pattern 'turn-child-pid=(\d+)'
     $turnControlFile = Get-ManagedJobControlFile -Id $turnOwned.id
     $cleanup = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex `
         -OwnerSessionId $env:CODEX_THREAD_ID -CleanupLifetime Turn | Out-String) | ConvertFrom-Json
@@ -394,7 +395,7 @@ while ($true) {
         -Visible -SharedTerminal -Lifetime Session @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($sessionOwned.id)
     $sessionOwned = Wait-JobStatus -Id $sessionOwned.id -Expected @('running')
-    $sessionChildPid = Wait-LoggedProcessId -LogPath $sessionOwned.logPath -Pattern 'session-child-pid=(\d+)'
+    $sessionChildPid = Wait-PaneProcessId -Id $sessionOwned.id -Pattern 'session-child-pid=(\d+)'
     $sessionControlFile = Get-ManagedJobControlFile -Id $sessionOwned.id
     $sessionCleanup = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex `
         -OwnerSessionId $env:CODEX_THREAD_ID -CleanupLifetime Turn,Session | Out-String) | ConvertFrom-Json

@@ -406,7 +406,8 @@ function Start-ManagedJobBackgroundTerminalTab {
             '--json', 'new-tab',
             '--command', $commandLine,
             '--title', $Name,
-            '--cwd', $WorkingDirectory
+            '--cwd', $WorkingDirectory,
+            '--profile', 'PowerShell'
         )
     if ($result.exitCode -ne 0) {
         throw 'The background shared-terminal tab failed to launch.'

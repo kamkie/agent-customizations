@@ -1,6 +1,6 @@
 ---
 name: managed-jobs
-description: Contain, run, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
+description: Contain, run, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes, optional visible output, and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
 ---
 
 # Managed Jobs
@@ -29,6 +29,8 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
   `-Lifetime Session` only across turns and `Persistent` only across sessions.
 - Use the returned job instead of a global `list`; target `status` when needed.
 - Treat arguments, environment values, records, and logs as non-secret.
+- Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen`
+  leaves a completed terminal for the user to close manually.
 - Never replace this controller with a detached/background launch. Use
   `claude-runner` for Claude session, resume, and review behavior.
 

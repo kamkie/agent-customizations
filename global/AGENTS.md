@@ -6,6 +6,10 @@ Default managed jobs to durable hidden execution with persistent logs. Use the o
 
 Do not launch long-running work through raw `Start-Process`, `Start-Job`, detached terminal tabs, or background flags unless the user explicitly requests unmanaged execution. When a hook denies a background or detached launch, start a managed job instead; a foreground retry bounded by a tool-call timeout is not an acceptable substitute.
 
+### Shared terminal shorthand
+
+Treat `shared term` as a complete instruction to open a collaborative terminal through the `managed-jobs` skill: start a visible `-SharedTerminal` managed job running `pwsh.exe -NoProfile` with session lifetime, working directory at the current repository root (or the current directory outside a repository), then report the job id and how to capture, send input, and stop. Do not ask for further details unless a required prerequisite is missing.
+
 ## Work modes and progress
 
 Use these instruction-level work modes without relying on a harness or product Plan mode:

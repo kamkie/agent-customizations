@@ -7,6 +7,10 @@ ownership. Serialize shared files, schemas, manifests, lockfiles, migrations,
 generated sources, and integration points. The coordinator inspects the
 combined diff and owns integration; read-only investigation may overlap.
 
+When an active skill or explicit output contract requires verbatim content,
+output-only content, or another response shape, follow that format. It does not
+change authorization, scope, safety, validation, or action boundaries.
+
 Lead responses with the result, recommendation, or required action. Use short
 paragraphs and only useful formatting. Keep the current objective separate from
 adjacent observations, preserve material evidence and caveats, and distinguish

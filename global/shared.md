@@ -84,9 +84,12 @@ delivery stages rather than leaving work stranded in a delegated checkout.
 Keep one coherent problem per PR/MR when repository policy is silent. Lead its
 description with the problem and rationale, then summarize the solution,
 validation, and remaining risk. Record required opposite-agent review and
-triage every finding. Before marking ready, refresh the current head, unresolved
+triage every finding. Mark the PR/MR ready before human handoff when its current
+head passes required checks and review, has no unresolved blocking feedback, and
+is cleanly mergeable. Immediately before that transition, refresh the head,
 feedback, checks, mergeability, and blocking reviews; keep it draft when any
-gate fails or the head changed.
+gate fails or the head changed. Refresh again after the transition and return it
+to draft if a gate changed.
 
 After merge, fetch the remote default branch and prove the result is reachable
 before cleanup. Stop task-specific processes and remove task-created temporary

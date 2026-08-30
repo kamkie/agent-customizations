@@ -29,6 +29,17 @@ if (@($ids | Where-Object { $_ -notin $expectedIds }).Count -gt 0 -or
 $allowedTargets = @('codex', 'claude')
 $allowedInstructionSets = @('global', 'campaign')
 $knownProperties = @($schema.properties.PSObject.Properties.Name)
+$answerLeakPattern = '(?i)\b(?:expected\s+(?:answer|outcome|behavior|result)|answer\s*:|rubric\s*:|solution\s*:)'
+foreach ($sample in @(
+    'Use the expected outcome: stop.',
+    'The answer: continue.',
+    'Internal rubric: choose careful.',
+    'Solution: publish the branch.'
+)) {
+    if ($sample -notmatch $answerLeakPattern) {
+        throw "Instruction behavior answer-leak guard missed sample: $sample"
+    }
+}
 $allowedValues = @{}
 foreach ($property in $schema.properties.PSObject.Properties) {
     if ($property.Value.PSObject.Properties.Name -contains 'enum') {
@@ -49,7 +60,7 @@ foreach ($case in $cases.cases) {
     if ($case.instructionSet -eq 'campaign' -and 'claude' -in @($case.targets)) {
         throw "Campaign behavior case '$($case.id)' cannot target Claude."
     }
-    if ($case.prompt -match '(?im)^\s*(?:expected|answer|rubric|solution)\b') {
+    if ($case.prompt -match $answerLeakPattern) {
         throw "Instruction behavior case '$($case.id)' leaks its expectation into the prompt."
     }
 

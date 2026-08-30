@@ -4,6 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $controller = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\Invoke-ManagedJob.ps1'
 $hostScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Host.ps1'
+$maintenanceScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Maintenance.ps1'
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Common.ps1')
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('managed-jobs-lifecycle-' + [guid]::NewGuid().ToString('N'))
 $stateRoot = Join-Path $testRoot 'state'
@@ -184,6 +185,7 @@ try {
 
     $maintenanceLockPath = Join-Path $stateRoot '.maintenance.lock'
     $heldMaintenanceLock = [IO.File]::Open($maintenanceLockPath, 'OpenOrCreate', 'ReadWrite', 'None')
+    $queuedMaintenance = $null
     try {
         $overlappingMaintenanceRejected = $false
         try { & $controller reconcile -StateRoot $stateRoot | Out-Null } catch {
@@ -191,9 +193,55 @@ try {
         }
         Assert-True $overlappingMaintenanceRejected `
             'The maintenance lock should reject overlapping reconcile or prune mutations.'
+
+        $contendedPlanPath = Join-Path $maintenanceDirectory 'contended-worker.json'
+        Write-ManagedJson -Path $contendedPlanPath -Value ([ordered]@{
+            schemaVersion = 1
+            action = 'prune'
+            cutoffUtc = [datetime]::UtcNow.ToString('o')
+            statuses = @()
+            candidateIds = @()
+        })
+        $maintenanceStartInfo = [Diagnostics.ProcessStartInfo]::new()
+        $maintenanceStartInfo.FileName = $pwsh
+        $maintenanceStartInfo.UseShellExecute = $false
+        $maintenanceStartInfo.CreateNoWindow = $true
+        $maintenanceStartInfo.RedirectStandardOutput = $true
+        $maintenanceStartInfo.RedirectStandardError = $true
+        foreach ($argument in @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $maintenanceScript,
+            '-Controller', $controller, '-Action', 'prune', '-StateRoot', $stateRoot,
+            '-PlanPath', $contendedPlanPath
+        )) {
+            $maintenanceStartInfo.ArgumentList.Add($argument)
+        }
+        $maintenanceProcess = [Diagnostics.Process]::Start($maintenanceStartInfo)
+        $maintenanceOutputTask = $maintenanceProcess.StandardOutput.ReadToEndAsync()
+        $maintenanceErrorTask = $maintenanceProcess.StandardError.ReadToEndAsync()
+        $queuedMaintenance = [pscustomobject]@{
+            process = $maintenanceProcess
+            outputTask = $maintenanceOutputTask
+            errorTask = $maintenanceErrorTask
+        }
+        Start-Sleep -Milliseconds 500
+        Assert-True (-not $queuedMaintenance.process.HasExited -and
+            (Test-Path -LiteralPath $contendedPlanPath -PathType Leaf)) `
+            'An accepted async prune should wait without discarding its frozen plan.'
     } finally {
         $heldMaintenanceLock.Dispose()
     }
+    if (-not $queuedMaintenance.process.WaitForExit(10000)) {
+        try { $queuedMaintenance.process.Kill($true) } catch {}
+        throw 'Queued maintenance worker did not finish after the maintenance lock was released.'
+    }
+    $queuedMaintenanceOutput = $queuedMaintenance.outputTask.GetAwaiter().GetResult()
+    $queuedMaintenanceError = $queuedMaintenance.errorTask.GetAwaiter().GetResult()
+    Assert-True ($queuedMaintenance.process.ExitCode -eq 0 -and
+        $queuedMaintenanceOutput -match '"removedCount"' -and
+        -not (Test-Path -LiteralPath $contendedPlanPath) -and
+        [string]::IsNullOrWhiteSpace($queuedMaintenanceError)) `
+        'An accepted async prune should complete and consume its plan after contention clears.'
+    $queuedMaintenance.process.Dispose()
 
     $asyncReconcile = (& $controller reconcile -StateRoot $stateRoot -Status completed,failed -Async | Out-String) | ConvertFrom-Json
     $activeIds.Add($asyncReconcile.id)

@@ -199,7 +199,9 @@ operation owns the lock, the hook fails fast and reports the skipped attempt;
 the next startup or resume retries without depending on agent memory. The hook
 runtime is bounded to ten minutes. Turn and session cleanup remain separate
 targeted hook operations over owner references. Manual `reconcile -Async` keeps
-the supervised persistent-job contract described above.
+the supervised persistent-job contract described above. Its worker retries lock
+contention in the background so an accepted maintenance job completes later
+without slowing the caller or changing SessionStart's fail-fast behavior.
 
 Async prune snapshots its candidate ids and cutoff into a one-time runtime plan
 before dispatch. The worker consumes that plan under the maintenance lock,

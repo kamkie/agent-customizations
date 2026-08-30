@@ -27,7 +27,18 @@ if ($PlanPath) {
 }
 
 try {
-    & $Controller $Action @controllerParameters
+    while ($true) {
+        try {
+            & $Controller $Action @controllerParameters
+            break
+        } catch {
+            if ($_.Exception.GetBaseException().Message -cne
+                'Another managed-jobs maintenance operation is already running.') {
+                throw
+            }
+            Start-Sleep -Milliseconds 250
+        }
+    }
 } finally {
     if ($PlanPath -and (Test-Path -LiteralPath $PlanPath -PathType Leaf)) {
         Remove-Item -LiteralPath $PlanPath -Force -ErrorAction SilentlyContinue

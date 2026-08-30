@@ -53,15 +53,11 @@ function Wait-PanePattern {
     throw "Timed out waiting for expected shared-terminal output for $Id."
 }
 
-function Wait-LoggedProcessId {
-    param([string]$LogPath, [string]$Pattern, [int]$Seconds = 10)
-    $deadline = [datetime]::UtcNow.AddSeconds($Seconds)
-    do {
-        $log = if (Test-Path -LiteralPath $LogPath) { Get-Content -LiteralPath $LogPath -Raw } else { '' }
-        if ($log -match $Pattern) { return [int]$Matches[1] }
-        Start-Sleep -Milliseconds 100
-    } while ([datetime]::UtcNow -lt $deadline)
-    throw 'Timed out waiting for the managed child process id.'
+function Wait-PaneProcessId {
+    param([string]$Id, [string]$Pattern, [int]$Seconds = 10)
+    $captured = Wait-PanePattern -Id $Id -Pattern $Pattern -Seconds $Seconds
+    if ($captured -notmatch $Pattern) { throw 'The shared-terminal process id was not captured.' }
+    return [int]$Matches[1]
 }
 
 function Wait-ProcessExit {
@@ -200,6 +196,47 @@ try {
         }
         Assert-True ($null -eq (Get-LiveIntelligentTerminalConnection -Tools $probeTools)) `
             'No package process should report absence without probing the protocol.'
+
+        $profileConnection = [pscustomobject]@{ tools = $probeTools; comClsid = $probeTools.comClsid }
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{
+                exitCode = 0
+                standardOutput = '{"profiles":{"list":[{"name":"Git Bash","guid":"{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}"},{"guid":"{99999999-8888-7777-6666-555555555555}"},{"name":"Renamed Shell","source":"Windows.Terminal.PowershellCore","guid":"{11111111-2222-3333-4444-555555555555}","hidden":false}]}}'
+                standardError = ''
+            }
+        }
+        $renamedProfile = Resolve-PowerShellTerminalProfile -Connection $profileConnection
+        Assert-True (
+            $renamedProfile.name -eq 'Renamed Shell' -and
+            $renamedProfile.id -eq '{11111111-2222-3333-4444-555555555555}'
+        ) 'PowerShell profile discovery should survive a renamed display label.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{
+                exitCode = 0
+                standardOutput = '{"profiles":{"list":[{"name":"Renamed Shell","source":"Windows.Terminal.PowershellCore","hidden":false}]}}'
+                standardError = ''
+            }
+        }
+        $nameOnlyProfile = Resolve-PowerShellTerminalProfile -Connection $profileConnection
+        Assert-True ($nameOnlyProfile.name -eq 'Renamed Shell' -and -not $nameOnlyProfile.id) `
+            'A source-confirmed profile without a GUID should retain its name fallback.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{
+                exitCode = 0
+                standardOutput = '{"profiles":{"list":[{"name":"Renamed Shell","source":"Windows.Terminal.PowershellCore","hidden":false},{"name":"Renamed Shell","hidden":false}]}}'
+                standardError = ''
+            }
+        }
+        Assert-True ($null -eq (Resolve-PowerShellTerminalProfile -Connection $profileConnection)) `
+            'An ambiguous GUID-less profile name should preserve the default-profile fallback.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{ exitCode = 0; standardOutput = '{"profiles":{"list":[]}}'; standardError = '' }
+        }
+        Assert-True ($null -eq (Resolve-PowerShellTerminalProfile -Connection $profileConnection)) `
+            'Missing PowerShell profile metadata should fall back without failing the launch.'
     } finally {
         Set-Item -Path function:Get-IntelligentTerminalPackageProcesses -Value $realPackageProcesses
         Set-Item -Path function:Invoke-IntelligentTerminalCliProcess -Value $realCliProcess
@@ -238,6 +275,7 @@ try {
 
     $interactiveCommand = @'
 Write-Output "shared-child-pid=$PID"
+Write-Output "shared-profile-id=$env:WT_PROFILE_ID"
 Write-Output 'shared-ready'
 while ($true) {
     $value = Read-Host 'shared-input'
@@ -310,6 +348,24 @@ while ($true) {
     $captured = Wait-PanePattern -Id $shared.id -Pattern 'agent-marker-observed'
     Assert-True ($captured -match 'agent-marker-observed') `
         'Literal input plus the named Enter key should reach only the registered pane.'
+    $liveProfileConnection = Get-LiveIntelligentTerminalConnection -Tools $tools
+    Assert-True ($null -ne $liveProfileConnection) `
+        'A running shared terminal should retain a live protocol connection.'
+    $expectedPowerShellProfile = Resolve-PowerShellTerminalProfile -Connection $liveProfileConnection
+    if (-not $expectedPowerShellProfile) {
+        $profileValidation = 'skipped: profile discovery returned nothing; default-profile fallback exercised.'
+    } elseif ($expectedPowerShellProfile.id) {
+        Assert-True ($captured -match (
+                'shared-profile-id=' + [regex]::Escape($expectedPowerShellProfile.id)
+            )) 'The shared tab should use the discovered PowerShell profile.'
+        $profileValidation = 'passed'
+    } else {
+        Assert-True ($captured -match 'shared-profile-id=\{[0-9a-fA-F-]{36}\}') `
+            'A name-selected shared profile should publish a runtime profile identifier.'
+        $profileValidation = 'passed: unique profile-name selector exercised.'
+    }
+    Assert-True ($captured -match 'shared-input:\s*agent-literal-marker') `
+        'The interactive prompt should render before the submitted input.'
 
     $null = & $controller send-input -Id $shared.id -StateRoot $stateRoot -InputText 'secure-test'
     $null = & $controller send-key -Id $shared.id -StateRoot $stateRoot -Key Enter
@@ -329,7 +385,7 @@ while ($true) {
             'Direct user input should reach the visible managed pane.'
     }
 
-    $sharedChildPid = Wait-LoggedProcessId -LogPath $shared.logPath -Pattern 'shared-child-pid=(\d+)'
+    $sharedChildPid = Wait-PaneProcessId -Id $shared.id -Pattern 'shared-child-pid=(\d+)'
     $stopped = (& $controller stop -Id $shared.id -StateRoot $stateRoot | Out-String) | ConvertFrom-Json
     $activeIds.Remove($shared.id) | Out-Null
     Assert-True ($stopped.status -eq 'stopped' -and $stopped.terminalControlState -eq 'released') `
@@ -361,7 +417,7 @@ while ($true) {
     $activeIds.Add($orphan.id)
     $orphan = Wait-JobStatus -Id $orphan.id -Expected @('running')
     $orphanControlFile = Get-ManagedJobControlFile -Id $orphan.id
-    $orphanChildPid = Wait-LoggedProcessId -LogPath $orphan.logPath -Pattern 'orphan-child-pid=(\d+)'
+    $orphanChildPid = Wait-PaneProcessId -Id $orphan.id -Pattern 'orphan-child-pid=(\d+)'
     Stop-Process -Id $orphan.hostPid -Force
     $activeIds.Remove($orphan.id) | Out-Null
     Assert-True (Wait-ProcessExit -TargetProcessId $orphanChildPid) `
@@ -377,7 +433,7 @@ while ($true) {
         -Visible -SharedTerminal @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($turnOwned.id)
     $turnOwned = Wait-JobStatus -Id $turnOwned.id -Expected @('running')
-    $turnChildPid = Wait-LoggedProcessId -LogPath $turnOwned.logPath -Pattern 'turn-child-pid=(\d+)'
+    $turnChildPid = Wait-PaneProcessId -Id $turnOwned.id -Pattern 'turn-child-pid=(\d+)'
     $turnControlFile = Get-ManagedJobControlFile -Id $turnOwned.id
     $cleanup = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex `
         -OwnerSessionId $env:CODEX_THREAD_ID -CleanupLifetime Turn | Out-String) | ConvertFrom-Json
@@ -394,7 +450,7 @@ while ($true) {
         -Visible -SharedTerminal -Lifetime Session @backgroundOnlyParameters | Out-String) | ConvertFrom-Json
     $activeIds.Add($sessionOwned.id)
     $sessionOwned = Wait-JobStatus -Id $sessionOwned.id -Expected @('running')
-    $sessionChildPid = Wait-LoggedProcessId -LogPath $sessionOwned.logPath -Pattern 'session-child-pid=(\d+)'
+    $sessionChildPid = Wait-PaneProcessId -Id $sessionOwned.id -Pattern 'session-child-pid=(\d+)'
     $sessionControlFile = Get-ManagedJobControlFile -Id $sessionOwned.id
     $sessionCleanup = (& $controller cleanup -StateRoot $stateRoot -OwnerAgent codex `
         -OwnerSessionId $env:CODEX_THREAD_ID -CleanupLifetime Turn,Session | Out-String) | ConvertFrom-Json
@@ -410,6 +466,7 @@ while ($true) {
         result = 'passed'
         assertions = $assertionCount
         userInputValidated = [bool]$RequireUserInput
+        profileValidation = $profileValidation
         packageVersion = $tools.packageVersion
     } | ConvertTo-Json
 } finally {

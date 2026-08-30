@@ -397,6 +397,55 @@ function Invoke-IntelligentTerminalCliProcess {
     }
 }
 
+function Resolve-PowerShellTerminalProfile {
+    param([Parameter(Mandatory)]$Connection)
+
+    try {
+        $result = Invoke-IntelligentTerminalCliProcess `
+            -Tools $Connection.tools `
+            -ComClsid $Connection.comClsid `
+            -Arguments @('--json', 'get-settings')
+        if ($result.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($result.standardOutput)) {
+            return $null
+        }
+        $settings = $result.standardOutput | ConvertFrom-Json
+        $profiles = @($settings.profiles.list | Where-Object {
+            $_.PSObject.Properties.Name -notcontains 'hidden' -or -not [bool]$_.hidden
+        })
+        $profile = $profiles | Where-Object {
+            $_.PSObject.Properties.Name -contains 'source' -and
+            [string]$_.source -eq 'Windows.Terminal.PowershellCore'
+        } | Select-Object -First 1
+        if (-not $profile) {
+            $profile = $profiles | Where-Object {
+                $_.PSObject.Properties.Name -contains 'name' -and [string]$_.name -eq 'PowerShell'
+            } | Select-Object -First 1
+        }
+        if (-not $profile -or [string]::IsNullOrWhiteSpace([string]$profile.name)) { return $null }
+
+        $profileId = [guid]::Empty
+        $profileIdText = if ($profile.PSObject.Properties.Name -contains 'guid') {
+            [string]$profile.guid
+        } else {
+            ''
+        }
+        $hasProfileId = [guid]::TryParse($profileIdText, [ref]$profileId)
+        if (-not $hasProfileId) {
+            $matchingNames = @($profiles | Where-Object {
+                $_.PSObject.Properties.Name -contains 'name' -and
+                [string]$_.name -eq [string]$profile.name
+            })
+            if ($matchingNames.Count -ne 1 -or [string]$profile.name -match '^-') { return $null }
+        }
+        return [pscustomobject]@{
+            name = [string]$profile.name
+            id = if ($hasProfileId) { $profileId.ToString('B') } else { $null }
+        }
+    } catch {
+        return $null
+    }
+}
+
 function Get-IntelligentTerminalPackageProcesses {
     param([Parameter(Mandatory)]$Tools)
 

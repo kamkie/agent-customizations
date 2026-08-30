@@ -60,14 +60,22 @@ written to the ordinary managed log.
 If that exact package already has a live protocol-registered window, shared
 launch uses its packaged `wtcli new-tab` protocol path. Version 0.2 creates
 protocol tabs in the background, so the user's foreground window and active
-pane remain unchanged. The controller verifies the returned session id against
-the session registered by the managed host. With no live window, shared launch
-shell-activates the packaged app, which opens a new foreground window, waits
-for that window to register with the terminal protocol, and then creates the
-managed tab through the same verified `wtcli new-tab` path. `wtai.exe` is not
-used: on recent package versions it silently fails to open a window, and a
-window it does open is not protocol-registered. Add `-RequireBackgroundTab` to
-reject the focus-taking cold start when focus preservation is mandatory.
+pane remain unchanged. The new tab uses the visible PowerShell Core profile
+discovered from the terminal's current settings, so renamed profiles retain
+their icon and terminal settings while the managed command remains `pwsh.exe`.
+Selection uses the profile GUID when available and its discovered name when the
+settings payload omits a GUID and that name is unique and option-safe. If the
+profile or an unambiguous selector is unavailable, launch falls back to the
+default profile instead of failing. The controller verifies the returned
+session id against the session registered by the managed host. With no live
+window,
+shared launch shell-activates the packaged app, which opens a new foreground
+window, waits for that window to register with the terminal protocol, and then
+creates the managed tab through the same verified `wtcli new-tab` path.
+`wtai.exe` is not used: on recent package versions it silently fails to open a
+window, and a window it does open is not protocol-registered. Add
+`-RequireBackgroundTab` to reject the focus-taking cold start when focus
+preservation is mandatory.
 
 Process-level signals such as the main window handle are unreliable for
 `WindowsTerminal.exe`, so the controller never guesses whether an existing
@@ -147,8 +155,12 @@ or credential stores. The controller rejects likely secrets.
 
 Permanent records omit argument text and environment values. A short-lived
 launch file carries validated non-secret values and is deleted when claimed.
-Child output is logged verbatim. Logs merge stdout and stderr; use
-application-native structured logs when stream separation matters.
+Hidden and ordinary visible child output is logged verbatim. Shared-terminal
+children inherit the pane streams directly so interactive prompts and terminal
+control sequences remain intact; their ordinary managed log contains lifecycle
+headers and footers, while pane output is captured only on demand through the
+job-scoped controller. Logs merge stdout and stderr; use application-native
+structured logs when stream separation matters.
 
 ## Structured recovery
 

@@ -71,10 +71,12 @@ record no vote rather than inferring one from the verdict.
 
 ## Then judge
 
-The script cannot do this part. Read
-[the round loop](references/round-loop.md) for the full contract — it owns
-classification, carry-forward, the escalation matrix, the handoff block, and the
-report format. In short:
+The script cannot do this part. The rules below cover an ordinary round. The
+review owner decides whether more detail is needed. Read
+[the detailed round loop](references/round-loop.md) only for later-round scope
+adjudication, unresolved-finding carry-forward, disagreement or escalation,
+post-review-commit recovery, or the full report contract. Do not load it for a
+clean review or a routine finding resolved in the same round.
 
 - Classify every finding yourself as confirmed, plausible, or false positive.
   Never "fix" a false positive.

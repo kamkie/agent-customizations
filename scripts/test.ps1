@@ -2,6 +2,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 
 $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $sandbox = Join-Path $temporaryRoot ('agent-customizations-test-' + [guid]::NewGuid().ToString('N'))
@@ -115,6 +116,21 @@ try {
         -ClaudeHome $claudeSandbox `
         -SummaryOnly
     if ($LASTEXITCODE -ne 0) { throw 'Installed sandboxes should be in sync.' }
+
+    foreach ($targetName in @('codex', 'claude')) {
+        $target = Get-CustomizationTarget -Name $targetName
+        $targetHome = if ($targetName -eq 'codex') { $codexSandbox } else { $claudeSandbox }
+        $installedInstructions = Join-Path $targetHome ([string]$target.instructions.destination)
+        $sourceParts = foreach ($source in @($target.instructions.sources)) {
+            $sourcePath = Join-Path $PSScriptRoot "..\$source"
+            [IO.File]::ReadAllText($sourcePath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+        }
+        $expectedInstructions = ($sourceParts -join "`n`n") + "`n"
+        $actualInstructions = [IO.File]::ReadAllText($installedInstructions).Replace("`r`n", "`n")
+        if ($actualInstructions -cne $expectedInstructions) {
+            throw "$($target.displayName) installation did not compose its shared and target instruction sources."
+        }
+    }
 
     $codexHooksPath = Join-Path $codexSandbox 'hooks.json'
     $codexHooks = Get-Content -LiteralPath $codexHooksPath -Raw | ConvertFrom-Json

@@ -55,15 +55,29 @@ foreach ($targetName in $targetNames) {
         }
     }
 
-    foreach ($field in @('source', 'destination')) {
-        if ([string]::IsNullOrWhiteSpace([string]$target.instructions.$field)) {
-            $errors.Add("Target '$targetName' instructions have no $field")
+    $instructionsProperty = $target.PSObject.Properties['instructions']
+    if (-not $instructionsProperty) {
+        $errors.Add("Target '$targetName' has no instructions")
+    } else {
+        $instructions = $instructionsProperty.Value
+        if ([string]::IsNullOrWhiteSpace([string]$instructions.destination)) {
+            $errors.Add("Target '$targetName' instructions have no destination")
         }
-    }
-
-    $instructionSource = Join-Path $repositoryRoot ([string]$target.instructions.source)
-    if (-not (Test-Path -LiteralPath $instructionSource -PathType Leaf)) {
-        $errors.Add("Target '$targetName' instruction source does not exist: $($target.instructions.source)")
+        $sourcesProperty = $instructions.PSObject.Properties['sources']
+        $instructionSources = if ($sourcesProperty) { @($sourcesProperty.Value) } else { @() }
+        if ($instructionSources.Count -eq 0) {
+            $errors.Add("Target '$targetName' instructions have no sources")
+        }
+        foreach ($source in $instructionSources) {
+            if ([string]::IsNullOrWhiteSpace([string]$source)) {
+                $errors.Add("Target '$targetName' instructions contain an empty source")
+                continue
+            }
+            $instructionSource = Join-Path $repositoryRoot ([string]$source)
+            if (-not (Test-Path -LiteralPath $instructionSource -PathType Leaf)) {
+                $errors.Add("Target '$targetName' instruction source does not exist: $source")
+            }
+        }
     }
 
     foreach ($skillName in @($target.skills)) {

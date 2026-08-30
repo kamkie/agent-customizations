@@ -1,12 +1,15 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "targets": {
     "codex": {
       "displayName": "Codex",
       "homeEnvironmentVariable": "CODEX_HOME",
       "defaultHomeDirectory": ".codex",
       "instructions": {
-        "source": "global/AGENTS.md",
+        "sources": [
+          "global/shared.md",
+          "global/codex-overlay.md"
+        ],
         "destination": "AGENTS.md"
       },
       "hooks": {
@@ -66,7 +69,10 @@
       "homeEnvironmentVariable": "CLAUDE_CONFIG_DIR",
       "defaultHomeDirectory": ".claude",
       "instructions": {
-        "source": "global/CLAUDE.md",
+        "sources": [
+          "global/shared.md",
+          "global/claude-overlay.md"
+        ],
         "destination": "CLAUDE.md"
       },
       "hooks": {

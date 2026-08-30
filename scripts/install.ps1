@@ -51,7 +51,7 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
     if ($PSCmdlet.ShouldProcess($resolvedHome, "Install $($drift.Count) $($targetConfig.displayName) customization change(s)")) {
         New-Item -ItemType Directory -Path $resolvedHome, $skillsRoot, $backupRoot -Force | Out-Null
 
-        $instructionSource = Join-Path $repositoryRoot ([string]$targetConfig.instructions.source)
+        $instructionContent = Get-CustomizationInstructionContent -Target $targetConfig
         $instructionTarget = Join-Path $resolvedHome ([string]$targetConfig.instructions.destination)
         $instructionState = $status | Where-Object Kind -eq 'Instructions' | Select-Object -First 1
         if ($instructionState.State -ne 'InSync') {
@@ -59,7 +59,7 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
                 Copy-Item -LiteralPath $instructionTarget -Destination (Join-Path $backupRoot ([string]$targetConfig.instructions.destination)) -Force
             }
             $temporaryInstruction = Join-Path $resolvedHome ('.instructions.install-' + [guid]::NewGuid().ToString('N'))
-            Copy-Item -LiteralPath $instructionSource -Destination $temporaryInstruction -Force
+            [IO.File]::WriteAllText($temporaryInstruction, $instructionContent, [Text.UTF8Encoding]::new($false))
             Move-Item -LiteralPath $temporaryInstruction -Destination $instructionTarget -Force
         }
 

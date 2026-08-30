@@ -11,7 +11,7 @@ function Get-CustomizationManifest {
     }
 
     $manifest = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-    if ($manifest.schemaVersion -ne 3) {
+    if ($manifest.schemaVersion -ne 4) {
         throw "Unsupported customization manifest schema: $($manifest.schemaVersion)"
     }
     return $manifest
@@ -84,6 +84,40 @@ function Test-FilesEqual {
     $sourceText = [IO.File]::ReadAllText($Source).Replace("`r`n", "`n")
     $targetText = [IO.File]::ReadAllText($Target).Replace("`r`n", "`n")
     return $sourceText -ceq $targetText
+}
+
+function Get-CustomizationInstructionContent {
+    param([Parameter(Mandatory)]$Target)
+
+    $repositoryRoot = Get-CustomizationRepositoryRoot
+    $sourcesProperty = $Target.instructions.PSObject.Properties['sources']
+    if (-not $sourcesProperty) { throw 'Instruction source list is missing.' }
+    $sources = @($sourcesProperty.Value)
+    if ($sources.Count -eq 0) { throw 'Instruction source list is empty.' }
+    $parts = [Collections.Generic.List[string]]::new()
+    foreach ($source in $sources) {
+        $sourcePath = Join-Path $repositoryRoot ([string]$source)
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+            throw "Instruction source not found: $source"
+        }
+        $content = [IO.File]::ReadAllText($sourcePath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+        if ([string]::IsNullOrWhiteSpace($content)) {
+            throw "Instruction source is empty: $source"
+        }
+        $parts.Add($content)
+    }
+    return ($parts -join "`n`n") + "`n"
+}
+
+function Test-TextContentEqual {
+    param(
+        [Parameter(Mandatory)][string]$Expected,
+        [Parameter(Mandatory)][string]$Target
+    )
+
+    if (-not (Test-Path -LiteralPath $Target -PathType Leaf)) { return $false }
+    $actual = [IO.File]::ReadAllText($Target).Replace("`r`n", "`n")
+    return $Expected.Replace("`r`n", "`n") -ceq $actual
 }
 
 function Get-CustomizationHookCommand {
@@ -329,11 +363,11 @@ function Get-CustomizationStatus {
     $target = Get-CustomizationTarget -Name $TargetName
     $results = [Collections.Generic.List[object]]::new()
 
-    $instructionSource = Join-Path $repositoryRoot ([string]$target.instructions.source)
+    $instructionContent = Get-CustomizationInstructionContent -Target $target
     $instructionTarget = Join-Path $HomePath ([string]$target.instructions.destination)
     $instructionState = if (-not (Test-Path -LiteralPath $instructionTarget -PathType Leaf)) {
         'Missing'
-    } elseif (Test-FilesEqual -Source $instructionSource -Target $instructionTarget) {
+    } elseif (Test-TextContentEqual -Expected $instructionContent -Target $instructionTarget) {
         'InSync'
     } else {
         'Different'

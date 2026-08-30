@@ -20,6 +20,7 @@
     "quick-change": {
       "mode": "quick",
       "autonomous": false,
+      "primaryAction": "implement-and-deliver",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
@@ -35,7 +36,7 @@
     "commit-validated-work": {
       "mode": "quick",
       "autonomous": false,
-      "primaryAction": "commit-validated-work",
+      "primaryAction": "commit-only",
       "publicationAuthorized": false,
       "mergeAuthorized": false,
       "deploymentAuthorized": false

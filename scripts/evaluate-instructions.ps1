@@ -135,6 +135,8 @@ function Read-AgentResponse {
                 '--sandbox', 'read-only', '--color', 'never', '--cd', $workspace,
                 '--output-schema', $schemaPath, '--output-last-message', $responsePath, '-'
             )
+            # --ignore-rules disables execpolicy .rules files; AGENTS.md remains
+            # the project instruction channel under evaluation.
             $prompt | & codex @arguments | Out-Host
             if ($LASTEXITCODE -ne 0) {
                 throw "Codex evaluation failed for case '$($Case.id)' with exit code $LASTEXITCODE."
@@ -145,11 +147,21 @@ function Read-AgentResponse {
             if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
                 throw 'Claude CLI is unavailable.'
             }
-            $raw = & claude --print --no-session-persistence --permission-mode plan `
-                --tools '' --system-prompt-file $instructionsPath --json-schema $schema `
-                --output-format json $prompt
-            if ($LASTEXITCODE -ne 0) {
-                throw "Claude evaluation failed for case '$($Case.id)' with exit code $LASTEXITCODE."
+            Push-Location $workspace
+            try {
+                # Claude accepts inline JSON for --json-schema; --tools ''
+                # disables built-in tools. Empty setting sources also prevent
+                # user or repository hooks from contaminating the fresh run.
+                $raw = & claude --print --no-session-persistence --permission-mode plan `
+                    --setting-sources '' --disable-slash-commands --tools '' `
+                    --system-prompt-file $instructionsPath --json-schema $schema `
+                    --output-format json $prompt
+                $claudeExit = $LASTEXITCODE
+            } finally {
+                Pop-Location
+            }
+            if ($claudeExit -ne 0) {
+                throw "Claude evaluation failed for case '$($Case.id)' with exit code $claudeExit."
             }
             $envelope = ($raw -join [Environment]::NewLine) | ConvertFrom-Json
             if ($envelope.PSObject.Properties.Name -contains 'structured_output' -and $envelope.structured_output) {

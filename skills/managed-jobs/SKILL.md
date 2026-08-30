@@ -69,5 +69,6 @@ reported scope, then run the same command without `-WhatIf`.
 
 Read [operations.md](references/operations.md) only for state-root overrides,
 ownership and recovery details, visible/shared-terminal controls, identity
-checks, or pruning. The readiness workflow license is in
+checks, or pruning. The HTTP readiness workflow adapts Open Mercato's
+`om-prepare-test-env` under the MIT License; see
 [open-mercato-license.md](references/open-mercato-license.md).

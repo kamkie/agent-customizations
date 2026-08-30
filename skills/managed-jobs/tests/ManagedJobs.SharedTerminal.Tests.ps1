@@ -196,6 +196,26 @@ try {
         }
         Assert-True ($null -eq (Get-LiveIntelligentTerminalConnection -Tools $probeTools)) `
             'No package process should report absence without probing the protocol.'
+
+        $profileConnection = [pscustomobject]@{ tools = $probeTools; comClsid = $probeTools.comClsid }
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{
+                exitCode = 0
+                standardOutput = '{"profiles":{"list":[{"name":"Git Bash","guid":"{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}"},{"guid":"{99999999-8888-7777-6666-555555555555}"},{"name":"Renamed Shell","source":"Windows.Terminal.PowershellCore","guid":"{11111111-2222-3333-4444-555555555555}","hidden":false}]}}'
+                standardError = ''
+            }
+        }
+        $renamedProfile = Resolve-PowerShellTerminalProfile -Connection $profileConnection
+        Assert-True (
+            $renamedProfile.name -eq 'Renamed Shell' -and
+            $renamedProfile.id -eq '{11111111-2222-3333-4444-555555555555}'
+        ) 'PowerShell profile discovery should survive a renamed display label.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{ exitCode = 0; standardOutput = '{"profiles":{"list":[]}}'; standardError = '' }
+        }
+        Assert-True ($null -eq (Resolve-PowerShellTerminalProfile -Connection $profileConnection)) `
+            'Missing PowerShell profile metadata should fall back without failing the launch.'
     } finally {
         Set-Item -Path function:Get-IntelligentTerminalPackageProcesses -Value $realPackageProcesses
         Set-Item -Path function:Invoke-IntelligentTerminalCliProcess -Value $realCliProcess
@@ -307,8 +327,17 @@ while ($true) {
     $captured = Wait-PanePattern -Id $shared.id -Pattern 'agent-marker-observed'
     Assert-True ($captured -match 'agent-marker-observed') `
         'Literal input plus the named Enter key should reach only the registered pane.'
-    Assert-True ($captured -match 'shared-profile-id=\{574e775e-4f2a-5b96-ac1e-a2962a402336\}') `
-        'The shared tab should use the PowerShell profile.'
+    $liveProfileConnection = Get-LiveIntelligentTerminalConnection -Tools $tools
+    $expectedPowerShellProfile = if ($liveProfileConnection) {
+        Resolve-PowerShellTerminalProfile -Connection $liveProfileConnection
+    } else {
+        $null
+    }
+    if ($expectedPowerShellProfile) {
+        Assert-True ($captured -match (
+                'shared-profile-id=' + [regex]::Escape($expectedPowerShellProfile.id)
+            )) 'The shared tab should use the discovered PowerShell profile.'
+    }
     Assert-True ($captured -match 'shared-input:\s*agent-literal-marker') `
         'The interactive prompt should render before the submitted input.'
 

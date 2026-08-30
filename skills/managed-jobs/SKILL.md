@@ -86,6 +86,11 @@ waiting for user input. Treat all captured pane output as sensitive: return it
 only to the active task and never copy it into a job record, ordinary managed
 log, or other durable artifact.
 
+Shared-terminal children inherit the pane streams directly so interactive
+prompts remain intact. Their ordinary managed log contains lifecycle events,
+not child output; capture any needed pane evidence while the job is running.
+After exit, only the managed status, exit code, and lifecycle log remain.
+
 Read [operations.md](references/operations.md) for shared state roots, secret
 handling, structured recovery, identity checks, visible and shared-terminal
 options, and pruning.

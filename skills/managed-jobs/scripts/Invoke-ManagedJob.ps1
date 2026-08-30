@@ -399,17 +399,28 @@ function Start-ManagedJobBackgroundTerminalTab {
     )
 
     $commandLine = (@('pwsh.exe') + $PowerShellArguments) -join ' '
+    $terminalArguments = @(
+        '--json', 'new-tab',
+        '--command', $commandLine,
+        '--title', $Name,
+        '--cwd', $WorkingDirectory
+    )
+    $powerShellProfile = Resolve-PowerShellTerminalProfile -Connection $Connection
+    if ($powerShellProfile) { $terminalArguments += @('--profile', $powerShellProfile.name) }
     $result = Invoke-IntelligentTerminalCliProcess `
         -Tools $Connection.tools `
         -ComClsid $Connection.comClsid `
-        -Arguments @(
-            '--json', 'new-tab',
-            '--command', $commandLine,
-            '--title', $Name,
-            '--cwd', $WorkingDirectory,
-            '--profile', 'PowerShell'
-        )
+        -Arguments $terminalArguments
     if ($result.exitCode -ne 0) {
+        $detail = $result.standardError.Trim()
+        try {
+            $comClsid = [guid]$Connection.comClsid
+            foreach ($privateValue in @($comClsid.ToString('B'), $comClsid.ToString('D'))) {
+                $detail = $detail -replace [regex]::Escape($privateValue), '<redacted>'
+            }
+        } catch {}
+        if ($detail.Length -gt 1000) { $detail = $detail.Substring(0, 1000) }
+        if ($detail) { throw "The background shared-terminal tab failed to launch: $detail" }
         throw 'The background shared-terminal tab failed to launch.'
     }
     try {

@@ -60,16 +60,18 @@ written to the ordinary managed log.
 If that exact package already has a live protocol-registered window, shared
 launch uses its packaged `wtcli new-tab` protocol path. Version 0.2 creates
 protocol tabs in the background, so the user's foreground window and active
-pane remain unchanged. The new tab explicitly uses the `PowerShell` profile so
-its icon and terminal settings match the managed `pwsh.exe` command instead of
-inheriting an unrelated default profile. The controller verifies the returned
-session id against the session registered by the managed host. With no live
-window, shared launch shell-activates the packaged app, which opens a new
-foreground window, waits for that window to register with the terminal
-protocol, and then creates the managed tab through the same verified `wtcli
-new-tab` path. `wtai.exe` is not used: on recent package versions it silently
-fails to open a window, and a window it does open is not protocol-registered.
-Add `-RequireBackgroundTab` to reject the focus-taking cold start when focus
+pane remain unchanged. The new tab uses the visible PowerShell Core profile
+discovered from the terminal's current settings, so renamed profiles retain
+their icon and terminal settings while the managed command remains `pwsh.exe`.
+If that profile metadata is unavailable, launch falls back to the default
+profile instead of failing. The controller verifies the returned session id
+against the session registered by the managed host. With no live window,
+shared launch shell-activates the packaged app, which opens a new foreground
+window, waits for that window to register with the terminal protocol, and then
+creates the managed tab through the same verified `wtcli new-tab` path.
+`wtai.exe` is not used: on recent package versions it silently fails to open a
+window, and a window it does open is not protocol-registered. Add
+`-RequireBackgroundTab` to reject the focus-taking cold start when focus
 preservation is mandatory.
 
 Process-level signals such as the main window handle are unreliable for

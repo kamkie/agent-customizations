@@ -19,6 +19,7 @@ $repo = git rev-parse --show-toplevel 2>$null
 if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 $job = (& $jobs start -Name console -Executable pwsh.exe -Arguments @('-NoProfile') `
     -WorkingDirectory $repo -Visible -SharedTerminal -Lifetime Session | Out-String) | ConvertFrom-Json
+[pscustomobject]@{ controller = $jobs; job = $job } | ConvertTo-Json -Depth 12
 ```
 
 Report `$job.id` and these commands with both the resolved controller path and

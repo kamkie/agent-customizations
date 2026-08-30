@@ -10,7 +10,7 @@ Do not launch long-running work through raw `Start-Process`, `Start-Job`, detach
 
 Treat `shared term` as a complete instruction. Do not load the `managed-jobs`
 skill for this shorthand; call its installed controller directly in one
-PowerShell tool call:
+shell tool call using PowerShell:
 
 ```powershell
 $codexRoot = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
@@ -21,9 +21,17 @@ $job = (& $jobs start -Name console -Executable pwsh.exe -Arguments @('-NoProfil
     -WorkingDirectory $repo -Visible -SharedTerminal -Lifetime Session | Out-String) | ConvertFrom-Json
 ```
 
-Report `$job.id` and the exact controller commands for `capture`, `send-input`,
-`send-key`, and `stop`. Do not run `reconcile` or `list`, and do not ask for
-details unless a required prerequisite is missing.
+Report `$job.id` and these commands with the actual id substituted:
+
+```powershell
+& $jobs capture -Id <job-id> -MaxLines 80
+& $jobs send-input -Id <job-id> -InputText '<non-secret-text>'
+& $jobs send-key -Id <job-id> -Key Enter
+& $jobs stop -Id <job-id>
+```
+
+Do not run `reconcile` or `list`, and do not ask for details unless a required
+prerequisite is missing.
 
 ## Work modes and progress
 

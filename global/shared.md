@@ -8,9 +8,10 @@ Keep ordinary short commands attached to the active tool call. Default managed
 jobs to hidden supervised execution; use visible output only when the user asks
 to watch it. Follow the skill for lifetime, recovery, and cleanup decisions.
 
-Do not replace managed execution with raw detached or background launches. If a
-process hook rejects such a launch, use `managed-jobs`; do not retry it as a
-foreground command bounded by a tool-call timeout.
+Do not replace managed execution with raw detached or background launches unless
+the user explicitly requests unmanaged execution. If a process hook rejects
+such a launch, use `managed-jobs`; do not retry it as a foreground command
+bounded by a tool-call timeout.
 
 Treat `shared term` as a complete instruction to use the `shared-term` skill.
 Do not load `managed-jobs` or ask for details unless a prerequisite is missing.

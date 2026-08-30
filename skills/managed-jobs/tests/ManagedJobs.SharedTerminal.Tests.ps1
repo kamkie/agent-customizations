@@ -223,6 +223,16 @@ try {
             'A source-confirmed profile without a GUID should retain its name fallback.'
 
         function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{
+                exitCode = 0
+                standardOutput = '{"profiles":{"list":[{"name":"Renamed Shell","source":"Windows.Terminal.PowershellCore","hidden":false},{"name":"Renamed Shell","hidden":false}]}}'
+                standardError = ''
+            }
+        }
+        Assert-True ($null -eq (Resolve-PowerShellTerminalProfile -Connection $profileConnection)) `
+            'An ambiguous GUID-less profile name should preserve the default-profile fallback.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
             [pscustomobject]@{ exitCode = 0; standardOutput = '{"profiles":{"list":[]}}'; standardError = '' }
         }
         Assert-True ($null -eq (Resolve-PowerShellTerminalProfile -Connection $profileConnection)) `
@@ -341,18 +351,18 @@ while ($true) {
     $liveProfileConnection = Get-LiveIntelligentTerminalConnection -Tools $tools
     Assert-True ($null -ne $liveProfileConnection) `
         'A running shared terminal should retain a live protocol connection.'
-    $expectedPowerShellProfile = if ($liveProfileConnection) {
-        Resolve-PowerShellTerminalProfile -Connection $liveProfileConnection
-    } else {
-        $null
-    }
-    if ($expectedPowerShellProfile -and $expectedPowerShellProfile.id) {
+    $expectedPowerShellProfile = Resolve-PowerShellTerminalProfile -Connection $liveProfileConnection
+    if (-not $expectedPowerShellProfile) {
+        $profileValidation = 'skipped: profile discovery returned nothing; default-profile fallback exercised.'
+    } elseif ($expectedPowerShellProfile.id) {
         Assert-True ($captured -match (
                 'shared-profile-id=' + [regex]::Escape($expectedPowerShellProfile.id)
             )) 'The shared tab should use the discovered PowerShell profile.'
         $profileValidation = 'passed'
     } else {
-        $profileValidation = 'skipped: PowerShell profile GUID unavailable; name/default fallback exercised.'
+        Assert-True ($captured -match 'shared-profile-id=\{[0-9a-fA-F-]{36}\}') `
+            'A name-selected shared profile should publish a runtime profile identifier.'
+        $profileValidation = 'passed: unique profile-name selector exercised.'
     }
     Assert-True ($captured -match 'shared-input:\s*agent-literal-marker') `
         'The interactive prompt should render before the submitted input.'

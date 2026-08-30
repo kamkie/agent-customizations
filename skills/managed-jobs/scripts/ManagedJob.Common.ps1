@@ -438,7 +438,12 @@ function Get-LiveIntelligentTerminalConnection {
             if ($probe.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
                 throw ('the list-windows probe exited with code {0}' -f $probe.exitCode)
             }
-            $windowCount = @(($probe.standardOutput | ConvertFrom-Json).windows).Count
+            $payload = $probe.standardOutput | ConvertFrom-Json
+            if ($payload.PSObject.Properties.Name -notcontains 'windows' -or
+                $payload.windows -isnot [array]) {
+                throw 'the list-windows probe returned an unexpected payload shape'
+            }
+            $windowCount = @($payload.windows).Count
         } catch {
             $lastProbeError = $_.Exception.Message
             continue

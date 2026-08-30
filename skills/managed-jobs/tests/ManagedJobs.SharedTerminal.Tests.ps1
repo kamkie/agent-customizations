@@ -178,6 +178,22 @@ try {
         Assert-True ($probeFailure -match 'probe kept failing') `
             'A persistent probe timeout should throw instead of reporting absence.'
 
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{ exitCode = 0; standardOutput = '{"windows":null}'; standardError = '' }
+        }
+        $probeFailure = $null
+        try { Get-LiveIntelligentTerminalConnection -Tools $probeTools | Out-Null } catch { $probeFailure = $_.Exception.Message }
+        Assert-True ($probeFailure -match 'probe kept failing') `
+            'A null windows value should throw instead of counting as a live window.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{ exitCode = 0; standardOutput = '{"windows":{}}'; standardError = '' }
+        }
+        $probeFailure = $null
+        try { Get-LiveIntelligentTerminalConnection -Tools $probeTools | Out-Null } catch { $probeFailure = $_.Exception.Message }
+        Assert-True ($probeFailure -match 'probe kept failing') `
+            'An object-valued windows property should throw instead of counting as a live window.'
+
         function Get-IntelligentTerminalPackageProcesses { param($Tools) @() }
         function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
             throw 'the probe must not run without package processes'

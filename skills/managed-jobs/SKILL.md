@@ -65,6 +65,10 @@ The installed session hook owns global reconciliation. Run synchronous
 with `prune -OlderThanDays 14 -WhatIf`, obtain explicit authorization for the
 reported scope, then run the same command without `-WhatIf`.
 
+Set `MANAGED_JOBS_ROOT` before starting either agent when they must share a
+non-default registry. One-off `-StateRoot` overrides are only for persistent
+jobs; turn and session jobs must remain visible to their cleanup hooks.
+
 The HTTP readiness workflow adapts Open Mercato's
 `om-prepare-test-env` under the MIT License; see
 [open-mercato-license.md](references/open-mercato-license.md).

@@ -1,6 +1,6 @@
 ---
 name: managed-jobs
-description: Contain, run, inspect, recover, and stop long-running local Windows processes with explicit lifetimes and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or the globally defined `shared term` shorthand.
+description: Contain, run, verify readiness, inspect, interact with visible shared terminals, recover, and stop long-running local Windows processes with explicit lifetimes and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or solely for the globally defined `shared term` shorthand.
 ---
 
 # Managed Jobs

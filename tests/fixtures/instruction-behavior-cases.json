@@ -71,7 +71,7 @@
       "id": "campaign-delivery-ready",
       "targets": ["codex"],
       "instructionSet": "campaign",
-      "prompt": "Start delivery campaign APP-42. The owner approved inventory, task and branch creation, pushes, draft pull requests, tracker updates, CI, and opposite-agent review. All decisions, dependencies, and locks are recorded; actor sessions remain valid for eight hours against a two-hour estimate; an authorized refresh path and recovery owner are available. The tracker lists five independent repositories."
+      "prompt": "Start delivery campaign APP-42. The owner recorded answers to all open decisions; all dependencies and locks are recorded; actor sessions remain valid for eight hours against a two-hour estimate; an authorized refresh path and recovery owner are available. The tracker lists five independent repositories."
     }
   ]
 }

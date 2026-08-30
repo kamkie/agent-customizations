@@ -191,6 +191,17 @@ try {
         }
         Assert-True $overlappingMaintenanceRejected `
             'The maintenance lock should reject overlapping reconcile or prune mutations.'
+
+        $boundedWaitTimer = [Diagnostics.Stopwatch]::StartNew()
+        $boundedWaitRejected = $false
+        try {
+            & $controller reconcile -StateRoot $stateRoot -WaitForMaintenanceLock -MaintenanceLockWaitSeconds 1 | Out-Null
+        } catch {
+            $boundedWaitRejected = $_.Exception.Message -match 'Timed out after 1 seconds'
+        }
+        $boundedWaitTimer.Stop()
+        Assert-True ($boundedWaitRejected -and $boundedWaitTimer.Elapsed.TotalSeconds -lt 2) `
+            'Maintenance lock waiting should fail on its configured deadline instead of leaking a process indefinitely.'
     } finally {
         $heldMaintenanceLock.Dispose()
     }

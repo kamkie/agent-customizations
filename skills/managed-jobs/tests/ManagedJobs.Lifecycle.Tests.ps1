@@ -253,6 +253,45 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $encodedLaunchPath)) `
         'Encoded shared-host invocation should consume the launch handoff.'
 
+    # A cold-start shared-terminal reservation (starting, no host yet) must
+    # survive reconciliation through the bootstrap worst case, while ordinary
+    # pre-host records keep the 30-second stale threshold.
+    function New-ReservationRecord {
+        param([string]$Id, [int]$AgeSeconds, [string]$LaunchMode)
+        $record = [ordered]@{
+            schemaVersion = 4; id = $Id; name = $Id; kind = 'test'; status = 'starting'
+            lifetime = 'persistent'; ownerAgent = $null; ownerSessionId = $null; visible = $true
+            keepTerminalOpen = $false; processContainment = 'pending'
+            createdAtUtc = [datetime]::UtcNow.AddSeconds(-$AgeSeconds).ToString('o')
+            startedAtUtc = $null; finishedAtUtc = $null; hostPid = $null; hostStartedAtUtc = $null
+            executable = $pwsh; argumentCount = 0; environmentNames = @()
+            invocationFingerprint = ('7' * 64); workingDirectory = $testRoot
+            logPath = (Join-Path $stateRoot "logs\$Id.log"); exitCode = $null; error = $null
+        }
+        if ($LaunchMode) {
+            $record['sharedTerminal'] = $true
+            $record['terminalControlState'] = 'pending'
+            $record['terminalLaunchMode'] = $LaunchMode
+        }
+        $record | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$Id.json") -Encoding utf8
+    }
+    New-ReservationRecord -Id '20000101-000000-reserve-bootstrap-fresh-000001' -AgeSeconds 60 -LaunchMode 'foreground-bootstrap'
+    New-ReservationRecord -Id '20000101-000000-reserve-bootstrap-expired-000001' -AgeSeconds 130 -LaunchMode 'foreground-bootstrap'
+    New-ReservationRecord -Id '20000101-000000-reserve-plain-expired-000001' -AgeSeconds 60 -LaunchMode $null
+    Assert-True ((Get-JobStatus -Id '20000101-000000-reserve-bootstrap-fresh-000001').status -eq 'starting') `
+        'A cold-start reservation inside the bootstrap allowance must survive reconciliation.'
+    Assert-True ((Get-JobStatus -Id '20000101-000000-reserve-bootstrap-expired-000001').status -eq 'orphaned') `
+        'A cold-start reservation beyond the bootstrap allowance should be orphaned.'
+    Assert-True ((Get-JobStatus -Id '20000101-000000-reserve-plain-expired-000001').status -eq 'orphaned') `
+        'An ordinary pre-host record keeps the 30-second stale threshold.'
+    foreach ($reservationId in @(
+        '20000101-000000-reserve-bootstrap-fresh-000001',
+        '20000101-000000-reserve-bootstrap-expired-000001',
+        '20000101-000000-reserve-plain-expired-000001'
+    )) {
+        Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$reservationId.json") -Force
+    }
+
     # Start, record redaction, structured list/status, logs, and reconcile.
     $completed = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-complete' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Write-Output lifecycle-ok') -Environment @{ LIFECYCLE_MARKER = 'not-recorded'; GIT_AUTHOR_NAME = 'Lifecycle Test' } | Out-String) | ConvertFrom-Json

@@ -23,7 +23,22 @@ Do not launch long-running work through raw `Start-Process`, `Start-Job`, detach
 
 ### Shared terminal shorthand
 
-Treat `shared term` as a complete instruction to open a collaborative terminal through the `managed-jobs` skill: start a visible `-SharedTerminal` managed job running `pwsh.exe -NoProfile` with session lifetime, working directory at the current repository root (or the current directory outside a repository), then report the job id and how to capture, send input, and stop. Do not ask for further details unless a required prerequisite is missing.
+Treat `shared term` as a complete instruction. Do not load the `managed-jobs`
+skill for this shorthand; call its installed controller directly in one
+PowerShell tool call:
+
+```powershell
+$claudeRoot = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
+$jobs = Join-Path $claudeRoot 'skills\managed-jobs\scripts\Invoke-ManagedJob.ps1'
+$repo = git rev-parse --show-toplevel 2>$null
+if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
+$job = (& $jobs start -Name console -Executable pwsh.exe -Arguments @('-NoProfile') `
+    -WorkingDirectory $repo -Visible -SharedTerminal -Lifetime Session | Out-String) | ConvertFrom-Json
+```
+
+Report `$job.id` and the exact controller commands for `capture`, `send-input`,
+`send-key`, and `stop`. Do not run `reconcile` or `list`, and do not ask for
+details unless a required prerequisite is missing.
 
 ## Questions, proposals, and authorization
 

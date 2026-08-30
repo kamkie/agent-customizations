@@ -184,10 +184,6 @@ relevant, and identity-match result.
 
 ### Maintenance operations
 
-`reconcile -Async` and `prune -Async` start hidden persistent jobs whose
-`kind` is `maintenance`. The returned record uses the normal managed-job
-contract: inspect it with `status -Id`, read its JSON result with `logs -Id`,
-and stop it through the controller if cancellation is explicitly requested.
 An exclusive maintenance lock permits only one reconcile or prune mutation at
 a time; an overlapping operation fails without doing partial work.
 
@@ -198,16 +194,9 @@ immediately without spawning an unmanaged child. If another maintenance
 operation owns the lock, the hook fails fast and reports the skipped attempt;
 the next startup or resume retries without depending on agent memory. The hook
 runtime is bounded to ten minutes. Turn and session cleanup remain separate
-targeted hook operations over owner references. Manual `reconcile -Async` keeps
-the supervised persistent-job contract described above.
-
-Async prune snapshots its candidate ids and cutoff into a one-time runtime plan
-before dispatch. The worker consumes that plan under the maintenance lock,
-rechecks that every planned record still exists, is terminal, matches the
-selected status filter, and remains older than the frozen cutoff, then reports
-removed and skipped ids in its log. It cannot discover or delete records that
-were not in the plan. Preview with synchronous `prune -WhatIf` first; `-Async`
-cannot be combined with `-WhatIf`.
+targeted hook operations over owner references. Manual reconcile and prune are
+synchronous. Preview destructive pruning with `prune -WhatIf`, obtain explicit
+authorization for that scope, then run prune without `-WhatIf`.
 
 Turn and session cleanup is silent when it succeeds. A turn is blocked only
 when an owned process tree cannot be stopped safely; the hook names the job,

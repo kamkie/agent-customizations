@@ -137,51 +137,6 @@ try {
         $emptyPrunePreview.removedCount -eq 0
     ) 'Prune preview should accept an empty managed-job registry.'
 
-    $maintenanceDirectory = Join-Path $stateRoot 'maintenance'
-    $null = New-Item -ItemType Directory -Path $maintenanceDirectory -Force
-    $invalidPlanPath = Join-Path $maintenanceDirectory 'invalid-missing-statuses.json'
-    Write-ManagedJson -Path $invalidPlanPath -Value ([ordered]@{
-        schemaVersion = 1
-        action = 'prune'
-        cutoffUtc = [datetime]::UtcNow.ToString('o')
-        candidateIds = @()
-    })
-    $invalidPlanRejected = $false
-    try {
-        & $controller prune -StateRoot $stateRoot -MaintenancePlan $invalidPlanPath | Out-Null
-    } catch { $invalidPlanRejected = $_.Exception.Message -match 'maintenance plan is invalid' }
-    Assert-True $invalidPlanRejected 'Prune should reject a maintenance plan whose status filter is missing.'
-    Remove-Item -LiteralPath $invalidPlanPath -Force -ErrorAction SilentlyContinue
-
-    $missingPlanPath = Join-Path $maintenanceDirectory 'missing-records.json'
-    $missingPlanIds = @(1..20 | ForEach-Object { '20000101-000000-missing-plan-{0:d6}' -f $_ })
-    Write-ManagedJson -Path $missingPlanPath -Value ([ordered]@{
-        schemaVersion = 1
-        action = 'prune'
-        cutoffUtc = [datetime]::UtcNow.ToString('o')
-        statuses = @()
-        candidateIds = $missingPlanIds
-    })
-    $missingPlanTimer = [Diagnostics.Stopwatch]::StartNew()
-    $missingPlanResult = (& $controller prune -StateRoot $stateRoot -MaintenancePlan $missingPlanPath | Out-String) | ConvertFrom-Json
-    $missingPlanTimer.Stop()
-    Assert-True (
-        $missingPlanResult.plannedCandidateCount -eq $missingPlanIds.Count -and
-        $missingPlanResult.candidateCount -eq 0 -and
-        $missingPlanResult.skippedCount -eq $missingPlanIds.Count
-    ) 'Prune should report every vanished planned record as skipped.'
-    Assert-True ($missingPlanTimer.Elapsed.TotalSeconds -lt 3.5) `
-        "Vanished prune-plan records should skip without per-record retry delays. Elapsed: $($missingPlanTimer.Elapsed.TotalSeconds) seconds."
-
-    $invalidAsyncRoot = Join-Path $testRoot 'invalid-async-state'
-    $invalidAsyncRejected = $false
-    try {
-        & $controller list -StateRoot $invalidAsyncRoot -Async | Out-Null
-    } catch { $invalidAsyncRejected = $_.Exception.Message -match 'valid only for reconcile and prune' }
-    Assert-True $invalidAsyncRejected '-Async should reject actions other than reconcile and prune.'
-    Assert-True (-not (Test-Path -LiteralPath $invalidAsyncRoot)) `
-        'Invalid async usage should fail before creating a state root.'
-
     $maintenanceLockPath = Join-Path $stateRoot '.maintenance.lock'
     $heldMaintenanceLock = [IO.File]::Open($maintenanceLockPath, 'OpenOrCreate', 'ReadWrite', 'None')
     try {
@@ -194,20 +149,6 @@ try {
     } finally {
         $heldMaintenanceLock.Dispose()
     }
-
-    $asyncReconcile = (& $controller reconcile -StateRoot $stateRoot -Status completed,failed -Async | Out-String) | ConvertFrom-Json
-    $activeIds.Add($asyncReconcile.id)
-    Assert-True (
-        $asyncReconcile.kind -eq 'maintenance' -and
-        $asyncReconcile.lifetime -eq 'persistent' -and
-        $asyncReconcile.maintenance.action -eq 'reconcile' -and
-        @($asyncReconcile.maintenance.statuses).Count -eq 2
-    ) 'Async reconcile should return a persistent supervised maintenance record.'
-    $asyncReconcile = Wait-JobStatus -Id $asyncReconcile.id -Expected @('completed', 'failed')
-    $activeIds.Remove($asyncReconcile.id) | Out-Null
-    Assert-True ($asyncReconcile.status -eq 'completed') 'Async reconcile should complete through managed-job supervision.'
-    $asyncReconcileLog = (& $controller logs -StateRoot $stateRoot -Id $asyncReconcile.id -Tail 100 | Out-String)
-    Assert-True ($asyncReconcileLog -match '"total"') 'Async reconcile should preserve its structured result in the managed log.'
 
     $alternateRoot = Join-Path $testRoot 'alternate-state'
     $alternateTurnRejected = $false
@@ -839,41 +780,15 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     Assert-True (@($orphanSummary.jobs).id -contains $staleId) 'Reconcile should orphan a stale unclaimed start after its grace period.'
     Assert-True (-not (Test-Path -LiteralPath $staleLaunch)) 'Orphan reconciliation should remove an unclaimed launch handoff.'
 
-    # WhatIf previews exact terminal candidates, then async prune freezes that
-    # scope, revalidates it under the maintenance lock, and removes only the plan.
+    # WhatIf previews exact terminal candidates before synchronous pruning.
     $preview = (& $controller prune -StateRoot $stateRoot -OlderThanDays 0 -WhatIf | Out-String) | ConvertFrom-Json
     Assert-True ($preview.preview -and $preview.candidateCount -ge 4 -and $preview.removedCount -eq 0) 'Prune WhatIf should return candidates without deletion.'
     Assert-True (Test-Path -LiteralPath (Join-Path $stateRoot "jobs\$orphanId.json")) 'Preview must preserve candidate records.'
-    $asyncWhatIfRejected = $false
-    try {
-        & $controller prune -StateRoot $stateRoot -OlderThanDays 0 -Async -WhatIf | Out-Null
-    } catch { $asyncWhatIfRejected = $_.Exception.Message -match 'cannot be combined with -WhatIf' }
-    Assert-True $asyncWhatIfRejected 'Async prune should require a separate synchronous preview.'
-
-    $asyncPrune = (& $controller prune -StateRoot $stateRoot -OlderThanDays 0 -Async | Out-String) | ConvertFrom-Json
-    $activeIds.Add($asyncPrune.id)
-    Assert-True (
-        $asyncPrune.kind -eq 'maintenance' -and
-        $asyncPrune.lifetime -eq 'persistent' -and
-        $asyncPrune.maintenance.action -eq 'prune' -and
-        $asyncPrune.maintenance.plannedCandidateCount -eq $preview.candidateCount
-    ) 'Async prune should return its supervised record and frozen candidate count.'
-    $asyncPrune = Wait-JobStatus -Id $asyncPrune.id -Expected @('completed', 'failed')
-    $activeIds.Remove($asyncPrune.id) | Out-Null
-    $asyncPruneLog = (& $controller logs -StateRoot $stateRoot -Id $asyncPrune.id -Tail 100 | Out-String)
-    Assert-True ($asyncPrune.status -eq 'completed') `
-        "Async prune should complete through managed-job supervision. Log: $asyncPruneLog"
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $stateRoot "jobs\$orphanId.json"))) `
-        "Async prune should remove an eligible id from its frozen plan. Log: $asyncPruneLog"
-    Assert-True ($asyncPruneLog -match '"removedCount"') 'Async prune should preserve its structured result in the managed log.'
-    $remainingAfterAsyncPrune = @(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File)
-    Assert-True (
-        $remainingAfterAsyncPrune.Count -eq 1 -and
-        $remainingAfterAsyncPrune.BaseName -eq $asyncPrune.id
-    ) 'Async prune must not include its own active operation record in the frozen plan.'
 
     $pruned = (& $controller prune -StateRoot $stateRoot -OlderThanDays 0 | Out-String) | ConvertFrom-Json
-    Assert-True ($pruned.removed -contains $asyncPrune.id) 'A later synchronous prune should remove the completed maintenance record.'
+    Assert-True ($pruned.removedCount -eq $preview.candidateCount) 'Prune should remove the previewed eligible records.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $stateRoot "jobs\$orphanId.json"))) `
+        'Prune should remove an eligible orphaned record.'
     Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File).Count -eq 0) 'All isolated terminal fixtures should be pruned.'
 
     [pscustomobject]@{ result = 'passed'; assertions = $assertionCount; isolatedStateRoot = $stateRoot } | ConvertTo-Json

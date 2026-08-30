@@ -153,7 +153,7 @@ function Read-AgentResponse {
                 # Claude accepts inline JSON for --json-schema; --tools ''
                 # disables built-in tools. Empty setting sources also prevent
                 # user or repository hooks from contaminating the fresh run.
-                $raw = & claude --print --no-session-persistence --permission-mode plan `
+                $raw = & claude --print --no-session-persistence --permission-mode dontAsk `
                     --setting-sources '' --disable-slash-commands --tools '' `
                     --system-prompt-file $instructionsPath --json-schema $schema `
                     --output-format json $prompt

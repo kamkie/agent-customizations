@@ -212,6 +212,17 @@ try {
         ) 'PowerShell profile discovery should survive a renamed display label.'
 
         function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
+            [pscustomobject]@{
+                exitCode = 0
+                standardOutput = '{"profiles":{"list":[{"name":"Renamed Shell","source":"Windows.Terminal.PowershellCore","hidden":false}]}}'
+                standardError = ''
+            }
+        }
+        $nameOnlyProfile = Resolve-PowerShellTerminalProfile -Connection $profileConnection
+        Assert-True ($nameOnlyProfile.name -eq 'Renamed Shell' -and -not $nameOnlyProfile.id) `
+            'A source-confirmed profile without a GUID should retain its name fallback.'
+
+        function Invoke-IntelligentTerminalCliProcess { param($Tools, $ComClsid, $SessionId, $Arguments, $TimeoutSeconds)
             [pscustomobject]@{ exitCode = 0; standardOutput = '{"profiles":{"list":[]}}'; standardError = '' }
         }
         Assert-True ($null -eq (Resolve-PowerShellTerminalProfile -Connection $profileConnection)) `
@@ -328,15 +339,20 @@ while ($true) {
     Assert-True ($captured -match 'agent-marker-observed') `
         'Literal input plus the named Enter key should reach only the registered pane.'
     $liveProfileConnection = Get-LiveIntelligentTerminalConnection -Tools $tools
+    Assert-True ($null -ne $liveProfileConnection) `
+        'A running shared terminal should retain a live protocol connection.'
     $expectedPowerShellProfile = if ($liveProfileConnection) {
         Resolve-PowerShellTerminalProfile -Connection $liveProfileConnection
     } else {
         $null
     }
-    if ($expectedPowerShellProfile) {
+    if ($expectedPowerShellProfile -and $expectedPowerShellProfile.id) {
         Assert-True ($captured -match (
                 'shared-profile-id=' + [regex]::Escape($expectedPowerShellProfile.id)
             )) 'The shared tab should use the discovered PowerShell profile.'
+        $profileValidation = 'passed'
+    } else {
+        $profileValidation = 'skipped: PowerShell profile GUID unavailable; name/default fallback exercised.'
     }
     Assert-True ($captured -match 'shared-input:\s*agent-literal-marker') `
         'The interactive prompt should render before the submitted input.'
@@ -440,6 +456,7 @@ while ($true) {
         result = 'passed'
         assertions = $assertionCount
         userInputValidated = [bool]$RequireUserInput
+        profileValidation = $profileValidation
         packageVersion = $tools.packageVersion
     } | ConvertTo-Json
 } finally {

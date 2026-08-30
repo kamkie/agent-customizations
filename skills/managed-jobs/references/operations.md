@@ -179,6 +179,23 @@ job id because it reads and reconciles only that record.
 Structured status includes the expected PID/start time, current snapshot when
 relevant, and identity-match result.
 
+### Maintenance operations
+
+`reconcile -Async` and `prune -Async` start hidden persistent jobs whose
+`kind` is `maintenance`. The returned record uses the normal managed-job
+contract: inspect it with `status -Id`, read its JSON result with `logs -Id`,
+and stop it through the controller if cancellation is explicitly requested.
+An exclusive maintenance lock permits only one reconcile or prune mutation at
+a time; an overlapping operation fails without doing partial work.
+
+Async prune snapshots its candidate ids and cutoff into a one-time runtime plan
+before dispatch. The worker consumes that plan under the maintenance lock,
+rechecks that every planned record still exists, is terminal, matches the
+selected status filter, and remains older than the frozen cutoff, then reports
+removed and skipped ids in its log. It cannot discover or delete records that
+were not in the plan. Preview with synchronous `prune -WhatIf` first; `-Async`
+cannot be combined with `-WhatIf`.
+
 Turn and session cleanup is silent when it succeeds. A turn is blocked only
 when an owned process tree cannot be stopped safely; the hook names the job,
 PID, and failure. Dead processes and stale records are reconciled without

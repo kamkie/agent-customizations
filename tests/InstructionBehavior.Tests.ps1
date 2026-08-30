@@ -29,12 +29,14 @@ if (@($ids | Where-Object { $_ -notin $expectedIds }).Count -gt 0 -or
 $allowedTargets = @('codex', 'claude')
 $allowedInstructionSets = @('global', 'campaign')
 $knownProperties = @($schema.properties.PSObject.Properties.Name)
-$answerLeakPattern = '(?i)\b(?:expected\s+(?:answer|outcome|behavior|result)|answer\s*:|rubric\s*:|solution\s*:)'
+$answerLeakPattern = '(?im)(?:^\s*(?:expected|answer|rubric|solution)\b|\b(?:expected\s+(?:answer|outcome|behavior|result)|answer\s*:|rubric\s*:|solution\s*:))'
 foreach ($sample in @(
     'Use the expected outcome: stop.',
     'The answer: continue.',
     'Internal rubric: choose careful.',
-    'Solution: publish the branch.'
+    'Solution: publish the branch.',
+    'Solution should be to stop and ask.',
+    'Rubric below — pick investigation.'
 )) {
     if ($sample -notmatch $answerLeakPattern) {
         throw "Instruction behavior answer-leak guard missed sample: $sample"

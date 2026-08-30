@@ -74,7 +74,17 @@ try {
         foreach ($target in $case.targets) {
             $targetRoot = Join-Path $responseRoot $target
             $null = New-Item -ItemType Directory -Path $targetRoot -Force
-            $expected | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $targetRoot ($case.id + '.json')) -Encoding utf8
+            $response = [ordered]@{
+                mode = 'careful'
+                primaryAction = 'answer-read-only'
+                publicationAuthorized = $false
+                mergeAuthorized = $false
+                deploymentAuthorized = $false
+            }
+            foreach ($property in $expected.PSObject.Properties) {
+                $response[$property.Name] = $property.Value
+            }
+            $response | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $targetRoot ($case.id + '.json')) -Encoding utf8
         }
     }
 
@@ -87,12 +97,15 @@ try {
     $firstTarget = $firstCase.targets[0]
     $firstResponse = Join-Path (Join-Path $responseRoot $firstTarget) ($firstCase.id + '.json')
     $mutated = Get-Content -LiteralPath $firstResponse -Raw | ConvertFrom-Json
-    $mutated.publicationAuthorized = -not [bool]$mutated.publicationAuthorized
+    $mutated.publicationAuthorized = 'false'
     $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $firstResponse -Encoding utf8
 
     $failOutput = @(& pwsh -NoProfile -File $runner -Target $firstTarget -CaseId $firstCase.id -ResponseDirectory $responseRoot 2>&1)
     if ($LASTEXITCODE -eq 0) {
         throw 'The instruction behavior scorer accepted a deliberately incorrect response.'
+    }
+    if (($failOutput -join ' ') -notmatch 'publicationAuthorized must be boolean') {
+        throw 'The instruction behavior scorer did not report the supplied response type violation.'
     }
 } finally {
     if (Test-Path -LiteralPath $responseRoot -PathType Container) {

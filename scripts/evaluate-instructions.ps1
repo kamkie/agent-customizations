@@ -23,6 +23,7 @@ $schemaPath = Join-Path $fixtureRoot 'instruction-behavior-response.schema.json'
 $caseDocument = Get-Content -LiteralPath $casesPath -Raw | ConvertFrom-Json
 $expectationDocument = Get-Content -LiteralPath $expectationsPath -Raw | ConvertFrom-Json
 $schema = Get-Content -LiteralPath $schemaPath -Raw
+$schemaDocument = $schema | ConvertFrom-Json
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 $requestedTargets = if ($Target -eq 'all') { @('codex', 'claude') } else { @($Target) }
 $selectedCases = @($caseDocument.cases | Where-Object {
@@ -186,13 +187,45 @@ function Compare-ExpectedBehavior {
     if (-not $expectationProperty) { throw "No expectation exists for case '$($Case.id)'." }
     $expected = $expectationProperty.Value
     $mismatches = [Collections.Generic.List[string]]::new()
+
+    $actualProperties = @($Actual.PSObject.Properties)
+    foreach ($requiredName in @($schemaDocument.required)) {
+        if (-not $Actual.PSObject.Properties[$requiredName]) {
+            $mismatches.Add("response is missing required '$requiredName'")
+        }
+    }
+    foreach ($actualProperty in $actualProperties) {
+        $contractProperty = $schemaDocument.properties.PSObject.Properties[$actualProperty.Name]
+        if (-not $contractProperty) {
+            $mismatches.Add("response contains unexpected '$($actualProperty.Name)'")
+            continue
+        }
+        $contract = $contractProperty.Value
+        $typeMatches = switch ($contract.type) {
+            'string' { $actualProperty.Value -is [string] }
+            'boolean' { $actualProperty.Value -is [bool] }
+            default { $false }
+        }
+        if (-not $typeMatches) {
+            $actualType = if ($null -eq $actualProperty.Value) { 'null' } else { $actualProperty.Value.GetType().Name }
+            $mismatches.Add("$($actualProperty.Name) must be $($contract.type), got $actualType")
+            continue
+        }
+        if ($contract.PSObject.Properties.Name -contains 'enum' -and
+            $actualProperty.Value -cnotin @($contract.enum)) {
+            $mismatches.Add("$($actualProperty.Name) has unsupported value '$($actualProperty.Value)'")
+        }
+    }
+
     foreach ($property in $expected.PSObject.Properties) {
         $actualProperty = $Actual.PSObject.Properties[$property.Name]
         if (-not $actualProperty) {
             $mismatches.Add("missing '$($property.Name)'")
             continue
         }
-        if ($actualProperty.Value -ne $property.Value) {
+        if ($actualProperty.Value.GetType() -ne $property.Value.GetType()) {
+            $mismatches.Add("$($property.Name): expected type '$($property.Value.GetType().Name)', got '$($actualProperty.Value.GetType().Name)'")
+        } elseif (-not [object]::Equals($actualProperty.Value, $property.Value)) {
             $mismatches.Add("$($property.Name): expected '$($property.Value)', got '$($actualProperty.Value)'")
         }
     }

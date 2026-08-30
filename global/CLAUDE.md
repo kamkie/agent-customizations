@@ -36,13 +36,14 @@ $job = (& $jobs start -Name console -Executable pwsh.exe -Arguments @('-NoProfil
     -WorkingDirectory $repo -Visible -SharedTerminal -Lifetime Session | Out-String) | ConvertFrom-Json
 ```
 
-Report `$job.id` and these commands with the actual id substituted:
+Report `$job.id` and these commands with both the resolved controller path and
+actual id substituted:
 
 ```powershell
-& $jobs capture -Id <job-id> -MaxLines 80
-& $jobs send-input -Id <job-id> -InputText '<non-secret-text>'
-& $jobs send-key -Id <job-id> -Key Enter
-& $jobs stop -Id <job-id>
+& '<controller-path>' capture -Id <job-id> -MaxLines 80
+& '<controller-path>' send-input -Id <job-id> -InputText '<non-secret-text>'
+& '<controller-path>' send-key -Id <job-id> -Key Enter
+& '<controller-path>' stop -Id <job-id>
 ```
 
 Do not run `reconcile` or `list`, and do not ask for details unless a required

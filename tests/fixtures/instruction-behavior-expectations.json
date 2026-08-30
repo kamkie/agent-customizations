@@ -3,6 +3,7 @@
   "expectations": {
     "capability-question": {
       "mode": "investigation",
+      "autonomous": false,
       "primaryAction": "answer-read-only",
       "publicationAuthorized": false,
       "mergeAuthorized": false,
@@ -10,6 +11,7 @@
     },
     "design-request": {
       "mode": "design",
+      "autonomous": false,
       "primaryAction": "produce-design-artifact",
       "publicationAuthorized": false,
       "mergeAuthorized": false,
@@ -17,20 +19,39 @@
     },
     "quick-change": {
       "mode": "quick",
+      "autonomous": false,
       "primaryAction": "implement-and-deliver",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
     },
+    "ordinary-implementation": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "implement-and-deliver",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "commit-validated-work": {
+      "mode": "quick",
+      "autonomous": false,
+      "primaryAction": "commit-validated-work",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
     "careful-after-two-failures": {
       "mode": "careful",
+      "autonomous": false,
       "primaryAction": "recheck-and-diagnose",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
     },
     "autonomous-request": {
-      "mode": "autonomous",
+      "mode": "standard",
+      "autonomous": true,
       "primaryAction": "implement-and-deliver",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
@@ -43,7 +64,8 @@
       "deploymentAuthorized": false
     },
     "campaign-delivery-trigger": {
-      "mode": "autonomous",
+      "mode": "standard",
+      "autonomous": true,
       "primaryAction": "deliver-pilot-before-fanout",
       "publicationAuthorized": true,
       "mergeAuthorized": false,

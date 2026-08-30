@@ -13,6 +13,16 @@
         "destination": "hooks.json",
         "entries": [
           {
+            "id": "managed-jobs-session-start",
+            "event": "SessionStart",
+            "matcher": "^(startup|resume)$",
+            "source": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
+            "script": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
+            "timeout": 600,
+            "async": true,
+            "statusMessage": "Scheduling managed-job reconciliation"
+          },
+          {
             "id": "managed-jobs-pre-tool-use",
             "event": "PreToolUse",
             "matcher": "^Bash$",
@@ -62,6 +72,15 @@
         "destination": "settings.json",
         "handlerFormat": "claude",
         "entries": [
+          {
+            "id": "managed-jobs-session-start",
+            "event": "SessionStart",
+            "matcher": "^(startup|resume|fork)$",
+            "source": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
+            "script": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
+            "timeout": 600,
+            "async": true
+          },
           {
             "id": "managed-jobs-pre-tool-use",
             "event": "PreToolUse",

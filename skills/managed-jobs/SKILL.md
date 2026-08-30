@@ -29,9 +29,9 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
   turn. Use `-Lifetime Session` only when the process must remain available
   across turns, and use `-Lifetime Persistent` only when it must intentionally
   survive the session.
-- When recovering surviving work after an interruption or agent/controller
-  restart, reconcile once, then reuse an equivalent active job. Do not
-  reconcile before every launch.
+- The installed `SessionStart` hook schedules global reconciliation
+  asynchronously on session startup or resume. Normal recovery does not depend
+  on the agent remembering to reconcile, and launches do not wait for it.
 - Use the structured result returned by `start` for normal handoff. Do not
   follow it with a global `list`; use `status -Id $job.id` when targeted
   confirmation is useful.
@@ -59,8 +59,9 @@ Stop only after the work is complete or when the user explicitly asks:
 
 ## Asynchronous maintenance
 
-Run a large reconciliation as a hidden supervised maintenance job so the caller
-can continue immediately:
+The installed session hook starts reconciliation automatically. Use the manual
+form only to retry a reported hook failure or request an explicit repair while
+a session is already running:
 
 ```powershell
 $operation = (& $jobs reconcile -Async | Out-String) | ConvertFrom-Json

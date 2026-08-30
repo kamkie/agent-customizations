@@ -12,7 +12,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$manifest = Get-CustomizationManifest
 $fixtureRoot = Join-Path $repositoryRoot 'tests\fixtures'
 $casesPath = Join-Path $fixtureRoot 'instruction-behavior-cases.json'
 $expectationsPath = Join-Path $fixtureRoot 'instruction-behavior-expectations.json'
@@ -50,31 +52,6 @@ if ($ownsOutputDirectory -and
 }
 $null = New-Item -ItemType Directory -Path $resolvedOutputDirectory -Force
 
-function Get-InstructionSources {
-    param(
-        [Parameter(Mandatory)][string]$AgentTarget,
-        [Parameter(Mandatory)][string]$InstructionSet
-    )
-
-    $sources = @('global\shared.md')
-    switch ($AgentTarget) {
-        'codex' { $sources += 'global\codex-overlay.md' }
-        'claude' { $sources += 'global\claude-overlay.md' }
-        default { throw "Unsupported instruction target: $AgentTarget" }
-    }
-    switch ($InstructionSet) {
-        'global' { }
-        'campaign' {
-            if ($AgentTarget -ne 'codex') {
-                throw "Instruction set '$InstructionSet' is not supported for target '$AgentTarget'."
-            }
-            $sources += 'skills\orchestrate-work-campaigns\SKILL.md'
-        }
-        default { throw "Unknown instruction set: $InstructionSet" }
-    }
-    return @($sources)
-}
-
 function Write-CompiledInstructions {
     param(
         [Parameter(Mandatory)][string]$AgentTarget,
@@ -82,12 +59,25 @@ function Write-CompiledInstructions {
         [Parameter(Mandatory)][string]$Destination
     )
 
-    $parts = foreach ($source in Get-InstructionSources -AgentTarget $AgentTarget -InstructionSet $InstructionSet) {
-        Get-Content -LiteralPath (Join-Path $repositoryRoot $source) -Raw
+    $targetProperty = $manifest.targets.PSObject.Properties[$AgentTarget]
+    if (-not $targetProperty) { throw "Unsupported instruction target: $AgentTarget" }
+    $content = Get-CustomizationInstructionContent -Target $targetProperty.Value
+
+    switch ($InstructionSet) {
+        'global' { }
+        'campaign' {
+            if ($AgentTarget -ne 'codex') {
+                throw "Instruction set '$InstructionSet' is not supported for target '$AgentTarget'."
+            }
+            $skillPath = Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\SKILL.md'
+            $skill = [IO.File]::ReadAllText($skillPath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+            $content = $content.TrimEnd([char[]]"`r`n") + "`n`n" + $skill + "`n"
+        }
+        default { throw "Unknown instruction set: $InstructionSet" }
     }
     [IO.File]::WriteAllText(
         $Destination,
-        (($parts -join [Environment]::NewLine) + [Environment]::NewLine),
+        $content,
         [Text.UTF8Encoding]::new($false)
     )
 }

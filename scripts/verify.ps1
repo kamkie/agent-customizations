@@ -94,6 +94,13 @@ foreach ($targetName in $targetNames) {
             if ($entry.PSObject.Properties.Name -contains 'async' -and $entry.async -isnot [bool]) {
                 $errors.Add("Target '$targetName' hook '$($entry.id)' async value must be boolean")
             }
+            if ($entry.PSObject.Properties.Name -contains 'async' -and [bool]$entry.async -and
+                [string]$entry.id -in @(
+                    'managed-jobs-pre-tool-use', 'managed-jobs-stop',
+                    'managed-jobs-stop-failure', 'managed-jobs-session-end'
+                )) {
+                $errors.Add("Target '$targetName' managed hook '$($entry.id)' must remain synchronous")
+            }
             if ([string]$entry.event -notin $supportedHookEvents) {
                 $errors.Add("Target '$targetName' hook '$($entry.id)' has unsupported event '$($entry.event)'")
             }

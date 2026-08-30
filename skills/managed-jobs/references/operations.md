@@ -192,15 +192,14 @@ An exclusive maintenance lock permits only one reconcile or prune mutation at
 a time; an overlapping operation fails without doing partial work.
 
 Codex and Claude Code register the reconciliation scheduler as an asynchronous
-`SessionStart` command hook. Codex matches `startup|resume`; Claude Code also
-matches `fork`. The hook performs full reconciliation in its background command
-process, so the agent continues immediately without spawning an unmanaged child.
-When another maintenance operation holds the lock, the hook waits there for up
-to five minutes and runs next instead of being dropped during normal
-contention. The hook runtime is bounded to ten minutes. Turn and session cleanup
-remain separate targeted hook operations over owner references. Manual
-`reconcile -Async` keeps the supervised persistent-job contract described above,
-and its worker also waits through the post-dispatch lock race.
+`SessionStart` command hook for `startup|resume`. The hook performs full
+reconciliation in its background command process, so the agent continues
+immediately without spawning an unmanaged child. If another maintenance
+operation owns the lock, the hook fails fast and reports the skipped attempt;
+the next startup or resume retries without depending on agent memory. The hook
+runtime is bounded to ten minutes. Turn and session cleanup remain separate
+targeted hook operations over owner references. Manual `reconcile -Async` keeps
+the supervised persistent-job contract described above.
 
 Async prune snapshots its candidate ids and cutoff into a one-time runtime plan
 before dispatch. The worker consumes that plan under the maintenance lock,

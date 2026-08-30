@@ -102,25 +102,23 @@ try {
         'Hook-scheduled reconciliation should remove stale owner references.'
 
     $heldMaintenanceLock = [IO.File]::Open((Join-Path $stateRoot '.maintenance.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    $contendedHook = $null
     try {
-        $queuedHook = Start-SessionStartHookProcess -Payload $startPayload
-        Start-Sleep -Milliseconds 500
-        Assert-True (-not $queuedHook.process.HasExited) `
-            'SessionStart reconciliation should wait when another maintenance operation holds the lock.'
+        $contendedHook = Start-SessionStartHookProcess -Payload $startPayload
+        if (-not $contendedHook.process.WaitForExit(10000)) {
+            try { $contendedHook.process.Kill($true) } catch {}
+            throw 'Contended SessionStart reconciliation did not fail fast.'
+        }
+        $contendedOutput = $contendedHook.outputTask.GetAwaiter().GetResult()
+        $contendedError = $contendedHook.errorTask.GetAwaiter().GetResult()
+        Assert-True ($contendedHook.process.ExitCode -eq 1 -and
+            [string]::IsNullOrWhiteSpace($contendedOutput) -and
+            $contendedError -match 'Another managed-jobs maintenance operation is already running') `
+            'SessionStart reconciliation should fail fast and report lock contention.'
     } finally {
         $heldMaintenanceLock.Dispose()
+        if ($contendedHook) { $contendedHook.process.Dispose() }
     }
-    if (-not $queuedHook.process.WaitForExit(10000)) {
-        try { $queuedHook.process.Kill($true) } catch {}
-        throw 'Queued SessionStart reconciliation did not finish after the maintenance lock was released.'
-    }
-    $queuedOutput = $queuedHook.outputTask.GetAwaiter().GetResult()
-    $queuedError = $queuedHook.errorTask.GetAwaiter().GetResult()
-    Assert-True ($queuedHook.process.ExitCode -eq 0 -and
-        [string]::IsNullOrWhiteSpace($queuedOutput) -and
-        [string]::IsNullOrWhiteSpace($queuedError)) `
-        'Queued SessionStart reconciliation should finish silently after the maintenance lock is released.'
-    $queuedHook.process.Dispose()
 
     $turnJob = (& $controller start -StateRoot $stateRoot -Name 'hook-turn-owned' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json

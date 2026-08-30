@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "primaryAction",
+    "publicationAuthorized",
+    "mergeAuthorized",
+    "deploymentAuthorized"
+  ],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["investigation", "design", "quick", "careful", "autonomous"]
+    },
+    "primaryAction": {
+      "type": "string",
+      "enum": [
+        "answer-read-only",
+        "produce-design-artifact",
+        "implement-and-deliver",
+        "recheck-and-diagnose",
+        "inventory-authority-checkpoint",
+        "deliver-pilot-before-fanout"
+      ]
+    },
+    "publicationAuthorized": { "type": "boolean" },
+    "mergeAuthorized": { "type": "boolean" },
+    "deploymentAuthorized": { "type": "boolean" }
+  }
+}

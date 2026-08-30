@@ -28,6 +28,8 @@ tools' live configuration directories are deployment targets.
 - `skills/shape-product-decisions` — evidence-labeled product shaping from an
   ambiguous request to a concrete decision and implementation handoff, shared
   by Codex and Claude Code.
+- `skills/shared-term` — a focused collaborative Windows Terminal workflow,
+  shared by Codex and Claude Code.
 - `skills/ux-review` — Codex-specific browser walkthroughs with evidence-backed,
   acceptance-testable UX findings.
 - `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.

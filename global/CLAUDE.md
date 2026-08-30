@@ -23,32 +23,9 @@ Do not launch long-running work through raw `Start-Process`, `Start-Job`, detach
 
 ### Shared terminal shorthand
 
-Treat `shared term` as a complete instruction. Do not load the `managed-jobs`
-skill for this shorthand; call its installed controller directly in one
-shell tool call using PowerShell:
-
-```powershell
-$claudeRoot = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
-$jobs = Join-Path $claudeRoot 'skills\managed-jobs\scripts\Invoke-ManagedJob.ps1'
-$repo = git rev-parse --show-toplevel 2>$null
-if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
-$job = (& $jobs start -Name console -Executable pwsh.exe -Arguments @('-NoProfile') `
-    -WorkingDirectory $repo -Visible -SharedTerminal -Lifetime Session | Out-String) | ConvertFrom-Json
-[pscustomobject]@{ controller = $jobs; job = $job } | ConvertTo-Json -Depth 12
-```
-
-Report `$job.id` and these commands with both the resolved controller path and
-actual id substituted:
-
-```powershell
-& '<controller-path>' capture -Id <job-id> -MaxLines 80
-& '<controller-path>' send-input -Id <job-id> -InputText '<non-secret-text>'
-& '<controller-path>' send-key -Id <job-id> -Key Enter
-& '<controller-path>' stop -Id <job-id>
-```
-
-Do not run `reconcile` or `list`, and do not ask for details unless a required
-prerequisite is missing.
+Treat `shared term` as a complete instruction to use the `shared-term`
+skill. Do not load `managed-jobs` or ask for details unless a prerequisite is
+missing.
 
 ## Questions, proposals, and authorization
 

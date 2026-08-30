@@ -1,6 +1,6 @@
 ---
 name: managed-jobs
-description: Contain, run, verify readiness, inspect, interact with visible shared terminals, recover, and stop long-running local Windows processes with explicit lifetimes and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or solely for the globally defined `shared term` shorthand.
+description: Contain, run, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
 ---
 
 # Managed Jobs
@@ -28,11 +28,7 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - `Auto` uses the current agent turn when ownership is available. Use
   `-Lifetime Session` only across turns and `Persistent` only across sessions.
 - Use the returned job instead of a global `list`; target `status` when needed.
-- Treat arguments, environment values, records, and logs as non-secret. Treat
-  captures as sensitive and never persist them. Never send credentials through
-  controller input.
-- Use visible mode only when requested and shared-terminal mode only for
-  bidirectional work in the same pane.
+- Treat arguments, environment values, records, and logs as non-secret.
 - Never replace this controller with a detached/background launch. Use
   `claude-runner` for Claude session, resume, and review behavior.
 
@@ -67,8 +63,6 @@ The installed session hook owns global reconciliation. Run synchronous
 with `prune -OlderThanDays 14 -WhatIf`, obtain explicit authorization for the
 reported scope, then run the same command without `-WhatIf`.
 
-Read [operations.md](references/operations.md) only for state-root overrides,
-ownership and recovery details, visible/shared-terminal controls, identity
-checks, or pruning. The HTTP readiness workflow adapts Open Mercato's
+The HTTP readiness workflow adapts Open Mercato's
 `om-prepare-test-env` under the MIT License; see
 [open-mercato-license.md](references/open-mercato-license.md).

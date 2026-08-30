@@ -57,6 +57,7 @@
         "managed-jobs",
         "orchestrate-work-campaigns",
         "shape-product-decisions",
+        "shared-term",
         "ux-review"
       ]
     },
@@ -116,7 +117,8 @@
         "cross-agent-review",
         "dyslexia-friendly-formatter",
         "managed-jobs",
-        "shape-product-decisions"
+        "shape-product-decisions",
+        "shared-term"
       ]
     }
   }

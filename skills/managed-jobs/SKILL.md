@@ -28,8 +28,9 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - `Auto` uses the current agent turn when ownership is available. Use
   `-Lifetime Session` only across turns and `Persistent` only across sessions.
 - Use the returned job instead of a global `list`; target `status` when needed.
-- Treat arguments, environment values, records, logs, and captures as
-  non-secret. Never send credentials through controller input.
+- Treat arguments, environment values, records, and logs as non-secret. Treat
+  captures as sensitive and never persist them. Never send credentials through
+  controller input.
 - Use visible mode only when requested and shared-terminal mode only for
   bidirectional work in the same pane.
 - Never replace this controller with a detached/background launch. Use

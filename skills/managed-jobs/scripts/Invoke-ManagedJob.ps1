@@ -33,8 +33,6 @@ param(
     [ValidateRange(1, 500)]
     [int]$MaxLines = 100,
     [int]$OlderThanDays = 14,
-    [switch]$Async,
-    [string]$MaintenancePlan,
     [string]$StateRoot,
     [ValidateSet('starting', 'running', 'completed', 'failed', 'stopped', 'orphaned', 'invalid')]
     [string[]]$Status,
@@ -61,18 +59,6 @@ if ($Action -ne 'send-key' -and $PSBoundParameters.ContainsKey('Key')) {
 }
 if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
     throw '-MaxLines is valid only for capture.'
-}
-if ($Action -notin @('reconcile', 'prune') -and $PSBoundParameters.ContainsKey('Async')) {
-    throw '-Async is valid only for reconcile and prune.'
-}
-if ($Action -ne 'prune' -and $PSBoundParameters.ContainsKey('MaintenancePlan')) {
-    throw '-MaintenancePlan is valid only for prune.'
-}
-if ($Async -and $PSBoundParameters.ContainsKey('MaintenancePlan')) {
-    throw '-Async cannot be combined with -MaintenancePlan.'
-}
-if ($Async -and $WhatIfPreference) {
-    throw '-Async cannot be combined with -WhatIf. Preview prune synchronously before scheduling it.'
 }
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
@@ -223,117 +209,6 @@ function Get-PruneCandidates {
         }
         if ($timestamp -lt $Cutoff) { $job }
     }
-}
-
-function Read-PruneMaintenancePlan {
-    param([Parameter(Mandatory)][string]$Path)
-
-    $maintenanceDirectory = [IO.Path]::GetFullPath(
-        (Join-Path (Get-ManagedJobRoot) 'maintenance')
-    )
-    $maintenancePrefix = [IO.Path]::TrimEndingDirectorySeparator($maintenanceDirectory) +
-        [IO.Path]::DirectorySeparatorChar
-    $resolvedPath = [IO.Path]::GetFullPath($Path)
-    if (-not $resolvedPath.StartsWith($maintenancePrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'The prune maintenance plan must be inside the managed-jobs maintenance directory.'
-    }
-    $plan = Read-ManagedJob -Path $resolvedPath
-    if ($plan.PSObject.Properties.Name -notcontains 'schemaVersion' -or
-        [int]$plan.schemaVersion -ne 1 -or
-        $plan.PSObject.Properties.Name -notcontains 'action' -or
-        [string]$plan.action -ne 'prune' -or
-        $plan.PSObject.Properties.Name -notcontains 'cutoffUtc' -or
-        $plan.PSObject.Properties.Name -notcontains 'statuses' -or
-        $plan.PSObject.Properties.Name -notcontains 'candidateIds') {
-        throw 'The prune maintenance plan is invalid.'
-    }
-    $allowedStatuses = @('starting', 'running', 'completed', 'failed', 'stopped', 'orphaned', 'invalid')
-    $statusFilter = @($plan.statuses | ForEach-Object {
-        $value = [string]$_
-        if (-not [string]::IsNullOrWhiteSpace($value)) { $value }
-    })
-    if (@($statusFilter | Where-Object { $_ -notin $allowedStatuses }).Count -gt 0) {
-        throw 'The prune maintenance plan contains an invalid status filter.'
-    }
-    $candidateIds = @($plan.candidateIds | ForEach-Object { [string]$_ } | Select-Object -Unique)
-    foreach ($candidateId in $candidateIds) {
-        $null = Get-ManagedJobFile -Id $candidateId
-    }
-    $cutoff = if ($plan.cutoffUtc -is [datetime]) {
-        $plan.cutoffUtc.ToUniversalTime()
-    } else {
-        [datetimeoffset]::Parse([string]$plan.cutoffUtc).UtcDateTime
-    }
-    Remove-Item -LiteralPath $resolvedPath -Force
-    return [pscustomobject]@{
-        path = $resolvedPath
-        cutoff = $cutoff
-        statuses = $statusFilter
-        candidateIds = $candidateIds
-    }
-}
-
-function Start-ManagedJobMaintenance {
-    param([Parameter(Mandatory)][ValidateSet('reconcile', 'prune')][string]$MaintenanceAction)
-
-    $probe = Enter-ManagedJobMaintenanceLock
-    $probe.Dispose()
-    $root = Get-ManagedJobRoot
-    $maintenanceScript = Join-Path $PSScriptRoot 'ManagedJob.Maintenance.ps1'
-    $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
-    $maintenanceArguments = @(
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $maintenanceScript,
-        '-Controller', $PSCommandPath,
-        '-Action', $MaintenanceAction,
-        '-StateRoot', $root
-    )
-    $maintenanceEvidence = [ordered]@{ action = $MaintenanceAction }
-    $planPath = $null
-    if ($Status) {
-        $maintenanceArguments += @('-StatusCsv', ($Status -join ','))
-        $maintenanceEvidence.statuses = @($Status)
-    }
-    if ($MaintenanceAction -eq 'prune') {
-        $cutoff = [datetime]::UtcNow.AddDays(-[math]::Abs($OlderThanDays))
-        $candidateIds = @(
-            Get-PruneCandidates -Jobs @(Get-AllManagedJobs) -Cutoff $cutoff -StatusFilter $Status |
-                Select-Object -ExpandProperty id
-        )
-        $maintenanceDirectory = Join-Path $root 'maintenance'
-        $null = New-Item -ItemType Directory -Path $maintenanceDirectory -Force
-        $planPath = Join-Path $maintenanceDirectory ('prune-' + [guid]::NewGuid().ToString('N') + '.json')
-        Write-ManagedJson -Path $planPath -Value ([ordered]@{
-            schemaVersion = 1
-            action = 'prune'
-            createdAtUtc = [datetime]::UtcNow.ToString('o')
-            cutoffUtc = $cutoff.ToString('o')
-            statuses = @($Status)
-            candidateIds = $candidateIds
-        })
-        $maintenanceArguments += @('-PlanPath', $planPath)
-        $maintenanceEvidence.cutoffUtc = $cutoff.ToString('o')
-        $maintenanceEvidence.plannedCandidateCount = $candidateIds.Count
-    }
-
-    try {
-        $job = (& $PSCommandPath start `
-            -StateRoot $root `
-            -Name "managed-jobs-$MaintenanceAction" `
-            -Kind maintenance `
-            -Executable $pwsh `
-            -Arguments $maintenanceArguments `
-            -WorkingDirectory $root `
-            -Lifetime Persistent | Out-String) | ConvertFrom-Json
-    } catch {
-        if ($planPath -and (Test-Path -LiteralPath $planPath -PathType Leaf)) {
-            Remove-Item -LiteralPath $planPath -Force -ErrorAction SilentlyContinue
-        }
-        throw
-    }
-    $output = [ordered]@{}
-    foreach ($property in $job.PSObject.Properties) { $output[$property.Name] = $property.Value }
-    $output.maintenance = [pscustomobject]$maintenanceEvidence
-    [pscustomobject]$output | ConvertTo-Json -Depth 12
 }
 
 function Add-ManagedJobIdentity {
@@ -760,11 +635,6 @@ function Stop-ManagedJobTrees {
         }
     }
     return @($outcomes)
-}
-
-if ($Async) {
-    Start-ManagedJobMaintenance -MaintenanceAction $Action
-    return
 }
 
 switch ($Action) {
@@ -1362,53 +1232,9 @@ switch ($Action) {
     'prune' {
         $maintenanceLock = Enter-ManagedJobMaintenanceLock
         try {
-            $plannedCandidateIds = $null
-            $skipped = @()
-            if ($MaintenancePlan) {
-                if ($WhatIfPreference) {
-                    throw '-MaintenancePlan cannot be combined with -WhatIf.'
-                }
-                $plan = Read-PruneMaintenancePlan -Path $MaintenancePlan
-                $cutoff = $plan.cutoff
-                $statusFilter = $plan.statuses
-                $plannedCandidateIds = @($plan.candidateIds)
-                $plannedJobs = @()
-                foreach ($candidateId in $plannedCandidateIds) {
-                    $candidatePath = Get-ManagedJobFile -Id $candidateId
-                    if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
-                        $skipped += [ordered]@{ id = $candidateId; reason = 'record no longer exists or is unreadable' }
-                        continue
-                    }
-                    try {
-                        $plannedJobs += Read-ManagedJob -Path $candidatePath
-                    } catch {
-                        $skipped += [ordered]@{ id = $candidateId; reason = 'record no longer exists or is unreadable' }
-                    }
-                }
-                $candidates = @(Get-PruneCandidates -Jobs $plannedJobs -Cutoff $cutoff -StatusFilter $statusFilter)
-                $eligibleIds = @($candidates | ForEach-Object { $_.id })
-                foreach ($candidateId in $plannedCandidateIds) {
-                    if ($candidateId -notin $eligibleIds -and
-                        $candidateId -notin @($skipped | ForEach-Object { $_.id })) {
-                        $plannedJob = @($plannedJobs | Where-Object id -eq $candidateId)[0]
-                        $timestampText = if ($plannedJob.finishedAtUtc) { $plannedJob.finishedAtUtc } else { $plannedJob.createdAtUtc }
-                        $skipped += [ordered]@{
-                            id = $candidateId
-                            reason = 'record is no longer eligible'
-                            status = $plannedJob.status
-                            timestampUtc = if ($timestampText -is [datetime]) {
-                                $timestampText.ToUniversalTime().ToString('o')
-                            } else {
-                                [datetimeoffset]::Parse([string]$timestampText).UtcDateTime.ToString('o')
-                            }
-                        }
-                    }
-                }
-            } else {
-                $cutoff = [datetime]::UtcNow.AddDays(-[math]::Abs($OlderThanDays))
-                $statusFilter = @($Status)
-                $candidates = @(Get-PruneCandidates -Jobs @(Get-AllManagedJobs) -Cutoff $cutoff -StatusFilter $statusFilter)
-            }
+            $cutoff = [datetime]::UtcNow.AddDays(-[math]::Abs($OlderThanDays))
+            $statusFilter = @($Status)
+            $candidates = @(Get-PruneCandidates -Jobs @(Get-AllManagedJobs) -Cutoff $cutoff -StatusFilter $statusFilter)
 
             $candidateIds = @($candidates | ForEach-Object { $_.id })
             $removed = @()
@@ -1426,11 +1252,8 @@ switch ($Action) {
             [pscustomobject]@{
                 cutoffUtc = $cutoff.ToString('o')
                 selectedStatuses = @($statusFilter)
-                plannedCandidateCount = if ($null -ne $plannedCandidateIds) { $plannedCandidateIds.Count } else { $null }
                 candidateCount = $candidateIds.Count
                 candidates = $candidateIds
-                skippedCount = $skipped.Count
-                skipped = $skipped
                 removedCount = $removed.Count
                 removed = $removed
                 preview = [bool]$WhatIfPreference

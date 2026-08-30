@@ -207,7 +207,7 @@ function Enter-ManagedJobMaintenanceLock {
 
 function Get-PruneCandidates {
     param(
-        [Parameter(Mandatory)][object[]]$Jobs,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Jobs,
         [Parameter(Mandatory)][datetime]$Cutoff,
         [string[]]$StatusFilter
     )

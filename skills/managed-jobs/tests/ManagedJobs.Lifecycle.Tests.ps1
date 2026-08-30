@@ -130,6 +130,12 @@ try {
     Remove-Item Env:CLAUDE_CODE_SESSION_ID -ErrorAction SilentlyContinue
     $env:MANAGED_JOBS_ROOT = $stateRoot
     $null = & $controller reconcile -StateRoot $stateRoot
+    $emptyPrunePreview = (& $controller prune -StateRoot $stateRoot -WhatIf | Out-String) | ConvertFrom-Json
+    Assert-True (
+        $emptyPrunePreview.preview -and
+        $emptyPrunePreview.candidateCount -eq 0 -and
+        $emptyPrunePreview.removedCount -eq 0
+    ) 'Prune preview should accept an empty managed-job registry.'
 
     $invalidAsyncRoot = Join-Path $testRoot 'invalid-async-state'
     $invalidAsyncRejected = $false

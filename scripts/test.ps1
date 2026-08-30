@@ -133,8 +133,9 @@ try {
     $codexSessionStart = $codexHooks.hooks.SessionStart[0]
     if ([string]$codexSessionStart.matcher -ne '^(startup|resume)$' -or
         -not [bool]$codexSessionStart.hooks[0].async -or
+        [int]$codexSessionStart.hooks[0].timeout -ne 600 -or
         [string]$codexSessionStart.hooks[0].command -notmatch 'ManagedHookId "managed-jobs-session-start"') {
-        throw 'Codex SessionStart hook must asynchronously schedule managed reconciliation for startup and resume.'
+        throw 'Codex SessionStart hook must schedule ten-minute asynchronous reconciliation for startup and resume.'
     }
     $preToolHandlers = @($codexHooks.hooks.PreToolUse | ForEach-Object { $_.hooks })
     if ($preToolHandlers.Count -ne 1 -or
@@ -170,8 +171,9 @@ try {
     $claudeSessionStart = $claudeSettings.hooks.SessionStart[0]
     if ([string]$claudeSessionStart.matcher -ne '^(startup|resume|fork)$' -or
         -not [bool]$claudeSessionStart.hooks[0].async -or
+        [int]$claudeSessionStart.hooks[0].timeout -ne 600 -or
         [string]$claudeSessionStart.hooks[0].command -notmatch 'ManagedHookId "managed-jobs-session-start"') {
-        throw 'Claude SessionStart hook must asynchronously schedule managed reconciliation for startup, resume, and fork.'
+        throw 'Claude SessionStart hook must schedule ten-minute asynchronous reconciliation for startup, resume, and fork.'
     }
     $claudePreToolHandlers = @($claudeSettings.hooks.PreToolUse | ForEach-Object { $_.hooks })
     if ($claudePreToolHandlers.Count -ne 1 -or

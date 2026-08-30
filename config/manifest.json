@@ -18,7 +18,7 @@
             "matcher": "^(startup|resume)$",
             "source": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
             "script": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
-            "timeout": 10,
+            "timeout": 600,
             "async": true,
             "statusMessage": "Scheduling managed-job reconciliation"
           },
@@ -78,7 +78,7 @@
             "matcher": "^(startup|resume|fork)$",
             "source": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
             "script": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
-            "timeout": 10,
+            "timeout": 600,
             "async": true
           },
           {

@@ -18,7 +18,7 @@ if ($Action -ne 'prune' -and $PlanPath) {
     throw '-PlanPath is valid only for prune maintenance.'
 }
 
-$controllerParameters = @{ StateRoot = $StateRoot; WaitForMaintenanceLock = $true }
+$controllerParameters = @{ StateRoot = $StateRoot }
 if ($StatusCsv) {
     $controllerParameters.Status = @($StatusCsv.Split(',', [StringSplitOptions]::RemoveEmptyEntries))
 }

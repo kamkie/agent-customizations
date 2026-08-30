@@ -75,7 +75,7 @@
           {
             "id": "managed-jobs-session-start",
             "event": "SessionStart",
-            "matcher": "^(startup|resume|fork)$",
+            "matcher": "^(startup|resume)$",
             "source": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
             "script": "skills/managed-jobs/scripts/ManagedJob.SessionStartHook.ps1",
             "timeout": 600,

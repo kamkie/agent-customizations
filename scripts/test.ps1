@@ -169,11 +169,11 @@ try {
         }
     }
     $claudeSessionStart = $claudeSettings.hooks.SessionStart[0]
-    if ([string]$claudeSessionStart.matcher -ne '^(startup|resume|fork)$' -or
+    if ([string]$claudeSessionStart.matcher -ne '^(startup|resume)$' -or
         -not [bool]$claudeSessionStart.hooks[0].async -or
         [int]$claudeSessionStart.hooks[0].timeout -ne 600 -or
         [string]$claudeSessionStart.hooks[0].command -notmatch 'ManagedHookId "managed-jobs-session-start"') {
-        throw 'Claude SessionStart hook must schedule ten-minute asynchronous reconciliation for startup, resume, and fork.'
+        throw 'Claude SessionStart hook must schedule ten-minute asynchronous reconciliation for startup and resume.'
     }
     $claudePreToolHandlers = @($claudeSettings.hooks.PreToolUse | ForEach-Object { $_.hooks })
     if ($claudePreToolHandlers.Count -ne 1 -or

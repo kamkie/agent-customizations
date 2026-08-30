@@ -275,8 +275,8 @@ try {
         }
         $record | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stateRoot "jobs\$Id.json") -Encoding utf8
     }
-    New-ReservationRecord -Id '20000101-000000-reserve-bootstrap-fresh-000001' -AgeSeconds 60 -LaunchMode 'foreground-bootstrap'
-    New-ReservationRecord -Id '20000101-000000-reserve-bootstrap-expired-000001' -AgeSeconds 130 -LaunchMode 'foreground-bootstrap'
+    New-ReservationRecord -Id '20000101-000000-reserve-bootstrap-fresh-000001' -AgeSeconds 150 -LaunchMode 'foreground-bootstrap'
+    New-ReservationRecord -Id '20000101-000000-reserve-bootstrap-expired-000001' -AgeSeconds 190 -LaunchMode 'foreground-bootstrap'
     New-ReservationRecord -Id '20000101-000000-reserve-plain-expired-000001' -AgeSeconds 60 -LaunchMode $null
     Assert-True ((Get-JobStatus -Id '20000101-000000-reserve-bootstrap-fresh-000001').status -eq 'starting') `
         'A cold-start reservation inside the bootstrap allowance must survive reconciliation.'

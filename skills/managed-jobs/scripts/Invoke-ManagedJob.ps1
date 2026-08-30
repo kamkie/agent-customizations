@@ -109,12 +109,15 @@ function Set-ManagedJobControlReleased {
 function Get-PreHostStaleAllowanceSeconds {
     param($Job)
     # A cold-start shared-terminal launch legitimately holds its starting record
-    # without a host through the bootstrap-lock wait (up to 60s) plus window
-    # activation and protocol registration (up to 30s), so its reservation must
-    # outlive that worst case before reconciliation may orphan it.
+    # without a host through every bounded bootstrap stage: the bootstrap-lock
+    # wait (60s), the post-lock re-probe (3 x 5s probes plus retry delays, ~16s),
+    # the activation loop (30s nominal, overrunning by one final blocking
+    # re-probe, ~46s), and the new-tab CLI call (10s). The reservation must
+    # outlive that ~132s worst case, plus scheduling margin, before
+    # reconciliation may orphan it.
     if ($Job.PSObject.Properties.Name -contains 'terminalLaunchMode' -and
         [string]$Job.terminalLaunchMode -eq 'foreground-bootstrap') {
-        return 120
+        return 180
     }
     return 30
 }

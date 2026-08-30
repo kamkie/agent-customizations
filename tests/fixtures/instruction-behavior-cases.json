@@ -23,7 +23,7 @@
       "id": "ordinary-implementation",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "Implement the approved repository change and deliver it. No elevated risk, sensitive environment, irreversible action, or unusual uncertainty is identified."
+      "prompt": "Implement the approved repository change and deliver it."
     },
     {
       "id": "commit-validated-work",

@@ -37,5 +37,6 @@ Operate only the registered pane:
 Do not capture while a secret prompt is waiting. Treat captured pane content as
 sensitive and never copy it into logs, records, or other durable artifacts.
 
-Report the job id and exact capture, input, key, and stop commands with the
-returned controller path and job id substituted so they work in a later shell.
+After a launch, report only the requested result and job id. Keep controller
+commands internal; print them only when the user explicitly asks how to control
+the pane. For later operations, answer only the current request.

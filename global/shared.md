@@ -60,6 +60,9 @@ resolve every foreseeable user-owned dependency needed to finish it: decisions,
 answers, approvals, credentials or authenticated access, external capabilities,
 and recovery choices. Gather discoverable facts yourself, then ask once for the
 remaining user input instead of starting work that is expected to stop later.
+Treat readiness as unresolved unless the current context contains concrete
+evidence that every applicable category is satisfied or not applicable. An
+approved outcome or request for autonomy alone is not readiness evidence.
 
 Verify required access without exposing secrets. When a credential or session
 may expire before completion, establish an authorized refresh or

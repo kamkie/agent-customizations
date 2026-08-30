@@ -88,7 +88,8 @@ try {
             $targetRoot = Join-Path $responseRoot $target
             $null = New-Item -ItemType Directory -Path $targetRoot -Force
             $response = [ordered]@{
-                mode = 'careful'
+                mode = 'standard'
+                autonomous = $false
                 primaryAction = 'answer-read-only'
                 publicationAuthorized = $false
                 mergeAuthorized = $false

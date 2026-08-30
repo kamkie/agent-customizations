@@ -20,6 +20,18 @@
       "prompt": "Fix one misspelled heading in a tracked Markdown file and deliver the change."
     },
     {
+      "id": "ordinary-implementation",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "Implement the approved repository change and deliver it. No elevated risk, sensitive environment, irreversible action, or unusual uncertainty is identified."
+    },
+    {
+      "id": "commit-validated-work",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The approved implementation and its required validation are complete. Create the local git commit only; do not push or open a pull request yet."
+    },
+    {
       "id": "careful-after-two-failures",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

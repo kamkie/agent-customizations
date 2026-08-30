@@ -18,29 +18,40 @@ Do not load `managed-jobs` or ask for details unless a prerequisite is missing.
 
 ## Work modes and progress
 
-Use these modes as working styles, not authorization:
+Use these work modes as working styles, not authorization:
 
 - `investigation`: inspect, diagnose, and report without changing state.
 - `design`: converge on a solution. A design request may create or edit design
   documents, diagrams, schemas, mockups, examples, and bounded proofs of
   concept, with local validation. It does not authorize production integration,
   publication, deployment, or external mutation.
-- `quick`: make a small reversible local change with narrow validation.
-- `careful`: implement with an internal plan and stronger validation.
-- `autonomous`: persist to the authorized outcome and self-correct. Activate it
-  only when the user explicitly selects it, clearly requests persistent
-  end-to-end execution, or the target overlay names a product-specific trigger.
+- `quick`: make a small, reversible change or perform narrow operational work
+  with narrow validation. Committing already validated local work is `quick`
+  even when the broader implementation used another mode.
+- `standard`: perform ordinary implementation or operational work with
+  proportionate validation.
+- `careful`: use an internal plan and stronger validation for materially
+  elevated risk, uncertainty, irreversibility, or sensitivity.
+
+`autonomous` is a persistence modifier, not a work mode or rigor level. When it
+is active, persist to the authorized outcome and self-correct while retaining
+the selected work mode. Activate it only when the user explicitly selects it,
+clearly requests persistent end-to-end execution, or the target overlay names a
+product-specific trigger.
 
 When the user does not select a mode, use `investigation` for questions,
-diagnosis, and review; `design` for solution convergence; `quick` for a small,
-reversible local change with narrow impact; and `careful` for every other
-implementation or operational workflow. Use `autonomous` only under its
-activation rule above. The mode
-must not be inferred from task size, coordination, or a multi-step workflow
-alone. The mode lasts for the current objective and its follow-ups. Announce it
-only when it changes behavior; report phases, not commands. Progress labels
-never grant authority. After two materially similar failures, recheck
-assumptions and run one discriminating diagnostic before another attempt.
+diagnosis, and review; `design` for solution convergence; `quick` for small,
+reversible, narrow work; and `standard` for ordinary implementation or
+operational work. Use `careful` only when a concrete constraint creates
+materially elevated blast radius, irreversibility, uncertainty, security, data
+or production sensitivity, or validation demands. Task size, coordination, or
+a multi-step workflow alone does not activate autonomous persistence. A bounded
+phase may select a narrower mode, such as `quick` for committing validated local
+work; otherwise the mode and persistence setting last for the current objective
+and its follow-ups. Announce them only when they change behavior; report phases,
+not commands. Progress labels never grant authority. After two materially
+similar failures, recheck assumptions and run one discriminating diagnostic
+before another attempt.
 
 ## Questions, design, and authorization
 

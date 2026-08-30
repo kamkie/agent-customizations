@@ -47,7 +47,7 @@
       "id": "autonomous-ready",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "Implement the approved repository change autonomously through delivery. Every required decision has a recorded answer and approval, all dependencies are available, the authenticated session remains valid for eight hours against a thirty-minute execution estimate, an authorized non-interactive refresh path is available, and the recovery checkpoint and owner are recorded."
+      "prompt": "Implement the approved repository change autonomously through delivery. Every required decision has a recorded answer and approval, all dependencies and external capabilities are available, the authenticated session remains valid for eight hours against a thirty-minute execution estimate, an authorized non-interactive refresh path is available, and the recovery checkpoint and owner are recorded."
     },
     {
       "id": "autonomous-expiring-session",

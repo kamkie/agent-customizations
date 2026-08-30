@@ -1374,8 +1374,13 @@ switch ($Action) {
                 $plannedCandidateIds = @($plan.candidateIds)
                 $plannedJobs = @()
                 foreach ($candidateId in $plannedCandidateIds) {
+                    $candidatePath = Get-ManagedJobFile -Id $candidateId
+                    if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
+                        $skipped += [ordered]@{ id = $candidateId; reason = 'record no longer exists or is unreadable' }
+                        continue
+                    }
                     try {
-                        $plannedJobs += Read-ManagedJob -Path (Get-ManagedJobFile -Id $candidateId)
+                        $plannedJobs += Read-ManagedJob -Path $candidatePath
                     } catch {
                         $skipped += [ordered]@{ id = $candidateId; reason = 'record no longer exists or is unreadable' }
                     }

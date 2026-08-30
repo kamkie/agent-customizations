@@ -153,6 +153,26 @@ try {
     Assert-True $invalidPlanRejected 'Prune should reject a maintenance plan whose status filter is missing.'
     Remove-Item -LiteralPath $invalidPlanPath -Force -ErrorAction SilentlyContinue
 
+    $missingPlanPath = Join-Path $maintenanceDirectory 'missing-records.json'
+    $missingPlanIds = @(1..20 | ForEach-Object { '20000101-000000-missing-plan-{0:d6}' -f $_ })
+    Write-ManagedJson -Path $missingPlanPath -Value ([ordered]@{
+        schemaVersion = 1
+        action = 'prune'
+        cutoffUtc = [datetime]::UtcNow.ToString('o')
+        statuses = @()
+        candidateIds = $missingPlanIds
+    })
+    $missingPlanTimer = [Diagnostics.Stopwatch]::StartNew()
+    $missingPlanResult = (& $controller prune -StateRoot $stateRoot -MaintenancePlan $missingPlanPath | Out-String) | ConvertFrom-Json
+    $missingPlanTimer.Stop()
+    Assert-True (
+        $missingPlanResult.plannedCandidateCount -eq $missingPlanIds.Count -and
+        $missingPlanResult.candidateCount -eq 0 -and
+        $missingPlanResult.skippedCount -eq $missingPlanIds.Count
+    ) 'Prune should report every vanished planned record as skipped.'
+    Assert-True ($missingPlanTimer.Elapsed.TotalSeconds -lt 2) `
+        "Vanished prune-plan records should skip without per-record retry delays. Elapsed: $($missingPlanTimer.Elapsed.TotalSeconds) seconds."
+
     $invalidAsyncRoot = Join-Path $testRoot 'invalid-async-state'
     $invalidAsyncRejected = $false
     try {

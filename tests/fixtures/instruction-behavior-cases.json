@@ -47,7 +47,7 @@
       "id": "autonomous-ready",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "Implement the approved repository change autonomously through delivery. The readiness preflight has verified every required decision, approval, dependency, and authenticated capability, and each session will remain valid through completion or has an authorized refresh path that needs no further user input."
+      "prompt": "Implement the approved repository change autonomously through delivery. Every required decision has a recorded answer and approval, all dependencies are available, the authenticated session remains valid for eight hours against a thirty-minute execution estimate, an authorized non-interactive refresh path is available, and the recovery checkpoint and owner are recorded."
     },
     {
       "id": "autonomous-expiring-session",
@@ -71,7 +71,7 @@
       "id": "campaign-delivery-ready",
       "targets": ["codex"],
       "instructionSet": "campaign",
-      "prompt": "Start delivery campaign APP-42. The autonomous readiness preflight has verified all decisions, approvals, actor access, dependencies, credential continuity, and recovery choices needed through handoff. The tracker lists five independent repositories, each requiring a draft pull request, CI, and opposite-agent review."
+      "prompt": "Start delivery campaign APP-42. The owner approved inventory, task and branch creation, pushes, draft pull requests, tracker updates, CI, and opposite-agent review. All decisions, dependencies, and locks are recorded; actor sessions remain valid for eight hours against a two-hour estimate; an authorized refresh path and recovery owner are available. The tracker lists five independent repositories."
     }
   ]
 }

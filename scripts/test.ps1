@@ -121,8 +121,13 @@ try {
         $target = Get-CustomizationTarget -Name $targetName
         $targetHome = if ($targetName -eq 'codex') { $codexSandbox } else { $claudeSandbox }
         $installedInstructions = Join-Path $targetHome ([string]$target.instructions.destination)
-        $expectedInstructions = Get-CustomizationInstructionContent -Target $target
-        if (-not (Test-TextContentEqual -Expected $expectedInstructions -Target $installedInstructions)) {
+        $sourceParts = foreach ($source in @($target.instructions.sources)) {
+            $sourcePath = Join-Path $PSScriptRoot "..\$source"
+            [IO.File]::ReadAllText($sourcePath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+        }
+        $expectedInstructions = ($sourceParts -join "`n`n") + "`n"
+        $actualInstructions = [IO.File]::ReadAllText($installedInstructions).Replace("`r`n", "`n")
+        if ($actualInstructions -cne $expectedInstructions) {
             throw "$($target.displayName) installation did not compose its shared and target instruction sources."
         }
     }

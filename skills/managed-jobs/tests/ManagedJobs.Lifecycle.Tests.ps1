@@ -207,7 +207,7 @@ try {
     $keepOpenResult = Get-JobStatus -Id $keepOpenId
     Assert-True ($keepOpenResult.status -eq 'failed' -and $keepOpenResult.exitCode -eq 17) 'Keep-open record should preserve the real child failure.'
 
-    # The exact encoded command used after a cold wtai handoff must start the
+    # The exact encoded command used for a shared-terminal tab must start the
     # shared host, consume the launch file, register terminal metadata, and exit.
     $encodedId = '20000101-000000-lifecycle-encoded-shared-000001'
     $encodedJobPath = Join-Path $stateRoot "jobs\$encodedId.json"

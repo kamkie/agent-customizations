@@ -596,6 +596,12 @@ switch ($Action) {
         } else {
             'foreground-bootstrap'
         }
+        if ($SharedTerminal -and -not $backgroundTerminalConnection) {
+            # Cold start: activate a new terminal window (foreground) and wait for
+            # its protocol registration; the managed tab is then created through
+            # the same verified protocol path as a warm background-tab launch.
+            $backgroundTerminalConnection = Start-IntelligentTerminalWindow -Tools $terminalTools
+        }
         Assert-SecretSafeInvocation -Arguments $Arguments -Environment $Environment
         $resolvedOwnerAgent = if ($OwnerAgent) {
             $OwnerAgent.Trim().ToLowerInvariant()
@@ -725,7 +731,7 @@ switch ($Action) {
                         '-LaunchFile', ('"' + $launchFile + '"')
                     )
                 }
-                if ($SharedTerminal -and $backgroundTerminalConnection) {
+                if ($SharedTerminal) {
                     # Once control reaches wtcli, any failure can be ambiguous: the
                     # tab may have been created before the client timed out or exited.
                     $backgroundTabMayExist = $true
@@ -735,11 +741,7 @@ switch ($Action) {
                         -WorkingDirectory $resolvedDirectory `
                         -PowerShellArguments $pwshArguments
                 } else {
-                    $terminalExecutable = if ($SharedTerminal) {
-                        $terminalTools.wtai
-                    } else {
-                        (Get-Command wt.exe -ErrorAction Stop).Source
-                    }
+                    $terminalExecutable = (Get-Command wt.exe -ErrorAction Stop).Source
                     $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
                     Start-Process -FilePath $terminalExecutable -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
                 }

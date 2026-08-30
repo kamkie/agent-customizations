@@ -118,8 +118,8 @@ try {
         $backgroundProbeError = $_.Exception.Message
     }
     Assert-True (
-        (Split-Path -Leaf $tools.wtai) -eq 'wtai.exe' -and
         (Split-Path -Leaf $tools.wtcli) -eq 'wtcli.exe' -and
+        $tools.packageFamilyName -eq 'Microsoft.IntelligentTerminal_8wekyb3d8bbwe' -and
         [version]$tools.packageVersion -ge [version]'0.2.2192.0'
     ) 'Shared-terminal tools should resolve from the installed Microsoft package.'
     $recordedTools = Resolve-RecordedIntelligentTerminalTools -Job ([pscustomobject]@{
@@ -136,8 +136,7 @@ try {
                 -Executable $pwsh -Visible -SharedTerminal -RequireBackgroundTab | Out-Null
         } catch {
             $backgroundRequirementRejected = $_.Exception.Message -match (
-                'already-running Microsoft Intelligent Terminal window|' +
-                'could not be verified; refusing a focus-stealing foreground fallback'
+                'already-running Microsoft Intelligent Terminal window'
             )
         }
         Assert-True $backgroundRequirementRejected `

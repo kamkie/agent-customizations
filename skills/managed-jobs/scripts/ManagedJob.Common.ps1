@@ -271,9 +271,10 @@ function Resolve-IntelligentTerminalTools {
     $resolved = [ordered]@{
         packageVersion = [string]$package.Version
         packageRoot = $packageRoot
+        packageFamilyName = [string]$package.PackageFamilyName
         comClsid = '{A2E4F6B8-1C3D-4E5F-A6B7-C8D9E0F1A2B3}'
     }
-    foreach ($leaf in @('wtai.exe', 'wtcli.exe')) {
+    foreach ($leaf in @('wtcli.exe')) {
         $candidate = [IO.Path]::GetFullPath((Join-Path $packageRoot $leaf))
         if (-not $candidate.StartsWith($packagePrefix, [StringComparison]::OrdinalIgnoreCase) -or
             -not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
@@ -396,13 +397,13 @@ function Invoke-IntelligentTerminalCliProcess {
     }
 }
 
-function Get-LiveIntelligentTerminalConnection {
+function Get-IntelligentTerminalPackageProcesses {
     param([Parameter(Mandatory)]$Tools)
 
     $packagePrefix = [IO.Path]::TrimEndingDirectorySeparator(
         [IO.Path]::GetFullPath([string]$Tools.packageRoot)
     ) + [IO.Path]::DirectorySeparatorChar
-    $packageProcess = Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
+    return @(Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
         Where-Object {
             try {
                 $_.Path -and
@@ -413,27 +414,63 @@ function Get-LiveIntelligentTerminalConnection {
             } catch {
                 $false
             }
-        } |
-        Select-Object -First 1
-    if (-not $packageProcess) { return $null }
+        })
+}
 
+function Get-LiveIntelligentTerminalConnection {
+    param([Parameter(Mandatory)]$Tools)
+
+    $packageProcesses = Get-IntelligentTerminalPackageProcesses -Tools $Tools
+    if (-not $packageProcesses) { return $null }
+
+    $windowCount = $null
     try {
         $probe = Invoke-IntelligentTerminalCliProcess `
             -Tools $Tools `
             -ComClsid $Tools.comClsid `
             -Arguments @('--json', 'list-windows')
-        if ($probe.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
-            throw 'protocol probe failed'
+        if ($probe.exitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
+            $windowCount = @(($probe.standardOutput | ConvertFrom-Json).windows).Count
         }
-        $payload = $probe.standardOutput | ConvertFrom-Json
-        if (@($payload.windows).Count -eq 0) { throw 'no live protocol windows were returned' }
+    } catch {}
+    if ($windowCount -ge 1) {
         return [pscustomobject]@{
             tools = $Tools
             comClsid = ([guid]$Tools.comClsid).ToString('B')
         }
-    } catch {
-        throw 'A running Microsoft Intelligent Terminal instance could not be verified; refusing a focus-stealing foreground fallback.'
     }
+
+    # No protocol-registered window. Process-level signals (main window handle,
+    # window title) are unreliable for WindowsTerminal.exe, so the controller
+    # never guesses which process is live and never stops one. The cold-start
+    # bootstrap resolves this state without touching existing processes.
+    return $null
+}
+
+function Start-IntelligentTerminalWindow {
+    param(
+        [Parameter(Mandatory)]$Tools,
+        [ValidateRange(5, 120)][int]$TimeoutSeconds = 30
+    )
+
+    # wtai.exe silently fails to open a window on recent package versions, and a
+    # window it does open is not protocol-registered. Shell activation of the
+    # packaged app is the only bootstrap that yields a protocol-usable window.
+    Start-Process -FilePath 'explorer.exe' `
+        -ArgumentList ('shell:AppsFolder\{0}!App' -f $Tools.packageFamilyName) | Out-Null
+    $deadline = [datetime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        Start-Sleep -Milliseconds 500
+        $connection = Get-LiveIntelligentTerminalConnection -Tools $Tools
+        if ($connection) { return $connection }
+    } while ([datetime]::UtcNow -lt $deadline)
+    $leftoverIds = @(Get-IntelligentTerminalPackageProcesses -Tools $Tools | ForEach-Object { $_.Id })
+    $detail = if ($leftoverIds) {
+        ' A leftover terminal process may be blocking activation; close or stop PID {0} and retry.' -f ($leftoverIds -join ', ')
+    } else {
+        ''
+    }
+    throw "The Microsoft Intelligent Terminal window did not register with the terminal protocol before the bootstrap deadline.$detail"
 }
 
 function Get-ManagedJobHostPowerShellArguments {

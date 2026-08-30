@@ -50,24 +50,32 @@ active jobs and does not close a kept-open terminal after its job is complete.
 ### Shared terminal
 
 Add `-SharedTerminal` only with `-Visible` when both the user and agent need the
-same managed pane. Shared mode resolves `wtai.exe` and `wtcli.exe` directly from
+same managed pane. Shared mode resolves `wtcli.exe` directly from
 the installed `Microsoft.IntelligentTerminal` Store package (version
 0.2.2192.0 or newer); it does not trust a PATH alias. The in-pane host records
 its `WT_SESSION` and `WT_COM_CLSID` in the job's separate local control file.
 Those identifiers are never returned by `start` or `status` and are never
 written to the ordinary managed log.
 
-If that exact package already has a live window, shared launch uses its packaged
-`wtcli new-tab` protocol path. Version 0.2 creates protocol tabs in the
-background, so the user's foreground window and active pane remain unchanged.
-The controller verifies the returned session id against the session registered
-by the managed host. With no live window, shared launch uses `wtai.exe` as a
-foreground bootstrap. Add `-RequireBackgroundTab` to reject that cold-start
-fallback when focus preservation is mandatory.
+If that exact package already has a live protocol-registered window, shared
+launch uses its packaged `wtcli new-tab` protocol path. Version 0.2 creates
+protocol tabs in the background, so the user's foreground window and active
+pane remain unchanged. The controller verifies the returned session id against
+the session registered by the managed host. With no live window, shared launch
+shell-activates the packaged app, which opens a new foreground window, waits
+for that window to register with the terminal protocol, and then creates the
+managed tab through the same verified `wtcli new-tab` path. `wtai.exe` is not
+used: on recent package versions it silently fails to open a window, and a
+window it does open is not protocol-registered. Add `-RequireBackgroundTab` to
+reject the focus-taking cold start when focus preservation is mandatory.
 
-The foreground bootstrap is used only when no process from the exact package is
-running. If a matching process exists but its protocol probe fails, launch fails
-closed instead of silently taking focus.
+Process-level signals such as the main window handle are unreliable for
+`WindowsTerminal.exe`, so the controller never guesses whether an existing
+package process is live and never stops one. When the protocol reports no
+window, cold start shell-activates the app regardless of leftover processes;
+if no registered window appears before the bootstrap deadline, the launch
+fails with the leftover process ids so the user can close or stop them
+deliberately.
 
 The controller accepts only the managed job id. `capture`, `send-input`, and
 `send-key` load and validate that job's host identity, Job Object containment,

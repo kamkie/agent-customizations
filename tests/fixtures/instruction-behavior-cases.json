@@ -66,6 +66,12 @@
       "targets": ["codex"],
       "instructionSet": "campaign",
       "prompt": "Start delivery campaign APP-42. The tracker lists five independent repositories. Each requires a draft pull request, CI, and opposite-agent review before human handoff. The request says nothing about merging or deployment."
+    },
+    {
+      "id": "campaign-delivery-ready",
+      "targets": ["codex"],
+      "instructionSet": "campaign",
+      "prompt": "Start delivery campaign APP-42. The autonomous readiness preflight has verified all decisions, approvals, actor access, dependencies, credential continuity, and recovery choices needed through handoff. The tracker lists five independent repositories, each requiring a draft pull request, CI, and opposite-agent review."
     }
   ]
 }

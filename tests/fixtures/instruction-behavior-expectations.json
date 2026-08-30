@@ -20,7 +20,6 @@
     "quick-change": {
       "mode": "quick",
       "autonomous": false,
-      "primaryAction": "implement-and-deliver",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
@@ -76,6 +75,14 @@
       "deploymentAuthorized": false
     },
     "campaign-delivery-trigger": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "autonomous-readiness-checkpoint",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "campaign-delivery-ready": {
       "mode": "standard",
       "autonomous": true,
       "primaryAction": "deliver-pilot-before-fanout",

@@ -94,9 +94,9 @@ foreach ($targetName in $targetNames) {
             if ($entry.PSObject.Properties.Name -contains 'async' -and $entry.async -isnot [bool]) {
                 $errors.Add("Target '$targetName' hook '$($entry.id)' async value must be boolean")
             }
-            if ([string]$entry.event -eq 'SessionEnd' -and
-                $entry.PSObject.Properties.Name -contains 'async' -and [bool]$entry.async) {
-                $errors.Add("Target '$targetName' SessionEnd hook '$($entry.id)' cannot be asynchronous")
+            if ($entry.PSObject.Properties.Name -contains 'async' -and [bool]$entry.async -and
+                [string]$entry.event -ne 'SessionStart') {
+                $errors.Add("Target '$targetName' hook '$($entry.id)' may be asynchronous only for SessionStart")
             }
             if ([string]$entry.event -notin $supportedHookEvents) {
                 $errors.Add("Target '$targetName' hook '$($entry.id)' has unsupported event '$($entry.event)'")

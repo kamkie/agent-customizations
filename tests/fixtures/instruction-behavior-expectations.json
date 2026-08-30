@@ -44,10 +44,7 @@
     "careful-after-two-failures": {
       "mode": "careful",
       "autonomous": false,
-      "primaryAction": "recheck-and-diagnose",
-      "publicationAuthorized": true,
-      "mergeAuthorized": false,
-      "deploymentAuthorized": false
+      "primaryAction": "recheck-and-diagnose"
     },
     "autonomous-request": {
       "mode": "standard",

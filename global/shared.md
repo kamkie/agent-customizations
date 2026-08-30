@@ -27,8 +27,8 @@ Use these modes as working styles, not authorization:
 - `quick`: make a small reversible local change with narrow validation.
 - `careful`: implement with an internal plan and stronger validation.
 - `autonomous`: persist to the authorized outcome and self-correct. Activate it
-  only when the user explicitly selects it or clearly requests persistent
-  end-to-end execution.
+  only when the user explicitly selects it, clearly requests persistent
+  end-to-end execution, or the target overlay names a product-specific trigger.
 
 Infer the first four modes when none is selected. A mode lasts for the current
 objective and its follow-ups. Announce it only when it materially affects the

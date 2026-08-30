@@ -169,6 +169,13 @@ structured logs when stream separation matters.
 & $jobs logs -Id <job-id> -Follow
 ```
 
+Normal `start`, `list`, and collection `status` calls reconcile records whose
+stored state is `starting` or `running`; they do not repair inactive historical
+records. Run the explicit `reconcile` action after an interruption or restart
+when inactive owner references or shared-terminal control records may also need
+cleanup. Prefer `status -Id <job-id>` when the caller already has the returned
+job id because it reads and reconciles only that record.
+
 Structured status includes the expected PID/start time, current snapshot when
 relevant, and identity-match result.
 

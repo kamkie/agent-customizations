@@ -16,11 +16,10 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 ## Happy path
 
 ```powershell
-& $jobs reconcile
-& $jobs start -Name api -Executable dotnet -Arguments @('run') -WorkingDirectory $repo
-& $jobs list -Status running,starting -Json
-& $jobs status -Id <job-id>
-& $jobs logs -Id <job-id> -Tail 100
+$job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
+    -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
+& $jobs status -Id $job.id
+& $jobs logs -Id $job.id -Tail 100
 ```
 
 - Keep short commands attached to the active agent tool call.
@@ -30,7 +29,12 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
   turn. Use `-Lifetime Session` only when the process must remain available
   across turns, and use `-Lifetime Persistent` only when it must intentionally
   survive the session.
-- Reconcile after restarts and reuse an equivalent active job.
+- When recovering surviving work after an interruption or agent/controller
+  restart, reconcile once, then reuse an equivalent active job. Do not
+  reconcile before every launch.
+- Use the structured result returned by `start` for normal handoff. Do not
+  follow it with a global `list`; use `status -Id $job.id` when targeted
+  confirmation is useful.
 - For a local HTTP service, use the readiness gate before handing its URL to
   downstream work. The probe URL must use HTTP(S), target loopback, and contain
   no credentials, query, or fragment.
@@ -72,6 +76,10 @@ $job = (& $jobs start -Name console -Executable pwsh.exe `
 & $jobs send-key -Id $job.id -Key Enter
 & $jobs send-key -Id $job.id -Key 'Ctrl+C'
 ```
+
+For a normal shared-terminal launch, use the returned `$job` directly. Do not
+run a global `reconcile` or `list` before or after it; use
+`status -Id $job.id` only when targeted confirmation is needed.
 
 Add `-RequireBackgroundTab` when focus must not change. It fails instead of
 performing the foreground bootstrap when no protocol-registered Intelligent

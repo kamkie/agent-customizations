@@ -271,9 +271,10 @@ function Resolve-IntelligentTerminalTools {
     $resolved = [ordered]@{
         packageVersion = [string]$package.Version
         packageRoot = $packageRoot
+        packageFamilyName = [string]$package.PackageFamilyName
         comClsid = '{A2E4F6B8-1C3D-4E5F-A6B7-C8D9E0F1A2B3}'
     }
-    foreach ($leaf in @('wtai.exe', 'wtcli.exe')) {
+    foreach ($leaf in @('wtcli.exe')) {
         $candidate = [IO.Path]::GetFullPath((Join-Path $packageRoot $leaf))
         if (-not $candidate.StartsWith($packagePrefix, [StringComparison]::OrdinalIgnoreCase) -or
             -not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
@@ -396,13 +397,13 @@ function Invoke-IntelligentTerminalCliProcess {
     }
 }
 
-function Get-LiveIntelligentTerminalConnection {
+function Get-IntelligentTerminalPackageProcesses {
     param([Parameter(Mandatory)]$Tools)
 
     $packagePrefix = [IO.Path]::TrimEndingDirectorySeparator(
         [IO.Path]::GetFullPath([string]$Tools.packageRoot)
     ) + [IO.Path]::DirectorySeparatorChar
-    $packageProcess = Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
+    return @(Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
         Where-Object {
             try {
                 $_.Path -and
@@ -413,27 +414,89 @@ function Get-LiveIntelligentTerminalConnection {
             } catch {
                 $false
             }
-        } |
-        Select-Object -First 1
-    if (-not $packageProcess) { return $null }
+        })
+}
 
-    try {
-        $probe = Invoke-IntelligentTerminalCliProcess `
-            -Tools $Tools `
-            -ComClsid $Tools.comClsid `
-            -Arguments @('--json', 'list-windows')
-        if ($probe.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
-            throw 'protocol probe failed'
+function Get-LiveIntelligentTerminalConnection {
+    param([Parameter(Mandatory)]$Tools)
+
+    $packageProcesses = Get-IntelligentTerminalPackageProcesses -Tools $Tools
+    if (-not $packageProcesses) { return $null }
+
+    # Only an explicit successful zero-window response may report the terminal
+    # as absent: a timed-out, failed, or malformed probe against a running
+    # process must not trigger the focus-taking cold start.
+    $lastProbeError = $null
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        if ($attempt -gt 1) { Start-Sleep -Milliseconds 300 }
+        try {
+            $probe = Invoke-IntelligentTerminalCliProcess `
+                -Tools $Tools `
+                -ComClsid $Tools.comClsid `
+                -Arguments @('--json', 'list-windows') `
+                -TimeoutSeconds 5
+            if ($probe.exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($probe.standardOutput)) {
+                throw ('the list-windows probe exited with code {0}' -f $probe.exitCode)
+            }
+            $payload = $probe.standardOutput | ConvertFrom-Json
+            if ($payload.PSObject.Properties.Name -notcontains 'windows' -or
+                $payload.windows -isnot [array]) {
+                throw 'the list-windows probe returned an unexpected payload shape'
+            }
+            $windowCount = @($payload.windows).Count
+        } catch {
+            $lastProbeError = $_.Exception.Message
+            continue
         }
-        $payload = $probe.standardOutput | ConvertFrom-Json
-        if (@($payload.windows).Count -eq 0) { throw 'no live protocol windows were returned' }
-        return [pscustomobject]@{
-            tools = $Tools
-            comClsid = ([guid]$Tools.comClsid).ToString('B')
+        if ($windowCount -ge 1) {
+            return [pscustomobject]@{
+                tools = $Tools
+                comClsid = ([guid]$Tools.comClsid).ToString('B')
+            }
         }
-    } catch {
-        throw 'A running Microsoft Intelligent Terminal instance could not be verified; refusing a focus-stealing foreground fallback.'
+        # Verified: the protocol answered with zero windows. Process-level
+        # signals (main window handle, window title) are unreliable for
+        # WindowsTerminal.exe, so the controller never guesses which process is
+        # live and never stops one; the cold-start bootstrap resolves this
+        # state without touching existing processes.
+        return $null
     }
+    throw ('The Intelligent Terminal protocol probe kept failing while package processes are running: {0}' -f $lastProbeError)
+}
+
+function Start-IntelligentTerminalWindow {
+    param(
+        [Parameter(Mandatory)]$Tools,
+        [ValidateRange(5, 120)][int]$TimeoutSeconds = 30
+    )
+
+    # wtai.exe silently fails to open a window on recent package versions, and a
+    # window it does open is not protocol-registered. Shell activation of the
+    # packaged app is the only bootstrap that yields a protocol-usable window.
+    Start-Process -FilePath 'explorer.exe' `
+        -ArgumentList ('shell:AppsFolder\{0}!App' -f $Tools.packageFamilyName) | Out-Null
+    $deadline = [datetime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $lastProbeError = $null
+    do {
+        Start-Sleep -Milliseconds 500
+        try {
+            $connection = Get-LiveIntelligentTerminalConnection -Tools $Tools
+            if ($connection) { return $connection }
+        } catch {
+            # The window may still be starting its protocol server; keep the
+            # last probe failure for the final diagnostic.
+            $lastProbeError = $_.Exception.Message
+        }
+    } while ([datetime]::UtcNow -lt $deadline)
+    $leftoverIds = @(Get-IntelligentTerminalPackageProcesses -Tools $Tools | ForEach-Object { $_.Id })
+    $detail = ''
+    if ($leftoverIds) {
+        $detail += ' A leftover terminal process may be blocking activation; close or stop PID {0} and retry.' -f ($leftoverIds -join ', ')
+    }
+    if ($lastProbeError) {
+        $detail += " Last probe failure: $lastProbeError"
+    }
+    throw "The Microsoft Intelligent Terminal window did not register with the terminal protocol before the bootstrap deadline.$detail"
 }
 
 function Get-ManagedJobHostPowerShellArguments {

@@ -60,7 +60,8 @@ Microsoft Intelligent Terminal package and keeps every controller action scoped
 to the pane registered by that managed job. When Intelligent Terminal is
 already running, the controller creates the managed pane as a background tab
 without changing the user's foreground window or active pane. Otherwise it
-falls back to a foreground `wtai.exe` bootstrap:
+shell-activates a new terminal window (foreground), waits for its protocol
+registration, and creates the managed tab through the same protocol path:
 
 ```powershell
 $job = (& $jobs start -Name console -Executable pwsh.exe `
@@ -73,8 +74,10 @@ $job = (& $jobs start -Name console -Executable pwsh.exe `
 ```
 
 Add `-RequireBackgroundTab` when focus must not change. It fails instead of
-performing the foreground bootstrap when no Intelligent Terminal window is
-already running.
+performing the foreground bootstrap when no protocol-registered Intelligent
+Terminal window exists. The controller never stops an existing terminal
+process; if activation cannot produce a registered window before the bootstrap
+deadline, the launch fails with the leftover PID so the user can close it.
 
 `send-input` is literal and is only for known non-secret text. Never send an
 authentication secret through the controller; the user must type it directly

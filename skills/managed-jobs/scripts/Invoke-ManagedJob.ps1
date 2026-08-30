@@ -709,6 +709,36 @@ switch ($Action) {
             Write-ManagedJson -Path $launchFile -Value $launch
             $hostScript = Join-Path $PSScriptRoot 'ManagedJob.Host.ps1'
 
+            # The durable record now reserves this invocation fingerprint against
+            # concurrent duplicates, so the launch lock is released instead of
+            # being held through the slow cold-start bootstrap below.
+            $lock.Dispose()
+            $lock = $null
+            if ($SharedTerminal -and -not $backgroundTerminalConnection) {
+                # Cold start opens a user-visible window, so it runs only after
+                # validation succeeded and this request's record was reserved. A
+                # dedicated lock serializes concurrent cold starts, and its
+                # holder re-probes first so they reuse one activated window
+                # instead of opening several.
+                $bootstrapLockPath = Join-Path $root '.bootstrap.lock'
+                $bootstrapLock = $null
+                $bootstrapDeadline = [datetime]::UtcNow.AddSeconds(60)
+                do {
+                    try { $bootstrapLock = [IO.File]::Open($bootstrapLockPath, 'OpenOrCreate', 'ReadWrite', 'None') } catch [IO.IOException] {
+                        if ([datetime]::UtcNow -ge $bootstrapDeadline) { throw 'Timed out waiting for the shared-terminal bootstrap lock.' }
+                        Start-Sleep -Milliseconds 200
+                    }
+                } until ($bootstrapLock)
+                try {
+                    $backgroundTerminalConnection = Get-LiveIntelligentTerminalConnection -Tools $terminalTools
+                    if (-not $backgroundTerminalConnection) {
+                        $backgroundTerminalConnection = Start-IntelligentTerminalWindow -Tools $terminalTools
+                    }
+                } finally {
+                    $bootstrapLock.Dispose()
+                }
+            }
+
             if ($Visible) {
                 $pwshArguments = if ($SharedTerminal) {
                     Get-ManagedJobHostPowerShellArguments `
@@ -725,7 +755,7 @@ switch ($Action) {
                         '-LaunchFile', ('"' + $launchFile + '"')
                     )
                 }
-                if ($SharedTerminal -and $backgroundTerminalConnection) {
+                if ($SharedTerminal) {
                     # Once control reaches wtcli, any failure can be ambiguous: the
                     # tab may have been created before the client timed out or exited.
                     $backgroundTabMayExist = $true
@@ -735,11 +765,7 @@ switch ($Action) {
                         -WorkingDirectory $resolvedDirectory `
                         -PowerShellArguments $pwshArguments
                 } else {
-                    $terminalExecutable = if ($SharedTerminal) {
-                        $terminalTools.wtai
-                    } else {
-                        (Get-Command wt.exe -ErrorAction Stop).Source
-                    }
+                    $terminalExecutable = (Get-Command wt.exe -ErrorAction Stop).Source
                     $terminalArguments = @('-w', 'managed-jobs', 'new-tab', '--title', $Name, 'pwsh.exe') + $pwshArguments
                     Start-Process -FilePath $terminalExecutable -ArgumentList $terminalArguments -WindowStyle Hidden | Out-Null
                 }

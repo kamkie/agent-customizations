@@ -430,6 +430,13 @@ function Resolve-PowerShellTerminalProfile {
             ''
         }
         $hasProfileId = [guid]::TryParse($profileIdText, [ref]$profileId)
+        if (-not $hasProfileId) {
+            $matchingNames = @($profiles | Where-Object {
+                $_.PSObject.Properties.Name -contains 'name' -and
+                [string]$_.name -eq [string]$profile.name
+            })
+            if ($matchingNames.Count -ne 1 -or [string]$profile.name -match '^-') { return $null }
+        }
         return [pscustomobject]@{
             name = [string]$profile.name
             id = if ($hasProfileId) { $profileId.ToString('B') } else { $null }

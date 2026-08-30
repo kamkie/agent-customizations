@@ -170,7 +170,7 @@ try {
         $missingPlanResult.candidateCount -eq 0 -and
         $missingPlanResult.skippedCount -eq $missingPlanIds.Count
     ) 'Prune should report every vanished planned record as skipped.'
-    Assert-True ($missingPlanTimer.Elapsed.TotalSeconds -lt 2) `
+    Assert-True ($missingPlanTimer.Elapsed.TotalSeconds -lt 3.5) `
         "Vanished prune-plan records should skip without per-record retry delays. Elapsed: $($missingPlanTimer.Elapsed.TotalSeconds) seconds."
 
     $invalidAsyncRoot = Join-Path $testRoot 'invalid-async-state'

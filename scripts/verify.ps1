@@ -58,7 +58,8 @@ foreach ($targetName in $targetNames) {
     if ([string]::IsNullOrWhiteSpace([string]$target.instructions.destination)) {
         $errors.Add("Target '$targetName' instructions have no destination")
     }
-    $instructionSources = @($target.instructions.sources)
+    $sourcesProperty = $target.instructions.PSObject.Properties['sources']
+    $instructionSources = if ($sourcesProperty) { @($sourcesProperty.Value) } else { @() }
     if ($instructionSources.Count -eq 0) {
         $errors.Add("Target '$targetName' instructions have no sources")
     }

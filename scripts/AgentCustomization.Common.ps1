@@ -90,8 +90,12 @@ function Get-CustomizationInstructionContent {
     param([Parameter(Mandatory)]$Target)
 
     $repositoryRoot = Get-CustomizationRepositoryRoot
+    $sourcesProperty = $Target.instructions.PSObject.Properties['sources']
+    if (-not $sourcesProperty) { throw 'Instruction source list is missing.' }
+    $sources = @($sourcesProperty.Value)
+    if ($sources.Count -eq 0) { throw 'Instruction source list is empty.' }
     $parts = [Collections.Generic.List[string]]::new()
-    foreach ($source in @($Target.instructions.sources)) {
+    foreach ($source in $sources) {
         $sourcePath = Join-Path $repositoryRoot ([string]$source)
         if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
             throw "Instruction source not found: $source"
@@ -102,7 +106,6 @@ function Get-CustomizationInstructionContent {
         }
         $parts.Add($content)
     }
-    if ($parts.Count -eq 0) { throw 'Instruction source list is empty.' }
     return ($parts -join "`n`n") + "`n"
 }
 

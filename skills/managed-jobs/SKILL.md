@@ -1,6 +1,6 @@
 ---
 name: managed-jobs
-description: Contain, run, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
+description: Contain, run, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes, optional visible output, and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
 ---
 
 # Managed Jobs
@@ -29,6 +29,8 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
   `-Lifetime Session` only across turns and `Persistent` only across sessions.
 - Use the returned job instead of a global `list`; target `status` when needed.
 - Treat arguments, environment values, records, and logs as non-secret.
+- Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen`
+  leaves a completed terminal for the user to close manually.
 - Never replace this controller with a detached/background launch. Use
   `claude-runner` for Claude session, resume, and review behavior.
 
@@ -62,6 +64,10 @@ The installed session hook owns global reconciliation. Run synchronous
 `reconcile` only to retry a reported hook failure. Preview destructive cleanup
 with `prune -OlderThanDays 14 -WhatIf`, obtain explicit authorization for the
 reported scope, then run the same command without `-WhatIf`.
+
+Set `MANAGED_JOBS_ROOT` before starting either agent when they must share a
+non-default registry. One-off `-StateRoot` overrides are only for persistent
+jobs; turn and session jobs must remain visible to their cleanup hooks.
 
 The HTTP readiness workflow adapts Open Mercato's
 `om-prepare-test-env` under the MIT License; see

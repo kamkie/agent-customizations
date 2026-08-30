@@ -106,14 +106,16 @@ try {
         throw 'The instruction behavior scorer rejected matching responses: ' + ($passOutput -join ' ')
     }
 
-    $firstCase = $cases.cases[0]
-    $firstTarget = $firstCase.targets[0]
-    $firstResponse = Join-Path (Join-Path $responseRoot $firstTarget) ($firstCase.id + '.json')
-    $mutated = Get-Content -LiteralPath $firstResponse -Raw | ConvertFrom-Json
-    $mutated.publicationAuthorized = 'false'
-    $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $firstResponse -Encoding utf8
+    $negativeCase = $cases.cases | Where-Object id -eq 'capability-question' | Select-Object -First 1
+    if (-not $negativeCase) { throw 'The scorer negative controls require the capability-question case.' }
+    $negativeExpectation = $expectations.expectations.PSObject.Properties[$negativeCase.id].Value
+    $negativeTarget = $negativeCase.targets[0]
+    $negativeResponse = Join-Path (Join-Path $responseRoot $negativeTarget) ($negativeCase.id + '.json')
+    $mutated = Get-Content -LiteralPath $negativeResponse -Raw | ConvertFrom-Json
+    $mutated.publicationAuthorized = [string]$negativeExpectation.publicationAuthorized
+    $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeResponse -Encoding utf8
 
-    $failOutput = @(& pwsh -NoProfile -File $runner -Target $firstTarget -CaseId $firstCase.id -ResponseDirectory $responseRoot 2>&1)
+    $failOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot 2>&1)
     if ($LASTEXITCODE -eq 0) {
         throw 'The instruction behavior scorer accepted a deliberately incorrect response.'
     }
@@ -121,20 +123,22 @@ try {
         throw 'The instruction behavior scorer did not report the supplied response type violation.'
     }
 
-    $mutated.publicationAuthorized = $false
+    $mutated.publicationAuthorized = $negativeExpectation.publicationAuthorized
     $mutated.mode = $null
-    $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $firstResponse -Encoding utf8
-    $nullOutput = @(& pwsh -NoProfile -File $runner -Target $firstTarget -CaseId $firstCase.id -ResponseDirectory $responseRoot 2>&1)
+    $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeResponse -Encoding utf8
+    $nullOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot 2>&1)
     if ($LASTEXITCODE -eq 0 -or ($nullOutput -join ' ') -notmatch 'mode must be string, got null') {
         throw 'The instruction behavior scorer did not report a null response value as a contract violation.'
     }
 
-    $mutated.mode = 'investigation'
-    $mutated.publicationAuthorized = $true
-    $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $firstResponse -Encoding utf8
-    $valueOutput = @(& pwsh -NoProfile -File $runner -Target $firstTarget -CaseId $firstCase.id -ResponseDirectory $responseRoot 2>&1)
+    $mutated.mode = $negativeExpectation.mode
+    $wrongPublication = -not [bool]$negativeExpectation.publicationAuthorized
+    $mutated.publicationAuthorized = $wrongPublication
+    $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeResponse -Encoding utf8
+    $valueOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot 2>&1)
+    $valueMismatch = "publicationAuthorized: expected '$($negativeExpectation.publicationAuthorized)', got '$wrongPublication'"
     if ($LASTEXITCODE -eq 0 -or
-        ($valueOutput -join ' ') -notmatch "publicationAuthorized: expected 'False', got 'True'") {
+        ($valueOutput -join ' ') -notmatch [regex]::Escape($valueMismatch)) {
         throw 'The instruction behavior scorer did not reject a correctly typed wrong value.'
     }
 } finally {

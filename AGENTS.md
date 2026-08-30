@@ -6,8 +6,8 @@ Code configuration directories are deployment targets, not editing locations.
 
 ## Working rules
 
-- Keep target-specific global guidance in `global/` and each skill inside its
-  own `skills/<name>/` directory.
+- Keep shared global guidance in `global/shared.md`, target-specific guidance in
+  the matching overlay, and each skill inside its own `skills/<name>/` directory.
 - Classify new guidance using [`docs/customization-ownership.md`](docs/customization-ownership.md)
   before adding it. Reusable skills own repeated workflows and discover
   repository policy; they do not embed repository-specific contracts.
@@ -40,7 +40,8 @@ unless a portable, reviewable installation mechanism is added deliberately.
   change authorizes the complete delivery workflow below unless the user limits
   the requested terminal state. The user does not need to repeat commit, push,
   pull-request, cross-review, or readiness steps.
-- While the temporary bot-unavailable rule below is active, a pull request
+- While the [temporary bot-unavailable rule](docs/temporary-bot-unavailable.md)
+  is active, a pull request
   authored by `kamkie` requires a new explicit `merge PR <number> at <sha>`
   instruction after readiness. General implementation authority stops at the
   ready pull request because GitHub cannot record owner approval on a
@@ -78,30 +79,13 @@ unless a portable, reviewable installation mechanism is added deliberately.
 - Commit intentionally on the agent-owned branch and push it. Report every
   validation command that could not run, why, and the remaining risk.
 
-### Open the draft pull request while the bot is unavailable
+### Apply the temporary pull-request policy when active
 
-`kamkie` is the repository owner, reviewer, approver, and administrator.
-`kamkie-codex-bot` is temporarily unavailable. Do not attempt to retrieve,
-restore, or use its GitHub CLI credential until this notice is removed.
-
-Until then, `kamkie` opens all agent-authored pull requests and performs
-author-side mutations. It executes merges only after applicable current-head
-authorization. Commits and pushes may continue to use the configured Git/SSH
-credentials because PR authorship is determined by the credential that creates
-the PR.
-
-Before PR creation or an author-side mutation, verify the effective login:
-
-```powershell
-if ((gh api user --jq .login) -ne 'kamkie') {
-    throw 'Expected the kamkie GitHub identity while the bot is unavailable.'
-}
-gh pr create --draft # supply the task-specific base, head, title, and body
-```
-
-Do not print authentication tokens, place them in repository files or process
-arguments, or globally switch the active GitHub account. If the effective login
-is not `kamkie`, stop before the mutation and report the exact blocker.
+Immediately before pull-request creation or another author-side mutation, read
+the complete [temporary bot-unavailable policy](docs/temporary-bot-unavailable.md).
+It owns the current GitHub actor, credential boundary, draft creation rule, and
+owner-authored exact-head authorization gate. Do not load it for work that has
+not reached an author-side mutation.
 
 ### Cross-review before human handoff
 
@@ -142,16 +126,10 @@ After a review is recorded, a commit is pushed, or the PR is marked ready,
 re-fetch the PR's head SHA, thread-aware unresolved feedback, latest reviews,
 required checks, draft state, mergeability, and blocking-review state.
 
-- For a pull request not authored by `kamkie`, owner approval is valid only when
-  the latest `kamkie` approval applies to the current head SHA. Never
-  manufacture approval with a stored owner credential or reuse approval from an
-  earlier commit.
-- A pull request authored by `kamkie` during the temporary bot outage cannot
-  receive owner self-approval. After every other gate passes, report the exact
-  current head and leave the pull request unmerged until the user explicitly
-  instructs `merge PR <number> at <sha>`. That exact-head instruction replaces
-  only the unavailable self-review; it does not waive cross-review, triage,
-  checks, readiness, or clean mergeability.
+- Apply the active owner-authorization rule. While the temporary bot-unavailable
+  policy is active, use its exact current-head gate; otherwise require the latest
+  owner approval to apply to the current head. Never manufacture or reuse stale
+  approval.
 - When applicable current-head owner authorization exists and cross-review,
   triage, required checks, non-draft state, and clean mergeability all pass,
   merge immediately as `kamkie` with the repository's merge-commit method and
@@ -168,9 +146,11 @@ required checks, draft state, mergeability, and blocking-review state.
 ### Delegated work inherits the whole workflow
 
 Prompts for background tasks, visible Codex tasks, subagents, or other agent CLIs
-must include this full terminal contract. "Implement and test" is not a complete
-delegation. A branch task is unfinished until its branch is pushed, its draft PR
-exists, cross-review is recorded, findings are triaged, and its exact ready,
-blocked, auto-merge, or merged state is verified. When a delegated task stops
-short, the coordinating agent completes the missing handoff steps instead of
-asking the user to repeat them.
+must include this full terminal contract. For another repository, discover and
+inject its exact branch, commit, push, PR/MR, CI, review, readiness, merge, and
+deployment rules. "Implement and test" is not a complete delegation. A local
+commit or hidden worktree is intermediate state, not delivery. A branch task is
+unfinished until its branch is pushed, its draft PR exists, cross-review is
+recorded, findings are triaged, and its exact ready, blocked, auto-merge, or
+merged state is verified. When delegated work stops short, the coordinator
+completes the missing handoff instead of asking the user to repeat authority.

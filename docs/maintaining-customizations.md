@@ -12,6 +12,8 @@ which remains authoritative for deciding where a rule belongs.
 2. Read the complete canonical instruction or `SKILL.md`, every reference
    required by the changed behavior, and the relevant target mapping in
    `config/manifest.json` before editing.
+   For global guidance, read `global/shared.md` and the applicable target
+   overlay; the installed instruction is their ordered composition.
 3. Classify each new or changed rule by ownership. Keep stable personal defaults
    in global guidance, repeated portable workflows in skills, and repository
    contracts in the repository that owns them.

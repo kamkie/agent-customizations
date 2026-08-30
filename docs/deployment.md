@@ -107,9 +107,11 @@ detached, or non-`main` checkouts by default. `-AllowDirty` and
 `-AllowNonMain` are explicit safeguards for exceptional use; they do not grant
 deployment authorization.
 
-Only drifted managed files are replaced. Existing files are backed up under a
-timestamped `customization-backups` directory in the selected target home, and
-the installer checks for remaining drift before it succeeds.
+Only drifted managed files are replaced. The installer composes each target's
+ordered shared and overlay instruction sources into its destination file.
+Existing files are backed up under a timestamped `customization-backups`
+directory in the selected target home, and the installer checks for remaining
+drift before it succeeds.
 
 ## Apply hook changes
 
@@ -126,7 +128,7 @@ Sessions already running keep the hook snapshot captured at startup.
 
 For each selected target, the manifest owns:
 
-- the target's global instruction file;
+- the ordered sources composing the target's global instruction file;
 - the compatible skills listed for that target;
 - the reviewed hook scripts; and
 - the reviewed hook registrations in `hooks.json` for Codex or `settings.json`

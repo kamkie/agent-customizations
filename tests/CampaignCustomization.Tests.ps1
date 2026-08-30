@@ -4,7 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 
-$global = Get-Content -LiteralPath (Join-Path $repositoryRoot 'global\AGENTS.md') -Raw
+$global = Get-Content -LiteralPath (Join-Path $repositoryRoot 'global\codex-overlay.md') -Raw
 $controller = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\SKILL.md') -Raw
 $controllerTemplate = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\controller-template.md') -Raw
 $audit = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\handoff-audit-checklist.md') -Raw

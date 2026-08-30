@@ -8,8 +8,8 @@ tools' live configuration directories are deployment targets.
 
 - `AGENTS.md` with the root `CLAUDE.md` import — repository development and
   full-delivery policy shared by Codex and Claude Code.
-- `global/AGENTS.md` — personal guidance applied across Codex repositories.
-- `global/CLAUDE.md` — personal guidance applied across Claude Code projects.
+- `global/shared.md` with Codex and Claude overlays — canonical personal
+  guidance composed into each target's installed instruction file.
 - `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
 - `skills/cross-agent-review` — opposite-engine adversarial review with triage,
   credited fix commits, and bounded rounds, shared by Codex and Claude Code.
@@ -43,6 +43,8 @@ tools' live configuration directories are deployment targets.
 - `docs/maintaining-customizations.md` — maintenance rules for agent
   instructions, skill entrypoints, references, and progressive-disclosure
   validation.
+- `docs/temporary-bot-unavailable.md` — conditionally loaded GitHub actor and
+  exact-head authorization policy used during the current bot outage.
 - `scripts/verify.ps1` — validates structure and scans managed sources for
   common publication hazards.
 - `scripts/status.ps1` — reports drift between this repository and live agent
@@ -56,7 +58,8 @@ tools' live configuration directories are deployment targets.
 
 Claude Code loads personal instructions from `~/.claude/CLAUDE.md` and
 personal skills from `~/.claude/skills`. Codex uses `~/.codex/AGENTS.md` and
-`~/.codex/skills`. The manifest reuses portable sources where possible and
+`~/.codex/skills`. The manifest composes `global/shared.md` with the applicable
+target overlay during installation, reuses portable skills where possible, and
 keeps tool-specific skills on their compatible target.
 
 ## Why deployment is explicit

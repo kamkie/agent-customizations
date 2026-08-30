@@ -199,7 +199,8 @@ When another maintenance operation holds the lock, the hook waits there for up
 to five minutes and runs next instead of being dropped during normal
 contention. The hook runtime is bounded to ten minutes. Turn and session cleanup
 remain separate targeted hook operations over owner references. Manual
-`reconcile -Async` keeps the supervised persistent-job contract described above.
+`reconcile -Async` keeps the supervised persistent-job contract described above,
+and its worker also waits through the post-dispatch lock race.
 
 Async prune snapshots its candidate ids and cutoff into a one-time runtime plan
 before dispatch. The worker consumes that plan under the maintenance lock,

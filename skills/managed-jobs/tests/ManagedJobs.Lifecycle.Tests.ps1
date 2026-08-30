@@ -4,6 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $controller = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\Invoke-ManagedJob.ps1'
 $hostScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Host.ps1'
+$maintenanceScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Maintenance.ps1'
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.Common.ps1')
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('managed-jobs-lifecycle-' + [guid]::NewGuid().ToString('N'))
 $stateRoot = Join-Path $testRoot 'state'
@@ -184,6 +185,7 @@ try {
 
     $maintenanceLockPath = Join-Path $stateRoot '.maintenance.lock'
     $heldMaintenanceLock = [IO.File]::Open($maintenanceLockPath, 'OpenOrCreate', 'ReadWrite', 'None')
+    $queuedMaintenance = $null
     try {
         $overlappingMaintenanceRejected = $false
         try { & $controller reconcile -StateRoot $stateRoot | Out-Null } catch {
@@ -202,9 +204,44 @@ try {
         $boundedWaitTimer.Stop()
         Assert-True ($boundedWaitRejected -and $boundedWaitTimer.Elapsed.TotalSeconds -lt 2) `
             'Maintenance lock waiting should fail on its configured deadline instead of leaking a process indefinitely.'
+
+        $maintenanceStartInfo = [Diagnostics.ProcessStartInfo]::new()
+        $maintenanceStartInfo.FileName = $pwsh
+        $maintenanceStartInfo.UseShellExecute = $false
+        $maintenanceStartInfo.CreateNoWindow = $true
+        $maintenanceStartInfo.RedirectStandardOutput = $true
+        $maintenanceStartInfo.RedirectStandardError = $true
+        foreach ($argument in @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $maintenanceScript,
+            '-Controller', $controller, '-Action', 'reconcile', '-StateRoot', $stateRoot
+        )) {
+            $maintenanceStartInfo.ArgumentList.Add($argument)
+        }
+        $maintenanceProcess = [Diagnostics.Process]::Start($maintenanceStartInfo)
+        $maintenanceOutputTask = $maintenanceProcess.StandardOutput.ReadToEndAsync()
+        $maintenanceErrorTask = $maintenanceProcess.StandardError.ReadToEndAsync()
+        $queuedMaintenance = [pscustomobject]@{
+            process = $maintenanceProcess
+            outputTask = $maintenanceOutputTask
+            errorTask = $maintenanceErrorTask
+        }
+        Start-Sleep -Milliseconds 500
+        Assert-True (-not $queuedMaintenance.process.HasExited) `
+            'A dispatched maintenance worker should wait when a SessionStart reconcile wins the post-probe lock race.'
     } finally {
         $heldMaintenanceLock.Dispose()
     }
+    if (-not $queuedMaintenance.process.WaitForExit(10000)) {
+        try { $queuedMaintenance.process.Kill($true) } catch {}
+        throw 'Queued maintenance worker did not finish after the maintenance lock was released.'
+    }
+    $queuedMaintenanceOutput = $queuedMaintenance.outputTask.GetAwaiter().GetResult()
+    $queuedMaintenanceError = $queuedMaintenance.errorTask.GetAwaiter().GetResult()
+    Assert-True ($queuedMaintenance.process.ExitCode -eq 0 -and
+        $queuedMaintenanceOutput -match '"total"' -and
+        [string]::IsNullOrWhiteSpace($queuedMaintenanceError)) `
+        'A dispatched maintenance worker should complete after post-probe lock contention clears.'
+    $queuedMaintenance.process.Dispose()
 
     $asyncReconcile = (& $controller reconcile -StateRoot $stateRoot -Status completed,failed -Async | Out-String) | ConvertFrom-Json
     $activeIds.Add($asyncReconcile.id)

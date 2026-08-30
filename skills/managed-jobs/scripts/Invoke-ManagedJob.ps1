@@ -73,8 +73,8 @@ if ($Action -ne 'prune' -and $PSBoundParameters.ContainsKey('MaintenancePlan')) 
 if ($Async -and $PSBoundParameters.ContainsKey('MaintenancePlan')) {
     throw '-Async cannot be combined with -MaintenancePlan.'
 }
-if ($Action -ne 'reconcile' -and $PSBoundParameters.ContainsKey('WaitForMaintenanceLock')) {
-    throw '-WaitForMaintenanceLock is valid only for reconcile.'
+if ($Action -notin @('reconcile', 'prune') -and $PSBoundParameters.ContainsKey('WaitForMaintenanceLock')) {
+    throw '-WaitForMaintenanceLock is valid only for reconcile and prune.'
 }
 if ($Async -and $PSBoundParameters.ContainsKey('WaitForMaintenanceLock')) {
     throw '-Async cannot be combined with -WaitForMaintenanceLock.'
@@ -1387,7 +1387,9 @@ switch ($Action) {
         }
     }
     'prune' {
-        $maintenanceLock = Enter-ManagedJobMaintenanceLock
+        $maintenanceLock = Enter-ManagedJobMaintenanceLock `
+            -Wait:$WaitForMaintenanceLock `
+            -TimeoutSeconds $MaintenanceLockWaitSeconds
         try {
             $plannedCandidateIds = $null
             $skipped = @()

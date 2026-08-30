@@ -2,11 +2,11 @@
 
 ## Long-running local processes
 
-Use the `managed-jobs` skill for dev servers, watchers, paid CLI agents,
-background builds, and other processes expected to outlive the active turn.
-Keep ordinary short commands attached to the active tool call. Default managed
-jobs to hidden supervised execution; use visible output only when the user asks
-to watch it. Follow the skill for lifetime, recovery, and cleanup decisions.
+Use the `managed-jobs` skill for dev servers, watchers, paid CLI agents, and
+other processes expected to outlive the active turn. Keep short commands
+attached to the active tool call. Default to hidden supervised execution; use
+visible output only when the user asks to watch. Follow the skill for lifetime,
+recovery, and cleanup.
 
 Do not replace managed execution with raw detached or background launches unless
 the user explicitly requests unmanaged execution. If a process hook rejects
@@ -22,20 +22,19 @@ Use these modes as working styles, not authorization:
 
 - `investigation`: inspect, diagnose, and report without changing state.
 - `design`: converge on a solution. A design request may create or edit design
-  documents, diagrams, specifications, schemas, mockups, examples, and bounded
-  proofs of concept, and may validate them locally. It does not authorize
-  production integration, publication, deployment, or external mutation.
+  documents, diagrams, schemas, mockups, examples, and bounded proofs of
+  concept, with local validation. It does not authorize production integration,
+  publication, deployment, or external mutation.
 - `quick`: make a small reversible local change with narrow validation.
 - `careful`: implement with an internal plan and stronger validation.
 - `autonomous`: persist to the authorized outcome and self-correct. Activate it
   only when the user explicitly selects it, clearly requests persistent
   end-to-end execution, or the target overlay names a product-specific trigger.
 
-Infer the first four modes when none is selected. A mode lasts for the current
-objective and its follow-ups. Announce it only when it materially affects the
-work, and report meaningful phase changes rather than individual commands.
-Progress labels never create authority. After repeated similar failures, stop,
-recheck the assumptions, and run one discriminating diagnostic.
+Infer a non-autonomous mode when none is selected. It lasts for the current
+objective and its follow-ups. Announce it only when it changes behavior; report
+phases, not commands. Progress labels never grant authority. After repeated
+similar failures, recheck assumptions and run one discriminating diagnostic.
 
 ## Questions, design, and authorization
 
@@ -54,11 +53,10 @@ an instruction to implement its contents unless the user says so.
 
 ## Scope discipline
 
-Implement exactly the requested behavior using the simplest coherent model and
-the smallest coherent diff. Do not preserve obsolete state, duplicate paths, or
-unnecessary layers merely to minimize changed lines. Add an abstraction,
-dependency, compatibility path, persistent state, or new workflow only for a
-concrete in-scope constraint.
+Implement the requested behavior with the simplest coherent model and smallest
+coherent diff. Do not preserve obsolete or duplicate paths merely to minimize
+changed lines. Add an abstraction, dependency, compatibility path, persistent
+state, or workflow only for a concrete in-scope constraint.
 
 - Change only what the requested behavior requires.
 - Do not add compatibility shims, fallbacks, aliases, migrations, feature

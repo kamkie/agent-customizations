@@ -106,6 +106,22 @@ function Set-ManagedJobControlReleased {
     }
 }
 
+function Get-PreHostStaleAllowanceSeconds {
+    param($Job)
+    # A cold-start shared-terminal launch legitimately holds its starting record
+    # without a host through every bounded bootstrap stage: the bootstrap-lock
+    # wait (60s), the post-lock re-probe (3 x 5s probes plus retry delays, ~16s),
+    # the activation loop (30s nominal, overrunning by one final blocking
+    # re-probe, ~46s), and the new-tab CLI call (10s). The reservation must
+    # outlive that ~132s worst case, plus scheduling margin, before
+    # reconciliation may orphan it.
+    if ($Job.PSObject.Properties.Name -contains 'terminalLaunchMode' -and
+        [string]$Job.terminalLaunchMode -eq 'foreground-bootstrap') {
+        return 180
+    }
+    return 30
+}
+
 function Update-ReconciledJob {
     param($Job)
     if ($Job.status -notin @('starting', 'running')) {
@@ -119,7 +135,7 @@ function Update-ReconciledJob {
         } else {
             [datetimeoffset]::Parse([string]$Job.createdAtUtc).UtcDateTime
         }
-        if (([datetime]::UtcNow - $createdAt).TotalSeconds -lt 30) { return $Job }
+        if (([datetime]::UtcNow - $createdAt).TotalSeconds -lt (Get-PreHostStaleAllowanceSeconds -Job $Job)) { return $Job }
     }
     if (Test-ManagedProcessIdentity -ProcessId $Job.hostPid -ExpectedStartTimeUtc $Job.hostStartedAtUtc) { return $Job }
     $path = Get-ManagedJobFile -Id $Job.id
@@ -135,7 +151,7 @@ function Update-ReconciledJob {
         } else {
             [datetimeoffset]::Parse([string]$current.createdAtUtc).UtcDateTime
         }
-        if (([datetime]::UtcNow - $createdAt).TotalSeconds -lt 30) { return $current }
+        if (([datetime]::UtcNow - $createdAt).TotalSeconds -lt (Get-PreHostStaleAllowanceSeconds -Job $current)) { return $current }
     }
     if (Test-ManagedProcessIdentity -ProcessId $current.hostPid -ExpectedStartTimeUtc $current.hostStartedAtUtc) { return $current }
     $current.status = 'orphaned'

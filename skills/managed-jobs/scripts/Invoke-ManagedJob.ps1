@@ -243,6 +243,7 @@ function Read-PruneMaintenancePlan {
         $plan.PSObject.Properties.Name -notcontains 'action' -or
         [string]$plan.action -ne 'prune' -or
         $plan.PSObject.Properties.Name -notcontains 'cutoffUtc' -or
+        $plan.PSObject.Properties.Name -notcontains 'statuses' -or
         $plan.PSObject.Properties.Name -notcontains 'candidateIds') {
         throw 'The prune maintenance plan is invalid.'
     }

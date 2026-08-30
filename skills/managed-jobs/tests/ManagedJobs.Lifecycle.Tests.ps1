@@ -137,6 +137,22 @@ try {
         $emptyPrunePreview.removedCount -eq 0
     ) 'Prune preview should accept an empty managed-job registry.'
 
+    $maintenanceDirectory = Join-Path $stateRoot 'maintenance'
+    $null = New-Item -ItemType Directory -Path $maintenanceDirectory -Force
+    $invalidPlanPath = Join-Path $maintenanceDirectory 'invalid-missing-statuses.json'
+    Write-ManagedJson -Path $invalidPlanPath -Value ([ordered]@{
+        schemaVersion = 1
+        action = 'prune'
+        cutoffUtc = [datetime]::UtcNow.ToString('o')
+        candidateIds = @()
+    })
+    $invalidPlanRejected = $false
+    try {
+        & $controller prune -StateRoot $stateRoot -MaintenancePlan $invalidPlanPath | Out-Null
+    } catch { $invalidPlanRejected = $_.Exception.Message -match 'maintenance plan is invalid' }
+    Assert-True $invalidPlanRejected 'Prune should reject a maintenance plan whose status filter is missing.'
+    Remove-Item -LiteralPath $invalidPlanPath -Force -ErrorAction SilentlyContinue
+
     $invalidAsyncRoot = Join-Path $testRoot 'invalid-async-state'
     $invalidAsyncRejected = $false
     try {

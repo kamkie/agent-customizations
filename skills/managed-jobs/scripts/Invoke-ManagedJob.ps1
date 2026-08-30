@@ -406,7 +406,10 @@ function Start-ManagedJobBackgroundTerminalTab {
         '--cwd', $WorkingDirectory
     )
     $powerShellProfile = Resolve-PowerShellTerminalProfile -Connection $Connection
-    if ($powerShellProfile) { $terminalArguments += @('--profile', $powerShellProfile.name) }
+    if ($powerShellProfile) {
+        $profileSelector = if ($powerShellProfile.id) { $powerShellProfile.id } else { $powerShellProfile.name }
+        $terminalArguments += @('--profile', $profileSelector)
+    }
     $result = Invoke-IntelligentTerminalCliProcess `
         -Tools $Connection.tools `
         -ComClsid $Connection.comClsid `

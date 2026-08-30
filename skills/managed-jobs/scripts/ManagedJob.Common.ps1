@@ -424,10 +424,15 @@ function Resolve-PowerShellTerminalProfile {
         if (-not $profile -or [string]::IsNullOrWhiteSpace([string]$profile.name)) { return $null }
 
         $profileId = [guid]::Empty
-        if (-not [guid]::TryParse([string]$profile.guid, [ref]$profileId)) { return $null }
+        $profileIdText = if ($profile.PSObject.Properties.Name -contains 'guid') {
+            [string]$profile.guid
+        } else {
+            ''
+        }
+        $hasProfileId = [guid]::TryParse($profileIdText, [ref]$profileId)
         return [pscustomobject]@{
             name = [string]$profile.name
-            id = $profileId.ToString('B')
+            id = if ($hasProfileId) { $profileId.ToString('B') } else { $null }
         }
     } catch {
         return $null

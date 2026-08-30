@@ -172,6 +172,16 @@ function Select-ManagedJobs {
     return @($Jobs)
 }
 
+function Get-ManagedJobsWithActiveReconciliation {
+    foreach ($job in Get-AllManagedJobs) {
+        if ($job.status -in @('starting', 'running')) {
+            Update-ReconciledJob -Job $job
+        } else {
+            $job
+        }
+    }
+}
+
 function Add-ManagedJobIdentity {
     param($Job)
     $copy = [ordered]@{}
@@ -679,7 +689,7 @@ switch ($Action) {
                 }
             } until ($lock)
 
-            $active = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ } | Where-Object status -in @('starting', 'running'))
+            $active = @(Get-ManagedJobsWithActiveReconciliation | Where-Object status -in @('starting', 'running'))
             $duplicate = $active | Where-Object {
                 $_.PSObject.Properties.Name -contains 'invocationFingerprint' -and $_.invocationFingerprint -eq $fingerprint
             } | Select-Object -First 1
@@ -989,7 +999,7 @@ switch ($Action) {
         $jobOutput | ConvertTo-Json -Depth 12
     }
     'list' {
-        $jobs = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ } | Sort-Object createdAtUtc -Descending)
+        $jobs = @(Get-ManagedJobsWithActiveReconciliation | Sort-Object createdAtUtc -Descending)
         Write-JobCollection -Jobs (Select-ManagedJobs -Jobs $jobs)
     }
     'status' {
@@ -997,7 +1007,7 @@ switch ($Action) {
             $job = Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id)
             Add-ManagedJobIdentity -Job (Update-ReconciledJob -Job $job) | ConvertTo-Json -Depth 12
         } else {
-            $jobs = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ } | Sort-Object createdAtUtc -Descending)
+            $jobs = @(Get-ManagedJobsWithActiveReconciliation | Sort-Object createdAtUtc -Descending)
             Write-JobCollection -Jobs (Select-ManagedJobs -Jobs $jobs)
         }
     }

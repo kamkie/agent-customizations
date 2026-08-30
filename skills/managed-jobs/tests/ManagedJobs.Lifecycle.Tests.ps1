@@ -292,10 +292,42 @@ try {
         Remove-Item -LiteralPath (Join-Path $stateRoot "jobs\$reservationId.json") -Force
     }
 
+    # Normal startup and collection inspection reconcile only active records;
+    # explicit reconciliation retains full historical cleanup behavior.
+    $historicalId = '20000101-000000-lifecycle-historical-000001'
+    $historicalRecord = [ordered]@{
+        schemaVersion = 4; id = $historicalId; name = 'lifecycle-historical'; kind = 'test'; status = 'completed'
+        lifetime = 'turn'; ownerAgent = 'codex'; ownerSessionId = $testSessionId; visible = $true; sharedTerminal = $true
+        terminalControlState = 'released'; keepTerminalOpen = $false; processContainment = 'windows-job-object-kill-on-close'
+        createdAtUtc = '2000-01-01T00:00:00Z'; startedAtUtc = '2000-01-01T00:00:01Z'; finishedAtUtc = '2000-01-01T00:00:02Z'
+        hostPid = 2147483647; hostStartedAtUtc = '2000-01-01T00:00:01Z'; executable = 'fixture'; argumentCount = 0
+        environmentNames = @(); invocationFingerprint = ('8' * 64); workingDirectory = $testRoot
+        logPath = (Join-Path $stateRoot "logs\$historicalId.log"); exitCode = 0; error = $null
+    }
+    $historicalPath = Join-Path $stateRoot "jobs\$historicalId.json"
+    $historicalControlPath = Get-ManagedJobControlFile -Id $historicalId
+    $historicalRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $historicalPath -Encoding utf8
+    Register-ManagedJobOwnerReference -Job ([pscustomobject]$historicalRecord)
+    @{ schemaVersion = 1; jobId = $historicalId; hostPid = 2147483647; wtSession = [guid]::NewGuid(); wtComClsid = [guid]::NewGuid() } |
+        ConvertTo-Json | Set-Content -LiteralPath $historicalControlPath -Encoding utf8
+
     # Start, record redaction, structured list/status, logs, and reconcile.
     $completed = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-complete' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Write-Output lifecycle-ok') -Environment @{ LIFECYCLE_MARKER = 'not-recorded'; GIT_AUTHOR_NAME = 'Lifecycle Test' } | Out-String) | ConvertFrom-Json
     $completed = Wait-JobStatus -Id $completed.id -Expected @('completed')
+    Assert-True (Test-Path -LiteralPath $historicalControlPath) `
+        'Normal startup must not reconcile inactive historical control records.'
+    Assert-True (@(Get-ManagedJobOwnerReferenceIds -OwnerAgent codex -OwnerSessionId $testSessionId -Lifetime turn) -contains $historicalId) `
+        'Normal startup must not reconcile inactive historical owner references.'
+    $null = & $controller list -StateRoot $stateRoot -Status running,starting -Json
+    Assert-True (Test-Path -LiteralPath $historicalControlPath) `
+        'Collection listing must not reconcile inactive historical control records.'
+    $null = & $controller reconcile -StateRoot $stateRoot -Status completed
+    Assert-True (-not (Test-Path -LiteralPath $historicalControlPath)) `
+        'Explicit reconciliation should clean inactive historical control records.'
+    Assert-True (@(Get-ManagedJobOwnerReferenceIds -OwnerAgent codex -OwnerSessionId $testSessionId -Lifetime turn) -notcontains $historicalId) `
+        'Explicit reconciliation should clean inactive historical owner references.'
+    Remove-Item -LiteralPath $historicalPath -Force
     $recordText = Get-Content -LiteralPath (Join-Path $stateRoot "jobs\$($completed.id).json") -Raw
     Assert-True ($recordText -notmatch 'lifecycle-ok|not-recorded|Lifecycle Test') 'Permanent records must omit argument text and environment values.'
     Assert-True ($completed.schemaVersion -eq 3) 'Existing start callers should retain schema version 3.'

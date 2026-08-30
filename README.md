@@ -47,14 +47,18 @@ tools' live configuration directories are deployment targets.
   exact-head authorization policy used during the current bot outage.
 - `scripts/verify.ps1` — validates structure and scans managed sources for
   common publication hazards.
+- `scripts/evaluate-instructions.ps1` — runs input-only scenarios in fresh,
+  tool-disabled Codex or Claude sessions and scores their structured behavior
+  against separately stored expectations.
 - `scripts/status.ps1` — reports drift between this repository and live agent
   installations.
 - `scripts/install.ps1` — explicitly deploys reviewed sources to one or both
   live installations.
 - `scripts/test.ps1` — exercises verification, sandbox installations, clean
   status, target isolation, and drift detection.
-- `tests` — repository-local behavior regressions and input-only forward-test
-  fixtures that are validated here but not installed into agent homes.
+- `tests` — repository-local regressions plus separately stored behavioral
+  evaluation prompts, expectations, and response contracts; none are installed
+  into agent homes.
 
 Claude Code loads personal instructions from `~/.claude/CLAUDE.md` and
 personal skills from `~/.claude/skills`. Codex uses `~/.codex/AGENTS.md` and
@@ -94,6 +98,13 @@ Run the deployment smoke test:
 
 ```powershell
 pwsh ./scripts/test.ps1
+```
+
+Run live behavioral instruction evaluations (these invoke the selected agent
+CLI and may incur usage):
+
+```powershell
+pwsh ./scripts/evaluate-instructions.ps1 -Target all
 ```
 
 Compare both live installations:

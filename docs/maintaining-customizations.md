@@ -105,6 +105,14 @@ Use realistic forward tests in addition to structural checks.
 Record what each forward test could and could not prove. A test that opened a
 reference does not prove that the entrypoint is self-contained.
 
+Keep forward-test prompts separate from their expected behavior so the agent
+cannot read its rubric. Use `scripts/evaluate-instructions.ps1` to run each case
+in a fresh, tool-disabled session and score the structured result. These live
+evaluations use the selected agent CLI and are intentionally separate from the
+deterministic `verify.ps1` and `test.ps1` checks; run the affected target and
+case set when instruction behavior changes, then report the exact cases,
+targets, and results.
+
 ## Validate and deliver
 
 Follow the canonical [implementation and delivery workflow](../AGENTS.md#implement-validate-and-commit)

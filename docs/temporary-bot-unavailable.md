@@ -3,6 +3,19 @@
 Load this policy immediately before creating or mutating a pull request while
 the repository's `AGENTS.md` says the bot-unavailable rule is active.
 
+## Lifecycle
+
+- **Owner:** the repository owner named below.
+- **Activation source:** the active notice in the repository's `AGENTS.md`.
+- **Review checkpoint:** re-read that notice and this policy immediately before
+  every author-side pull-request mutation. Do not carry an earlier session's
+  conclusion forward.
+- **Exit condition:** the owner confirms that the bot identity is available and
+  removes the active notice from `AGENTS.md` in a reviewed change.
+- **Stale or conflicting state:** stop before the pull-request mutation and ask
+  the owner to resolve the policy state. Do not infer that bot availability or
+  an absent credential ends the policy.
+
 `kamkie` is the repository owner, reviewer, approver, and administrator.
 `kamkie-codex-bot` is temporarily unavailable. Do not retrieve, restore, or use
 its GitHub CLI credential until this notice is removed.

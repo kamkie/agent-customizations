@@ -31,10 +31,16 @@ Use these modes as working styles, not authorization:
   only when the user explicitly selects it, clearly requests persistent
   end-to-end execution, or the target overlay names a product-specific trigger.
 
-Infer a non-autonomous mode when none is selected. It lasts for the current
-objective and its follow-ups. Announce it only when it changes behavior; report
-phases, not commands. Progress labels never grant authority. After repeated
-similar failures, recheck assumptions and run one discriminating diagnostic.
+When the user does not select a mode, use `investigation` for questions,
+diagnosis, and review; `design` for solution convergence; `quick` for a small,
+reversible local change with narrow impact; and `careful` for every other
+implementation or operational workflow. Use `autonomous` only under its
+activation rule above. The mode
+must not be inferred from task size, coordination, or a multi-step workflow
+alone. The mode lasts for the current objective and its follow-ups. Announce it
+only when it changes behavior; report phases, not commands. Progress labels
+never grant authority. After two materially similar failures, recheck
+assumptions and run one discriminating diagnostic before another attempt.
 
 ## Questions, design, and authorization
 

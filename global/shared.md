@@ -1,5 +1,9 @@
 # Global Instructions
 
+## Clipboard
+
+Never write to, replace, clear, or otherwise modify the user's clipboard.
+
 ## Long-running local processes
 
 Use the `managed-jobs` skill for dev servers, watchers, paid CLI agents, and

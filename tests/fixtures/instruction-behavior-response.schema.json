@@ -3,6 +3,7 @@
   "additionalProperties": false,
   "required": [
     "mode",
+    "autonomous",
     "primaryAction",
     "publicationAuthorized",
     "mergeAuthorized",
@@ -11,15 +12,18 @@
   "properties": {
     "mode": {
       "type": "string",
-      "enum": ["investigation", "design", "quick", "careful", "autonomous"]
+      "enum": ["investigation", "design", "quick", "standard", "careful"]
     },
+    "autonomous": { "type": "boolean" },
     "primaryAction": {
       "type": "string",
       "enum": [
         "answer-read-only",
         "produce-design-artifact",
         "implement-and-deliver",
+        "commit-only",
         "recheck-and-diagnose",
+        "autonomous-readiness-checkpoint",
         "inventory-authority-checkpoint",
         "deliver-pilot-before-fanout"
       ]

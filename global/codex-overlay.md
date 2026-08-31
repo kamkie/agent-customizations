@@ -1,8 +1,9 @@
 ## Codex-specific workflow
 
-Starting or resuming a Codex Goal activates `autonomous` mode for that goal.
-The `Start delivery campaign <tracker>` trigger below activates `autonomous`
-mode for that campaign.
+Starting or resuming a Codex Goal requests autonomous persistence for that goal.
+The `Start delivery campaign <tracker>` trigger below requests autonomous
+persistence for that campaign. In both cases, activation still requires the
+shared autonomous-readiness gate to pass.
 
 Before parallel agents write, give each one disjoint file or subsystem
 ownership. Serialize shared files, schemas, manifests, lockfiles, migrations,

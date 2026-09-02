@@ -30,6 +30,9 @@ tools' live configuration directories are deployment targets.
   by Codex and Claude Code.
 - `skills/shared-term` — a focused collaborative Windows Terminal workflow,
   shared by Codex and Claude Code.
+- `skills/teams-graph-connector` — Claude Code-specific, rate-limit-aware
+  reading of Microsoft Teams chats through the Microsoft 365 (Graph) MCP
+  connector.
 - `skills/ux-review` — Codex-specific browser walkthroughs with evidence-backed,
   acceptance-testable UX findings.
 - `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.

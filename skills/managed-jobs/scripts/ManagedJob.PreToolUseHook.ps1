@@ -56,8 +56,12 @@ try {
             $sha = [Security.Cryptography.SHA256]::Create()
             $fingerprint = [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($command.Trim())))
             # Test seam, part 1: announce that this process is about to enter the
-            # cache transaction so a regression test can wait for every peer.
+            # cache transaction so a regression test can wait for every peer. While
+            # the seam is active the lock wait and the hold below stretch to the
+            # same bound, so the rendezvous can never outlast a legitimate waiter.
+            $guardWaitMilliseconds = 2000
             if ($env:MANAGED_JOBS_GUARD_BARRIER) {
+                $guardWaitMilliseconds = 30000
                 $null = New-Item -ItemType File -Path "$($env:MANAGED_JOBS_GUARD_BARRIER).ready-$PID" -Force
             }
             # Serialize the read/prune/update/replace transaction across concurrent
@@ -69,7 +73,7 @@ try {
                 $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($guardFile.ToLowerInvariant()))).Substring(0, 32)
             $guardMutex = [Threading.Mutex]::new($false, $guardLockName)
             try {
-                $guardLocked = $guardMutex.WaitOne(2000)
+                $guardLocked = $guardMutex.WaitOne($guardWaitMilliseconds)
             } catch [Threading.AbandonedMutexException] {
                 # The previous holder exited without releasing; ownership transferred.
                 $guardLocked = $true
@@ -80,12 +84,12 @@ try {
                     ($nowUtc.Ticks - [long]$_.deniedAtUtcTicks) -lt [TimeSpan]::FromHours(1).Ticks
                 }
             }
-            # Test seam, part 2: hold (bounded) between the cache read and the
+            # Test seam, part 2: hold (bounded by the same wait) between the cache read and the
             # write until the barrier file exists. Without serialization every
             # peer completes its read here before any write, which forces the
             # lost update; with the lock only the holder reaches this point.
             if ($env:MANAGED_JOBS_GUARD_BARRIER) {
-                $barrierDeadline = [datetime]::UtcNow.AddSeconds(5)
+                $barrierDeadline = [datetime]::UtcNow.AddMilliseconds($guardWaitMilliseconds)
                 while (-not (Test-Path -LiteralPath $env:MANAGED_JOBS_GUARD_BARRIER) -and [datetime]::UtcNow -lt $barrierDeadline) {
                     Start-Sleep -Milliseconds 20
                 }

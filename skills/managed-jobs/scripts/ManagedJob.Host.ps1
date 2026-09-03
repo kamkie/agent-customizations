@@ -11,10 +11,13 @@ function Invoke-ManagedJobChildProcess {
     param(
         [Parameter(Mandatory)][Management.Automation.ApplicationInfo]$Application,
         [string[]]$Arguments = @(),
+        [Parameter(Mandatory)][string]$WorkingDirectory,
         [Parameter(Mandatory)][scriptblock]$OnLine
     )
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $Application.Source
+    # The PowerShell location is not the process working directory.
+    $startInfo.WorkingDirectory = $WorkingDirectory
     $startInfo.UseShellExecute = $false
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
@@ -148,7 +151,8 @@ try {
             $application = Get-Command -Name $launch.executable -CommandType Application -ErrorAction SilentlyContinue |
                 Select-Object -First 1
             if ($application) {
-                $exitCode = Invoke-ManagedJobChildProcess -Application $application -Arguments @($launch.arguments) -OnLine {
+                $exitCode = Invoke-ManagedJobChildProcess -Application $application -Arguments @($launch.arguments) `
+                    -WorkingDirectory $job.workingDirectory -OnLine {
                     param($line)
                     Write-Host $line
                     $writer.WriteLine($line)

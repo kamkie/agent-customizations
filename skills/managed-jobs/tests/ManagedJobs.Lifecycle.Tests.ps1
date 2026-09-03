@@ -613,12 +613,13 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
 `$startInfo.ArgumentList.Add('Start-Sleep -Seconds 20')
 `$grandchild = [Diagnostics.Process]::Start(`$startInfo)
 Write-Output "pipe-holder-pid=`$(`$grandchild.Id)"
+Write-Output "pipe-holder-cwd=`$([Environment]::CurrentDirectory)"
 `$grandchild.Dispose()
 exit 7
 "@
     $pipeHolderTimer = [Diagnostics.Stopwatch]::StartNew()
     $pipeHolderJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-pipe-holder' -Executable $pwsh `
-        -Arguments @('-NoProfile', '-Command', $pipeHolderJobCommand) | Out-String) | ConvertFrom-Json
+        -Arguments @('-NoProfile', '-Command', $pipeHolderJobCommand) -WorkingDirectory $testRoot | Out-String) | ConvertFrom-Json
     $activeIds.Add($pipeHolderJob.id)
     $pipeHolderJob = Wait-JobStatus -Id $pipeHolderJob.id -Expected @('completed', 'failed') -Seconds 15
     $pipeHolderTimer.Stop()
@@ -630,6 +631,11 @@ exit 7
     $pipeHolderPid = Wait-LoggedProcessId -LogPath $pipeHolderJob.logPath -Pattern 'pipe-holder-pid=(\d+)'
     Assert-True (Wait-ProcessExit -TargetProcessId $pipeHolderPid) `
         'Windows containment should still terminate the pipe-holding grandchild when the host exits.'
+    $pipeHolderLog = Get-Content -LiteralPath $pipeHolderJob.logPath -Raw
+    Assert-True ($pipeHolderLog -match 'pipe-holder-cwd=(.+)') 'The pipe-holder job should log its process working directory.'
+    $pipeHolderCwd = $Matches[1].Trim().TrimEnd('\')
+    Assert-True ($pipeHolderCwd -ieq $testRoot.TrimEnd('\')) `
+        'A launched application should start in the job working directory, not the host process directory.'
 
     $emptyId = '20000101-000000-lifecycle-empty-000001'
     $emptyPath = Join-Path $stateRoot "jobs\$emptyId.json"

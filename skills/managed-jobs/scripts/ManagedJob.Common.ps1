@@ -47,8 +47,9 @@ function Get-ManagedJobControlFile {
 
 function Read-ManagedJob {
     param([Parameter(Mandatory)][string]$Path)
-    # Move-overwrite has a tiny destination gap on Windows. Retry status reads that
-    # race an atomic record update rather than surfacing a false missing-record error.
+    # Records are replaced in one File.Move overwrite, but a reader can still hit a
+    # sharing violation while a writer is mid-replace. Retry status reads that race
+    # an atomic record update rather than surfacing a false missing-record error.
     for ($attempt = 0; $attempt -lt 10; $attempt++) {
         if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
             if ($attempt -eq 9) { throw "Managed job record not found: $Path" }

@@ -47,51 +47,93 @@ try {
     $guardFile = $null
     $fingerprint = $null
     $deniedEntries = @()
+    $guardMutex = $null
+    $guardLocked = $false
     try {
-        $stateRoot = if ($env:MANAGED_JOBS_ROOT) { $env:MANAGED_JOBS_ROOT } else { Join-Path $HOME '.agent-customizations\managed-jobs' }
-        $guardFile = Join-Path (Join-Path $stateRoot 'guard') 'denied-launches.json'
-        $sha = [Security.Cryptography.SHA256]::Create()
-        $fingerprint = [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($command.Trim())))
-        if (Test-Path -LiteralPath $guardFile) {
-            # Ticks survive the JSON round-trip; ConvertFrom-Json mangles ISO date strings.
-            $deniedEntries = @(Get-Content -LiteralPath $guardFile -Raw | ConvertFrom-Json) | Where-Object {
-                ($nowUtc.Ticks - [long]$_.deniedAtUtcTicks) -lt [TimeSpan]::FromHours(1).Ticks
+        try {
+            $stateRoot = if ($env:MANAGED_JOBS_ROOT) { $env:MANAGED_JOBS_ROOT } else { Join-Path $HOME '.agent-customizations\managed-jobs' }
+            $guardFile = Join-Path (Join-Path $stateRoot 'guard') 'denied-launches.json'
+            $sha = [Security.Cryptography.SHA256]::Create()
+            $fingerprint = [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($command.Trim())))
+            # Test seam, part 1: announce that this process is about to enter the
+            # cache transaction so a regression test can wait for every peer. While
+            # the seam is active the lock wait and the hold below stretch to the
+            # same bound, so the rendezvous can never outlast a legitimate waiter.
+            $guardWaitMilliseconds = 2000
+            if ($env:MANAGED_JOBS_GUARD_BARRIER) {
+                $guardWaitMilliseconds = 30000
+                $null = New-Item -ItemType File -Path "$($env:MANAGED_JOBS_GUARD_BARRIER).ready-$PID" -Force
             }
-        }
-    } catch {
-        $guardFile = $null
-        $deniedEntries = @()
-    }
-    $retryOfDenied = if ($fingerprint) {
-        $deniedEntries | Where-Object { [string]$_.fingerprint -eq $fingerprint } | Select-Object -First 1
-    } else { $null }
-
-    if (-not $matched -and -not $backgroundRequested -and -not $retryOfDenied) { exit 0 }
-
-    $guardTempFile = $null
-    try {
-        if ($guardFile -and $fingerprint) {
-            $deniedEntries = @($deniedEntries | Where-Object { [string]$_.fingerprint -ne $fingerprint }) + @(
-                [ordered]@{ fingerprint = $fingerprint; deniedAtUtcTicks = $nowUtc.Ticks }
-            )
-            $null = New-Item -ItemType Directory -Path (Split-Path -Parent $guardFile) -Force
-            $guardTempFile = "$guardFile.$PID.tmp"
-            ConvertTo-Json @($deniedEntries) -Depth 4 | Set-Content -LiteralPath $guardTempFile -Encoding utf8
-            # Replace in one MoveFileEx call and retry briefly: Move-Item -Force
-            # deletes then moves, so concurrent hook invocations collide.
-            for ($attempt = 0; ; $attempt++) {
-                try {
-                    [IO.File]::Move($guardTempFile, $guardFile, $true)
-                    break
-                } catch [IO.IOException], [UnauthorizedAccessException] {
-                    if ($attempt -ge 5) { throw }
-                    Start-Sleep -Milliseconds (10 * [math]::Pow(2, $attempt))
+            # Serialize the read/prune/update/replace transaction across concurrent
+            # hook processes: without the lock two denials read the same old state
+            # and the last writer erases the other's fingerprint. The wait is short
+            # and fails open — on timeout this invocation still reads the cache but
+            # skips its own write rather than overwrite another writer's entry.
+            $guardLockName = 'Local\managed-jobs-guard-' + [Convert]::ToHexString(
+                $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($guardFile.ToLowerInvariant()))).Substring(0, 32)
+            $guardMutex = [Threading.Mutex]::new($false, $guardLockName)
+            try {
+                $guardLocked = $guardMutex.WaitOne($guardWaitMilliseconds)
+            } catch [Threading.AbandonedMutexException] {
+                # The previous holder exited without releasing; ownership transferred.
+                $guardLocked = $true
+            }
+            if (Test-Path -LiteralPath $guardFile) {
+                # Ticks survive the JSON round-trip; ConvertFrom-Json mangles ISO date strings.
+                $deniedEntries = @(Get-Content -LiteralPath $guardFile -Raw | ConvertFrom-Json) | Where-Object {
+                    ($nowUtc.Ticks - [long]$_.deniedAtUtcTicks) -lt [TimeSpan]::FromHours(1).Ticks
                 }
             }
+            # Test seam, part 2: hold (bounded by the same wait) between the cache read and the
+            # write until the barrier file exists. Without serialization every
+            # peer completes its read here before any write, which forces the
+            # lost update; with the lock only the holder reaches this point.
+            if ($env:MANAGED_JOBS_GUARD_BARRIER) {
+                $barrierDeadline = [datetime]::UtcNow.AddMilliseconds($guardWaitMilliseconds)
+                while (-not (Test-Path -LiteralPath $env:MANAGED_JOBS_GUARD_BARRIER) -and [datetime]::UtcNow -lt $barrierDeadline) {
+                    Start-Sleep -Milliseconds 20
+                }
+            }
+        } catch {
+            $guardFile = $null
+            $deniedEntries = @()
         }
-    } catch {
-        if ($guardTempFile -and (Test-Path -LiteralPath $guardTempFile)) {
-            Remove-Item -LiteralPath $guardTempFile -Force -ErrorAction SilentlyContinue
+        $retryOfDenied = if ($fingerprint) {
+            $deniedEntries | Where-Object { [string]$_.fingerprint -eq $fingerprint } | Select-Object -First 1
+        } else { $null }
+
+        if (-not $matched -and -not $backgroundRequested -and -not $retryOfDenied) { exit 0 }
+
+        $guardTempFile = $null
+        try {
+            if ($guardFile -and $fingerprint -and $guardLocked) {
+                $deniedEntries = @($deniedEntries | Where-Object { [string]$_.fingerprint -ne $fingerprint }) + @(
+                    [ordered]@{ fingerprint = $fingerprint; deniedAtUtcTicks = $nowUtc.Ticks }
+                )
+                $null = New-Item -ItemType Directory -Path (Split-Path -Parent $guardFile) -Force
+                $guardTempFile = "$guardFile.$PID.tmp"
+                ConvertTo-Json @($deniedEntries) -Depth 4 | Set-Content -LiteralPath $guardTempFile -Encoding utf8
+                # Replace in one MoveFileEx call and retry briefly: Move-Item -Force
+                # deletes then moves, so concurrent hook invocations collide.
+                for ($attempt = 0; ; $attempt++) {
+                    try {
+                        [IO.File]::Move($guardTempFile, $guardFile, $true)
+                        break
+                    } catch [IO.IOException], [UnauthorizedAccessException] {
+                        if ($attempt -ge 5) { throw }
+                        Start-Sleep -Milliseconds (10 * [math]::Pow(2, $attempt))
+                    }
+                }
+            }
+        } catch {
+            if ($guardTempFile -and (Test-Path -LiteralPath $guardTempFile)) {
+                Remove-Item -LiteralPath $guardTempFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    } finally {
+        if ($guardMutex) {
+            if ($guardLocked) { try { $guardMutex.ReleaseMutex() } catch {} }
+            $guardMutex.Dispose()
         }
     }
 

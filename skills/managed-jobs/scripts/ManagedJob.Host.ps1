@@ -53,16 +53,24 @@ function Invoke-ManagedJobChildProcess {
                 }
             }
             $pending = @($readers.Values | Where-Object { $null -ne $_.task } | ForEach-Object { $_.task })
-            if ($pending.Count -eq 0) { break }
             if ($process.HasExited) {
+                # Exit is the completion condition. Drain readers that are
+                # still open for a bounded grace period, then abandon them.
+                if ($pending.Count -eq 0) { break }
                 if ($null -eq $exitedAtUtc) { $exitedAtUtc = [datetime]::UtcNow }
                 elseif (([datetime]::UtcNow - $exitedAtUtc) -gt $drainGrace) { break }
-            }
-            if (-not $progressed) {
+                if (-not $progressed) {
+                    $null = [Threading.Tasks.Task]::WaitAny([Threading.Tasks.Task[]]$pending, 200)
+                }
+            } elseif ($pending.Count -eq 0) {
+                # The application closed its own output handles but is still
+                # running; keep waiting for it rather than for the streams.
+                $null = $process.WaitForExit(200)
+            } elseif (-not $progressed) {
                 $null = [Threading.Tasks.Task]::WaitAny([Threading.Tasks.Task[]]$pending, 200)
             }
         }
-        $null = $process.WaitForExit(5000)
+        # Both loop exits require HasExited, so ExitCode is readable here.
         return [int]$process.ExitCode
     } finally {
         $process.Dispose()

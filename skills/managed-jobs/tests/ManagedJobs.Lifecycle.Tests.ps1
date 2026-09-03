@@ -637,6 +637,27 @@ exit 7
     Assert-True ($pipeHolderCwd -ieq $testRoot.TrimEnd('\')) `
         'A launched application should start in the job working directory, not the host process directory.'
 
+    # An application that closes its own output handles but keeps running must
+    # not be treated as finished, failed, or killed before it actually exits.
+    $closesHandlesCommand = @"
+Add-Type -Namespace ManagedJobTest -Name StdHandles -MemberDefinition '[DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int nStdHandle); [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr hObject);'
+`$null = [ManagedJobTest.StdHandles]::CloseHandle([ManagedJobTest.StdHandles]::GetStdHandle(-11))
+`$null = [ManagedJobTest.StdHandles]::CloseHandle([ManagedJobTest.StdHandles]::GetStdHandle(-12))
+Start-Sleep -Seconds 7
+exit 5
+"@
+    $closesHandlesTimer = [Diagnostics.Stopwatch]::StartNew()
+    $closesHandlesJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-closes-handles' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', $closesHandlesCommand) | Out-String) | ConvertFrom-Json
+    $activeIds.Add($closesHandlesJob.id)
+    $closesHandlesJob = Wait-JobStatus -Id $closesHandlesJob.id -Expected @('completed', 'failed') -Seconds 40
+    $closesHandlesTimer.Stop()
+    $activeIds.Remove($closesHandlesJob.id) | Out-Null
+    Assert-True ($closesHandlesJob.status -eq 'failed' -and $closesHandlesJob.exitCode -eq 5) `
+        'A job should wait for an application that closed its output handles and report its real exit code.'
+    Assert-True ($null -eq $closesHandlesJob.error -and $closesHandlesTimer.Elapsed.TotalSeconds -ge 7) `
+        'Early end-of-stream must not fail or terminate a still-running application.'
+
     $emptyId = '20000101-000000-lifecycle-empty-000001'
     $emptyPath = Join-Path $stateRoot "jobs\$emptyId.json"
     Set-Content -LiteralPath $emptyPath -Value '' -Encoding utf8

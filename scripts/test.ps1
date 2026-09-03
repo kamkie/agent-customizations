@@ -20,6 +20,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Instruction behavior evaluation contract test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\cross-agent-review\tests\Invoke-CrossAgentReview.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Cross-agent review range-routing test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\managed-jobs\tests\ManagedJobs.AtomicWrite.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Managed-job atomic record write test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\codex\managed-jobs\tests\CodexManagedJobHooks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\claude\managed-jobs\tests\ClaudeManagedJobHooks.Tests.ps1')

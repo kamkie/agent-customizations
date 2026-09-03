@@ -43,6 +43,10 @@ bash "$skill/scripts/invoke-cross-agent-review.sh" \
 
 - `-Direction`/`--direction`: `to-codex` when Claude implements, `to-claude` when
   Codex implements.
+- A round takes minutes and outlives the tool call. Run it under `managed-jobs`
+  with `-Lifetime Session`; the default turn lifetime kills the reviewer when the
+  turn ends while waiting. Read the verdict and result JSON from the job log as
+  soon as they appear rather than waiting only for the job to exit.
 - **Drop the second line in round 1** — nothing is carried forward yet. Sending
   the placeholder as literal text produces a bogus prompt.
 - Omit the base in round 1. In every later round pass `-Base`/`--base` with the

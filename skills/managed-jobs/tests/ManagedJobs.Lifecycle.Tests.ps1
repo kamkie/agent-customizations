@@ -602,6 +602,62 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     $cmdletJob = Wait-JobStatus -Id $cmdletJob.id -Expected @('completed', 'failed')
     Assert-True ($cmdletJob.status -eq 'completed') 'PowerShell commands without LASTEXITCODE should complete successfully.'
 
+    # A detached grandchild that inherits the redirected output handles must not
+    # keep the job reported as running after the launched executable exits.
+    $pipeHolderJobCommand = @"
+`$startInfo = [Diagnostics.ProcessStartInfo]::new('$pwsh')
+`$startInfo.UseShellExecute = `$false
+`$startInfo.CreateNoWindow = `$true
+`$startInfo.ArgumentList.Add('-NoProfile')
+`$startInfo.ArgumentList.Add('-Command')
+`$startInfo.ArgumentList.Add('Start-Sleep -Seconds 20')
+`$grandchild = [Diagnostics.Process]::Start(`$startInfo)
+Write-Output "pipe-holder-pid=`$(`$grandchild.Id)"
+Write-Output "pipe-holder-cwd=`$([Environment]::CurrentDirectory)"
+`$grandchild.Dispose()
+exit 7
+"@
+    $pipeHolderTimer = [Diagnostics.Stopwatch]::StartNew()
+    $pipeHolderJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-pipe-holder' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', $pipeHolderJobCommand) -WorkingDirectory $testRoot | Out-String) | ConvertFrom-Json
+    $activeIds.Add($pipeHolderJob.id)
+    $pipeHolderJob = Wait-JobStatus -Id $pipeHolderJob.id -Expected @('completed', 'failed') -Seconds 15
+    $pipeHolderTimer.Stop()
+    $activeIds.Remove($pipeHolderJob.id) | Out-Null
+    Assert-True ($pipeHolderJob.status -eq 'failed' -and $pipeHolderJob.exitCode -eq 7) `
+        'A job should report the launched executable exit code even when a grandchild holds the output pipe.'
+    Assert-True ($pipeHolderTimer.Elapsed.TotalSeconds -lt 15) `
+        'Job completion should follow the launched executable exit, not end-of-stream on an inherited pipe.'
+    $pipeHolderPid = Wait-LoggedProcessId -LogPath $pipeHolderJob.logPath -Pattern 'pipe-holder-pid=(\d+)'
+    Assert-True (Wait-ProcessExit -TargetProcessId $pipeHolderPid) `
+        'Windows containment should still terminate the pipe-holding grandchild when the host exits.'
+    $pipeHolderLog = Get-Content -LiteralPath $pipeHolderJob.logPath -Raw
+    Assert-True ($pipeHolderLog -match 'pipe-holder-cwd=(.+)') 'The pipe-holder job should log its process working directory.'
+    $pipeHolderCwd = $Matches[1].Trim().TrimEnd('\')
+    Assert-True ($pipeHolderCwd -ieq $testRoot.TrimEnd('\')) `
+        'A launched application should start in the job working directory, not the host process directory.'
+
+    # An application that closes its own output handles but keeps running must
+    # not be treated as finished, failed, or killed before it actually exits.
+    $closesHandlesCommand = @"
+Add-Type -Namespace ManagedJobTest -Name StdHandles -MemberDefinition '[DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int nStdHandle); [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr hObject);'
+`$null = [ManagedJobTest.StdHandles]::CloseHandle([ManagedJobTest.StdHandles]::GetStdHandle(-11))
+`$null = [ManagedJobTest.StdHandles]::CloseHandle([ManagedJobTest.StdHandles]::GetStdHandle(-12))
+Start-Sleep -Seconds 7
+exit 5
+"@
+    $closesHandlesTimer = [Diagnostics.Stopwatch]::StartNew()
+    $closesHandlesJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-closes-handles' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', $closesHandlesCommand) | Out-String) | ConvertFrom-Json
+    $activeIds.Add($closesHandlesJob.id)
+    $closesHandlesJob = Wait-JobStatus -Id $closesHandlesJob.id -Expected @('completed', 'failed') -Seconds 40
+    $closesHandlesTimer.Stop()
+    $activeIds.Remove($closesHandlesJob.id) | Out-Null
+    Assert-True ($closesHandlesJob.status -eq 'failed' -and $closesHandlesJob.exitCode -eq 5) `
+        'A job should wait for an application that closed its output handles and report its real exit code.'
+    Assert-True ($null -eq $closesHandlesJob.error -and $closesHandlesTimer.Elapsed.TotalSeconds -ge 7) `
+        'Early end-of-stream must not fail or terminate a still-running application.'
+
     $emptyId = '20000101-000000-lifecycle-empty-000001'
     $emptyPath = Join-Path $stateRoot "jobs\$emptyId.json"
     Set-Content -LiteralPath $emptyPath -Value '' -Encoding utf8

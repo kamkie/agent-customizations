@@ -9,9 +9,11 @@ param()
 # its foreground retry.
 #
 # The hook's MANAGED_JOBS_GUARD_BARRIER seam makes the contention deterministic:
-# every hook process announces readiness, then holds just before the cache read
-# until the barrier file exists, so process-startup jitter cannot serialize the
-# transactions by accident.
+# every hook process announces readiness before entering the transaction, then
+# holds between its cache read and its write until the barrier file exists.
+# Without serialization all six reads therefore complete before any write, so
+# scheduling order cannot hide the lost update; with the lock only the holder
+# reaches the hold and the rest queue on the mutex.
 
 $ErrorActionPreference = 'Stop'
 $hookScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.PreToolUseHook.ps1'
@@ -69,8 +71,8 @@ try {
         $null = $shell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).AddArgument($command)
         $handles += [pscustomobject]@{ shell = $shell; async = $shell.BeginInvoke() }
     }
-    # Wait until every hook process is parked at the seam, then release them all
-    # into the cache transaction together.
+    # Wait until every hook process has entered the transaction, then release the
+    # post-read hold so the writes follow the reads.
     $readyDeadline = [datetime]::UtcNow.AddSeconds(30)
     do {
         $ready = @(Get-ChildItem -LiteralPath $testRoot -Force -File -Filter 'barrier.ready-*').Count

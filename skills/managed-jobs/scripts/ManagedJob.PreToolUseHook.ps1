@@ -55,15 +55,10 @@ try {
             $guardFile = Join-Path (Join-Path $stateRoot 'guard') 'denied-launches.json'
             $sha = [Security.Cryptography.SHA256]::Create()
             $fingerprint = [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($command.Trim())))
-            # Test seam: when a barrier path is set, announce readiness and hold
-            # here (bounded) until the barrier file exists, so a regression test
-            # can force several hook processes into the cache transaction at once.
+            # Test seam, part 1: announce that this process is about to enter the
+            # cache transaction so a regression test can wait for every peer.
             if ($env:MANAGED_JOBS_GUARD_BARRIER) {
                 $null = New-Item -ItemType File -Path "$($env:MANAGED_JOBS_GUARD_BARRIER).ready-$PID" -Force
-                $barrierDeadline = [datetime]::UtcNow.AddSeconds(5)
-                while (-not (Test-Path -LiteralPath $env:MANAGED_JOBS_GUARD_BARRIER) -and [datetime]::UtcNow -lt $barrierDeadline) {
-                    Start-Sleep -Milliseconds 20
-                }
             }
             # Serialize the read/prune/update/replace transaction across concurrent
             # hook processes: without the lock two denials read the same old state
@@ -83,6 +78,16 @@ try {
                 # Ticks survive the JSON round-trip; ConvertFrom-Json mangles ISO date strings.
                 $deniedEntries = @(Get-Content -LiteralPath $guardFile -Raw | ConvertFrom-Json) | Where-Object {
                     ($nowUtc.Ticks - [long]$_.deniedAtUtcTicks) -lt [TimeSpan]::FromHours(1).Ticks
+                }
+            }
+            # Test seam, part 2: hold (bounded) between the cache read and the
+            # write until the barrier file exists. Without serialization every
+            # peer completes its read here before any write, which forces the
+            # lost update; with the lock only the holder reaches this point.
+            if ($env:MANAGED_JOBS_GUARD_BARRIER) {
+                $barrierDeadline = [datetime]::UtcNow.AddSeconds(5)
+                while (-not (Test-Path -LiteralPath $env:MANAGED_JOBS_GUARD_BARRIER) -and [datetime]::UtcNow -lt $barrierDeadline) {
+                    Start-Sleep -Milliseconds 20
                 }
             }
         } catch {

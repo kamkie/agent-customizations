@@ -77,8 +77,33 @@ function Write-ManagedJson {
     $directory = Split-Path -Parent $Path
     $null = New-Item -ItemType Directory -Path $directory -Force
     $temporary = Join-Path $directory ('.' + [IO.Path]::GetFileName($Path) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
-    $Value | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $temporary -Encoding utf8
-    Move-Item -LiteralPath $temporary -Destination $Path -Force
+    try {
+        $Value | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $temporary -Encoding utf8
+        Move-ManagedFileAtomic -Source $temporary -Destination $Path
+    } finally {
+        if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+function Move-ManagedFileAtomic {
+    param(
+        [Parameter(Mandatory)][string]$Source,
+        [Parameter(Mandatory)][string]$Destination
+    )
+    # Move-Item -Force deletes the destination and then moves, so two concurrent
+    # replacers race into "Cannot create a file when that file already exists".
+    # File.Move with overwrite replaces in one MoveFileEx call; the bounded retry
+    # covers a reader that briefly holds the destination open.
+    $delaysMilliseconds = @(10, 20, 40, 80, 160, 320, 640)
+    for ($attempt = 0; ; $attempt++) {
+        try {
+            [IO.File]::Move($Source, $Destination, $true)
+            return
+        } catch [IO.IOException], [UnauthorizedAccessException] {
+            if ($attempt -ge $delaysMilliseconds.Count) { throw }
+            Start-Sleep -Milliseconds $delaysMilliseconds[$attempt]
+        }
+    }
 }
 
 function Write-ManagedJob {

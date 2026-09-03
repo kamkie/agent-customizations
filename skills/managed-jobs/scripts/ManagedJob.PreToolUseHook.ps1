@@ -68,6 +68,7 @@ try {
 
     if (-not $matched -and -not $backgroundRequested -and -not $retryOfDenied) { exit 0 }
 
+    $guardTempFile = $null
     try {
         if ($guardFile -and $fingerprint) {
             $deniedEntries = @($deniedEntries | Where-Object { [string]$_.fingerprint -ne $fingerprint }) + @(
@@ -76,9 +77,23 @@ try {
             $null = New-Item -ItemType Directory -Path (Split-Path -Parent $guardFile) -Force
             $guardTempFile = "$guardFile.$PID.tmp"
             ConvertTo-Json @($deniedEntries) -Depth 4 | Set-Content -LiteralPath $guardTempFile -Encoding utf8
-            Move-Item -LiteralPath $guardTempFile -Destination $guardFile -Force
+            # Replace in one MoveFileEx call and retry briefly: Move-Item -Force
+            # deletes then moves, so concurrent hook invocations collide.
+            for ($attempt = 0; ; $attempt++) {
+                try {
+                    [IO.File]::Move($guardTempFile, $guardFile, $true)
+                    break
+                } catch [IO.IOException], [UnauthorizedAccessException] {
+                    if ($attempt -ge 5) { throw }
+                    Start-Sleep -Milliseconds (10 * [math]::Pow(2, $attempt))
+                }
+            }
         }
-    } catch {}
+    } catch {
+        if ($guardTempFile -and (Test-Path -LiteralPath $guardTempFile)) {
+            Remove-Item -LiteralPath $guardTempFile -Force -ErrorAction SilentlyContinue
+        }
+    }
 
     $reason = if ($retryOfDenied -and -not $matched -and -not $backgroundRequested) {
         "This command was recently denied as a background or detached launch, and rerunning it in the foreground bounded by a tool-call timeout is not an acceptable substitute. Start it as a managed job via the managed-jobs skill and poll status/logs. If the user explicitly requested unmanaged execution, add the comment marker '# managed-jobs: allow-direct'."

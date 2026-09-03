@@ -602,6 +602,35 @@ try { Start-Sleep -Seconds 30 } finally { `$client.Dispose(); `$listener.Stop() 
     $cmdletJob = Wait-JobStatus -Id $cmdletJob.id -Expected @('completed', 'failed')
     Assert-True ($cmdletJob.status -eq 'completed') 'PowerShell commands without LASTEXITCODE should complete successfully.'
 
+    # A detached grandchild that inherits the redirected output handles must not
+    # keep the job reported as running after the launched executable exits.
+    $pipeHolderJobCommand = @"
+`$startInfo = [Diagnostics.ProcessStartInfo]::new('$pwsh')
+`$startInfo.UseShellExecute = `$false
+`$startInfo.CreateNoWindow = `$true
+`$startInfo.ArgumentList.Add('-NoProfile')
+`$startInfo.ArgumentList.Add('-Command')
+`$startInfo.ArgumentList.Add('Start-Sleep -Seconds 20')
+`$grandchild = [Diagnostics.Process]::Start(`$startInfo)
+Write-Output "pipe-holder-pid=`$(`$grandchild.Id)"
+`$grandchild.Dispose()
+exit 7
+"@
+    $pipeHolderTimer = [Diagnostics.Stopwatch]::StartNew()
+    $pipeHolderJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-pipe-holder' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', $pipeHolderJobCommand) | Out-String) | ConvertFrom-Json
+    $activeIds.Add($pipeHolderJob.id)
+    $pipeHolderJob = Wait-JobStatus -Id $pipeHolderJob.id -Expected @('completed', 'failed') -Seconds 15
+    $pipeHolderTimer.Stop()
+    $activeIds.Remove($pipeHolderJob.id) | Out-Null
+    Assert-True ($pipeHolderJob.status -eq 'failed' -and $pipeHolderJob.exitCode -eq 7) `
+        'A job should report the launched executable exit code even when a grandchild holds the output pipe.'
+    Assert-True ($pipeHolderTimer.Elapsed.TotalSeconds -lt 15) `
+        'Job completion should follow the launched executable exit, not end-of-stream on an inherited pipe.'
+    $pipeHolderPid = Wait-LoggedProcessId -LogPath $pipeHolderJob.logPath -Pattern 'pipe-holder-pid=(\d+)'
+    Assert-True (Wait-ProcessExit -TargetProcessId $pipeHolderPid) `
+        'Windows containment should still terminate the pipe-holding grandchild when the host exits.'
+
     $emptyId = '20000101-000000-lifecycle-empty-000001'
     $emptyPath = Join-Path $stateRoot "jobs\$emptyId.json"
     Set-Content -LiteralPath $emptyPath -Value '' -Encoding utf8

@@ -7,6 +7,65 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 Set-ManagedJobStateRoot -Path (Split-Path -Parent (Split-Path -Parent $JobFile))
 
+function Invoke-ManagedJobChildProcess {
+    param(
+        [Parameter(Mandatory)][Management.Automation.ApplicationInfo]$Application,
+        [string[]]$Arguments = @(),
+        [Parameter(Mandatory)][scriptblock]$OnLine
+    )
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $Application.Source
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.StandardOutputEncoding = [Console]::OutputEncoding
+    $startInfo.StandardErrorEncoding = [Console]::OutputEncoding
+    foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add([string]$argument) }
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    if (-not $process.Start()) { throw "Failed to start $($Application.Source)." }
+    try {
+        $readers = @{
+            out = @{ reader = $process.StandardOutput; task = $null }
+            err = @{ reader = $process.StandardError; task = $null }
+        }
+        foreach ($key in @($readers.Keys)) { $readers[$key].task = $readers[$key].reader.ReadLineAsync() }
+        $exitedAtUtc = $null
+        $drainGrace = [timespan]::FromSeconds(2)
+        while ($true) {
+            $progressed = $false
+            foreach ($key in @($readers.Keys)) {
+                $entry = $readers[$key]
+                if ($null -eq $entry.task) { continue }
+                if (-not $entry.task.IsCompleted) { continue }
+                $progressed = $true
+                $line = $null
+                try { $line = $entry.task.GetAwaiter().GetResult() } catch { $line = $null }
+                if ($null -eq $line) {
+                    $entry.task = $null
+                } else {
+                    & $OnLine $line
+                    $entry.task = $entry.reader.ReadLineAsync()
+                }
+            }
+            $pending = @($readers.Values | Where-Object { $null -ne $_.task } | ForEach-Object { $_.task })
+            if ($pending.Count -eq 0) { break }
+            if ($process.HasExited) {
+                if ($null -eq $exitedAtUtc) { $exitedAtUtc = [datetime]::UtcNow }
+                elseif (([datetime]::UtcNow - $exitedAtUtc) -gt $drainGrace) { break }
+            }
+            if (-not $progressed) {
+                $null = [Threading.Tasks.Task]::WaitAny([Threading.Tasks.Task[]]$pending, 200)
+            }
+        }
+        $null = $process.WaitForExit(5000)
+        return [int]$process.ExitCode
+    } finally {
+        $process.Dispose()
+    }
+}
+
 $job = Read-ManagedJob -Path $JobFile
 $keepTerminalOpen = [bool]$job.keepTerminalOpen
 $sharedTerminal = $job.PSObject.Properties.Name -contains 'sharedTerminal' -and [bool]$job.sharedTerminal
@@ -79,14 +138,31 @@ try {
             # Piping their output delays prompts that do not end in a newline and
             # rewrites terminal control sequences, corrupting the visible pane.
             & $launch.executable @($launch.arguments)
+            $exitCode = if (Test-Path variable:LASTEXITCODE) { [int]$LASTEXITCODE } elseif ($?) { 0 } else { 1 }
         } else {
-            & $launch.executable @($launch.arguments) 2>&1 | ForEach-Object {
-                $line = $_.ToString()
-                Write-Host $line
-                $writer.WriteLine($line)
+            # Wait for the launched process to exit instead of for end-of-stream.
+            # Windows descendants inherit the redirected handles, so a detached
+            # grandchild that outlives the executable (for example a reusable
+            # broker daemon) would otherwise hold the pipe open and leave the job
+            # reported as running after the work has finished.
+            $application = Get-Command -Name $launch.executable -CommandType Application -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if ($application) {
+                $exitCode = Invoke-ManagedJobChildProcess -Application $application -Arguments @($launch.arguments) -OnLine {
+                    param($line)
+                    Write-Host $line
+                    $writer.WriteLine($line)
+                }
+            } else {
+                # PowerShell commands run in-process and cannot leak the pipe.
+                & $launch.executable @($launch.arguments) 2>&1 | ForEach-Object {
+                    $line = $_.ToString()
+                    Write-Host $line
+                    $writer.WriteLine($line)
+                }
+                $exitCode = if (Test-Path variable:LASTEXITCODE) { [int]$LASTEXITCODE } elseif ($?) { 0 } else { 1 }
             }
         }
-        $exitCode = if (Test-Path variable:LASTEXITCODE) { [int]$LASTEXITCODE } elseif ($?) { 0 } else { 1 }
     } finally {
         $ErrorActionPreference = $previousErrorPreference
     }

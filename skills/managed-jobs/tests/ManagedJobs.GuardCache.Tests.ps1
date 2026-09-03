@@ -7,12 +7,19 @@ param()
 # erases the other fingerprints, so a later foreground retry of an erased
 # command is allowed. Every concurrently denied command must still be denied on
 # its foreground retry.
+#
+# The hook's MANAGED_JOBS_GUARD_BARRIER seam makes the contention deterministic:
+# every hook process announces readiness, then holds just before the cache read
+# until the barrier file exists, so process-startup jitter cannot serialize the
+# transactions by accident.
 
 $ErrorActionPreference = 'Stop'
 $hookScript = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\ManagedJob.PreToolUseHook.ps1'
 $pwsh = (Get-Process -Id $PID).Path
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('managed-jobs-guard-cache-' + [guid]::NewGuid().ToString('N'))
 $previousStateRoot = $env:MANAGED_JOBS_ROOT
+$previousBarrier = $env:MANAGED_JOBS_GUARD_BARRIER
+$barrierFile = Join-Path $testRoot 'barrier'
 $assertionCount = 0
 
 function Assert-True {
@@ -37,13 +44,12 @@ $commandCount = 6
 $commands = @(0..($commandCount - 1) | ForEach-Object { "python -m guard_cache_server_$_" })
 
 $denyScript = {
-    param([string]$Pwsh, [string]$HookScript, [string]$Command, [Threading.ManualResetEventSlim]$Gate)
+    param([string]$Pwsh, [string]$HookScript, [string]$Command)
     $ErrorActionPreference = 'Stop'
     $payload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'Bash'
         tool_input = [ordered]@{ command = $Command; run_in_background = $true }
     } | ConvertTo-Json -Compress
-    $Gate.Wait()
     $output = ($payload | & $Pwsh -NoProfile -ExecutionPolicy Bypass -File $HookScript | Out-String)
     return [pscustomobject]@{ command = $Command; output = $output }
 }
@@ -53,18 +59,25 @@ $handles = @()
 try {
     $null = New-Item -ItemType Directory -Path $testRoot -Force
     $env:MANAGED_JOBS_ROOT = $testRoot
+    $env:MANAGED_JOBS_GUARD_BARRIER = $barrierFile
 
-    $gate = [Threading.ManualResetEventSlim]::new($false)
     $pool = [runspacefactory]::CreateRunspacePool(1, $commandCount)
     $pool.Open()
     foreach ($command in $commands) {
         $shell = [powershell]::Create()
         $shell.RunspacePool = $pool
-        $null = $shell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).AddArgument($command).AddArgument($gate)
+        $null = $shell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).AddArgument($command)
         $handles += [pscustomobject]@{ shell = $shell; async = $shell.BeginInvoke() }
     }
-    # Release every runspace at once so the hook processes overlap on the cache.
-    $gate.Set()
+    # Wait until every hook process is parked at the seam, then release them all
+    # into the cache transaction together.
+    $readyDeadline = [datetime]::UtcNow.AddSeconds(30)
+    do {
+        $ready = @(Get-ChildItem -LiteralPath $testRoot -Force -File -Filter 'barrier.ready-*').Count
+        if ($ready -lt $commandCount) { Start-Sleep -Milliseconds 20 }
+    } while ($ready -lt $commandCount -and [datetime]::UtcNow -lt $readyDeadline)
+    Assert-True ($ready -eq $commandCount) "Every hook process should reach the guard barrier, found $ready of $commandCount."
+    $null = New-Item -ItemType File -Path $barrierFile -Force
 
     $failures = [Collections.Generic.List[string]]::new()
     foreach ($handle in $handles) {
@@ -115,6 +128,11 @@ try {
         Remove-Item Env:MANAGED_JOBS_ROOT -ErrorAction SilentlyContinue
     } else {
         $env:MANAGED_JOBS_ROOT = $previousStateRoot
+    }
+    if ($null -eq $previousBarrier) {
+        Remove-Item Env:MANAGED_JOBS_GUARD_BARRIER -ErrorAction SilentlyContinue
+    } else {
+        $env:MANAGED_JOBS_GUARD_BARRIER = $previousBarrier
     }
     if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }

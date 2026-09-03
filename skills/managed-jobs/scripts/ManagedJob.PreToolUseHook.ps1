@@ -55,6 +55,16 @@ try {
             $guardFile = Join-Path (Join-Path $stateRoot 'guard') 'denied-launches.json'
             $sha = [Security.Cryptography.SHA256]::Create()
             $fingerprint = [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($command.Trim())))
+            # Test seam: when a barrier path is set, announce readiness and hold
+            # here (bounded) until the barrier file exists, so a regression test
+            # can force several hook processes into the cache transaction at once.
+            if ($env:MANAGED_JOBS_GUARD_BARRIER) {
+                $null = New-Item -ItemType File -Path "$($env:MANAGED_JOBS_GUARD_BARRIER).ready-$PID" -Force
+                $barrierDeadline = [datetime]::UtcNow.AddSeconds(5)
+                while (-not (Test-Path -LiteralPath $env:MANAGED_JOBS_GUARD_BARRIER) -and [datetime]::UtcNow -lt $barrierDeadline) {
+                    Start-Sleep -Milliseconds 20
+                }
+            }
             # Serialize the read/prune/update/replace transaction across concurrent
             # hook processes: without the lock two denials read the same old state
             # and the last writer erases the other's fingerprint. The wait is short

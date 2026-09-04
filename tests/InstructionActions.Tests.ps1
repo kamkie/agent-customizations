@@ -90,6 +90,13 @@ try {
     } finally { $env:PATH = $savedPath }
     Assert-True ($missingExit -ne 0 -and ($missing -join ' ') -match 'Required action client is unavailable: codex') 'Missing client was not identified during preflight.'
     Assert-True (-not (Test-Path $missingOutput)) 'Missing client created case artifacts or behavior results.'
+    try {
+        $env:PATH = ''
+        foreach ($emptyFilter in @(',', ' ')) {
+            $invalid = @(& $pwsh -NoProfile -File $runner -Target codex -CaseId $emptyFilter -OutputDirectory $missingOutput 2>&1)
+            Assert-True ($LASTEXITCODE -ne 0 -and ($invalid -join ' ') -match 'CaseId was supplied but contains no case names') 'An explicit empty filter could start the full suite.'
+        }
+    } finally { $env:PATH = $savedPath }
     $fakeBin = Join-Path $testRoot 'bin'
     $null = New-Item -ItemType Directory -Path $fakeBin
     @'

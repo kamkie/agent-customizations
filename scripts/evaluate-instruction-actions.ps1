@@ -18,6 +18,7 @@ $schemaPath = Join-Path $fixtures 'instruction-action-response.schema.json'
 $schema = Get-Content $schemaPath -Raw
 $manifest = Get-CustomizationManifest
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+if ($PSBoundParameters.ContainsKey('CaseId') -and -not $CaseId.Count) { throw 'CaseId was supplied but contains no case names.' }
 if (@($CaseId | Where-Object { $_ -notin $cases.id }).Count) { throw 'Unknown action case.' }
 if ($CaseId.Count) { $cases = @($cases | Where-Object id -in $CaseId) }
 $targets = if ($Target -eq 'all') { @('codex', 'claude') } else { @($Target) }

@@ -88,8 +88,9 @@ Do not require the user to certify every future dependency before starting.
 Before an irreversible or production-sensitive operation, or one that cannot
 safely pause, verify the decisions, authority, access, dependencies, and recovery
 or completion path needed for that operation. Resolve concrete gaps before
-crossing that boundary. If no independent safe work remains and these checks
-fail, leave requested autonomous persistence inactive and report the concrete
+crossing that boundary. When these checks fail and no independent safe work
+remains, autonomous persistence must be inactive, including when earlier safe
+phases ran autonomously. Stop at a recoverable checkpoint and report the concrete
 prerequisite needed to proceed. If the user explicitly requires completion without
 further input, verify continuity for the entire requested run before starting it.
 Keep these stronger checks scoped to the operation that needs them; continue

@@ -133,6 +133,7 @@ exit $clientExit
     $run = @(Get-ChildItem -LiteralPath $failureOutput -Directory)[0].FullName
     $summary = Get-Content (Join-Path $run 'summary.json') -Raw | ConvertFrom-Json
     $failedCase = Join-Path $run 'codex/design-agreement'
+    Assert-True (($failure -join ' ') -notmatch 'Runner changed its caller preference') 'Action runner leaked its native error preference.'
     Assert-True ($failureExit -ne 0 -and $summary.results[0].failureKind -eq 'execution') 'Client failure was scored as behavior.'
     Assert-True ((Get-Content (Join-Path $failedCase 'client-0.jsonl') -Raw) -match 'mock client failure') 'Nonzero client stdout was lost.'
     Assert-True ((Get-Content (Join-Path $failedCase 'client-0.stderr.txt') -Raw) -match 'mock diagnostic') 'Nonzero client stderr was lost.'

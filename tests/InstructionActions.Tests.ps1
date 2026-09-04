@@ -114,12 +114,16 @@ exit 17
     $driver = Join-Path $testRoot 'native-preference-driver.ps1'
     @'
 param([string]$Runner, [string]$Output)
-$PSNativeCommandUseErrorActionPreference = $true
+$global:PSNativeCommandUseErrorActionPreference = $true
 & $Runner -Target codex -CaseId design-agreement -OutputDirectory $Output
 $clientExit = $LASTEXITCODE
-if (-not $PSNativeCommandUseErrorActionPreference) { throw 'Runner changed its caller preference.' }
+if (-not $global:PSNativeCommandUseErrorActionPreference) { throw 'Runner changed its caller preference.' }
 exit $clientExit
 '@ | Set-Content $driver
+    $leakyRunner = Join-Path $testRoot 'leaky-runner.ps1'
+    '$global:PSNativeCommandUseErrorActionPreference = $false; exit 1' | Set-Content $leakyRunner
+    $leak = @(& $pwsh -NoProfile -File $driver -Runner $leakyRunner -Output $testRoot 2>&1)
+    Assert-True ($LASTEXITCODE -ne 0 -and ($leak -join ' ') -match 'Runner changed its caller preference') 'Preference-leak assertion did not detect a real global mutation.'
     $failureOutput = Join-Path $testRoot 'failed-client'
     try {
         $env:PATH = $fakeBin + [IO.Path]::PathSeparator + $savedPath

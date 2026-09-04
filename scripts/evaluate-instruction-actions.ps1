@@ -78,7 +78,7 @@ $currentRequest
                 foreach ($line in $raw) {
                     $event = $line | ConvertFrom-Json
                     if ($event.type -like 'item.*' -and $event.item.type -notin @('agent_message','reasoning')) {
-                        throw "Native CLI action is outside the controlled protocol: $($event.item.type)"
+                        throw [ArgumentException]::new("Native CLI action is outside the controlled protocol: $($event.item.type)")
                     }
                 }
                 return Get-Content $responsePath -Raw | ConvertFrom-Json
@@ -101,9 +101,10 @@ $currentRequest
             $actual = Invoke-InstructionActionCase -Case $case -Workspace $workspace -Responder $responder
             $actual | ConvertTo-Json -Depth 15 | Set-Content (Join-Path $caseRoot 'observations.json')
             $score = Test-InstructionActionResult -Actual $actual -Expected $expectations.($case.id)
-            $results.Add(@{target = $agentTarget; case = $case.id; passed = $score.passed; errors = $score.errors})
+            $results.Add(@{target = $agentTarget; case = $case.id; passed = $score.passed; failureKind = $(if ($score.passed) { 'none' } else { 'behavior' }); errors = $score.errors})
         } catch {
-            $results.Add(@{target = $agentTarget; case = $case.id; passed = $false; errors = @($_.Exception.Message)})
+            $kind = if ($_.Exception -is [ArgumentException]) { 'protocol' } else { 'execution' }
+            $results.Add(@{target = $agentTarget; case = $case.id; passed = $false; failureKind = $kind; errors = @($_.Exception.Message)})
         }
         Write-Host "$agentTarget/$($case.id): $($results[$results.Count - 1] | ConvertTo-Json -Compress)"
     }

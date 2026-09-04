@@ -61,10 +61,15 @@ try {
     Assert-True (-not $result.actual.finished -and -not $result.score.passed) 'Action exhaustion claimed completion.'
     $rejected = $false
     try { Replay 'design-agreement' @((Action 'write_file' '../outside.txt' 'bad')) | Out-Null } catch {
-        $rejected = $_.Exception.Message -like '*outside the tool allowlist*'
+        $rejected = $_.Exception -is [ArgumentException] -and $_.Exception.Message -like '*outside the tool allowlist*'
     }
     Assert-True $rejected 'Path traversal was not rejected.'
     Assert-True (-not (Test-Path (Join-Path $testRoot 'outside.txt'))) 'Path traversal wrote outside the workspace.'
+    $rejected = $false
+    try { Replay 'design-agreement' @((Action 'read_file' 'Greeting.txt')) | Out-Null } catch {
+        $rejected = $_.Exception -is [ArgumentException]
+    }
+    Assert-True $rejected 'A noncanonical filename was not classified as a protocol violation.'
     $occupied = Join-Path $testRoot 'occupied'
     $null = New-Item -ItemType Directory -Path $occupied
     [IO.File]::WriteAllText((Join-Path $occupied 'notes.txt'), 'existing')

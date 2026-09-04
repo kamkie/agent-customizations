@@ -14,14 +14,19 @@ $expectations = Get-Content (Join-Path $fixtures 'instruction-action-expectation
 $schemaPath = Join-Path $fixtures 'instruction-action-response.schema.json'
 $schema = Get-Content $schemaPath -Raw
 $manifest = Get-CustomizationManifest
-$CaseId = @($CaseId | ForEach-Object { $_ -split ',' })
+$CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 if (@($CaseId | Where-Object { $_ -notin $cases.id }).Count) { throw 'Unknown action case.' }
 if ($CaseId.Count) { $cases = @($cases | Where-Object id -in $CaseId) }
+$targets = if ($Target -eq 'all') { @('codex', 'claude') } else { @($Target) }
+foreach ($client in $targets) {
+    if (-not (Get-Command $client -ErrorAction SilentlyContinue)) {
+        throw "Required action client is unavailable: $client"
+    }
+}
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path ([IO.Path]::GetTempPath()) ('instruction-actions-' + [guid]::NewGuid().ToString('N')) }
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 # Each run uses its own child so an existing output directory is never a workspace.
 $runRoot = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) ([guid]::NewGuid().ToString('N'))
-$targets = if ($Target -eq 'all') { @('codex', 'claude') } else { @($Target) }
 $results = [Collections.Generic.List[object]]::new()
 foreach ($agentTarget in $targets) {
     foreach ($case in $cases) {

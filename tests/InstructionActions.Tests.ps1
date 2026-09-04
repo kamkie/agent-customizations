@@ -79,6 +79,17 @@ try {
     }
     Assert-True ($rejected -and -not (Test-Path (Join-Path $occupied 'greeting.txt'))) 'Occupied workspace was partially initialized.'
     Assert-True ([IO.File]::ReadAllText((Join-Path $occupied 'notes.txt')) -ceq 'existing') 'Occupied workspace contents were overwritten.'
+    $pwsh = (Get-Command pwsh).Source
+    $runner = Join-Path $PSScriptRoot '../scripts/evaluate-instruction-actions.ps1'
+    $missingOutput = Join-Path $testRoot 'missing-client'
+    $savedPath = $env:PATH
+    try {
+        $env:PATH = ''
+        $missing = @(& $pwsh -NoProfile -File $runner -Target codex -OutputDirectory $missingOutput 2>&1)
+        $missingExit = $LASTEXITCODE
+    } finally { $env:PATH = $savedPath }
+    Assert-True ($missingExit -ne 0 -and ($missing -join ' ') -match 'Required action client is unavailable: codex') 'Missing client was not identified during preflight.'
+    Assert-True (-not (Test-Path $missingOutput)) 'Missing client created case artifacts or behavior results.'
     Write-Host "Instruction action dispatcher and observation tests: OK ($assertions assertions)"
 } finally {
     $resolved = [IO.Path]::GetFullPath($testRoot)

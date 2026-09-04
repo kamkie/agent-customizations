@@ -6,7 +6,7 @@ description: Have the opposite agent engine attack a committed change, then tria
 # Cross-agent review
 
 One engine implements, the opposite engine attacks, the implementer decides. The
-reviewer never edits files. The implementer never grades its own work.
+reviewer never edits files. The implementer owns evidence-based triage; independent review supplies findings.
 
 This skill owns the loop, not the reviewer: each direction delegates to the
 runtime that already exists for it.
@@ -52,8 +52,8 @@ bash "$skill/scripts/invoke-cross-agent-review.sh" \
 - Omit the base in round 1. In every later round pass `-Base`/`--base` with the
   exact head the previous round reviewed.
 - `to-claude` requires an open pull request. Round 1 uses Claude's built-in PR
-  review, which cannot receive the focus file or vote request; record no vote
-  and escalate a disagreement only when no later scoped round will carry it.
+  review, which cannot receive the focus file or vote request; record no vote.
+  Missing reviewer agreement does not reopen an evidence-backed rejection.
   Later rounds use a read-only prompt restricted to `base..HEAD`, and the focus
   file carries unresolved findings into that range review.
 - In a later round, reject any new finding outside `base..HEAD` unless the
@@ -88,13 +88,26 @@ clean review or a routine finding resolved in the same round.
   repository defines, or `Co-Authored-By: Codex <noreply@openai.com>` /
   `Co-Authored-By: Claude <noreply@anthropic.com>`.
 - Run the repository's own validation commands before the round ends.
-- The initial budget is three successful, correctly scoped rounds. Failed or
-  scope-invalid runs consume nothing. A user-requested round adds one to the
-  budget and runs; only the user can increase the budget. Otherwise continue
-  only after a confirmed finding produced a repair diff; both sides vote and the
-  implementer decides.
-- Anything the loop cannot resolve is escalated to the user, not dropped. A
-  commit landing after the last review blocks the handoff.
+- **Decide by the repair's effect.** Require another scoped review when changes
+  since the last reviewed head alter behavior or introduce meaningful risk.
+  Instruction changes that alter agent decisions count as behavior changes.
+  Formatting, nonsemantic wording, and tests that only strengthen checks of an
+  unchanged contract may close with targeted validation and a recorded reason.
+  Evaluate the complete repair range; a small diff or low-severity label alone
+  does not establish that it is behavior-neutral.
+- Close an unsupported finding with concrete reasoning and evidence. Reviewer
+  agreement is not required, and rejection alone triggers neither another round
+  nor escalation. Keep credible unresolved defects and formal blocking reviews
+  visible; escalate only when a user decision or more review authority is needed.
+- The budget is three successful, correctly scoped rounds. Failed or scope-invalid
+  runs consume nothing. Only the user can increase the budget. A user-requested
+  round adds one and runs. Otherwise use remaining rounds only for behavior or
+  material risk changes; collect a reviewer vote when available and record the
+  implementer's decision.
+- Before handoff, account for every commit after the last reviewed head: reviewed
+  in a later range, or inspected as behavior-neutral with targeted validation.
+  Never describe an unreviewed commit as reviewed. Unclassified or materially
+  changed commits block review completion; repository readiness gates still apply.
 
 Reviewing a branch with no pull request is the uncommon path: build a read-only
 `-PromptFile` run from [the reviewer stance](references/reviewer-stance.md).

@@ -5,6 +5,9 @@ param(
     [string]$OutputDirectory
 )
 $ErrorActionPreference = 'Stop'
+# Capture native exit codes ourselves, including when a caller enables native
+# ErrorActionPreference integration. Preserve stdout before reporting failures.
+$PSNativeCommandUseErrorActionPreference = $false
 . (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 . (Join-Path $PSScriptRoot 'InstructionActions.Common.ps1')
 $repo = Get-CustomizationRepositoryRoot

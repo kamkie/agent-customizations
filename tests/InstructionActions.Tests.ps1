@@ -96,11 +96,27 @@ try {
 Write-Output '{"type":"error","message":"mock client failure"}'
 Write-Error 'mock diagnostic' -ErrorAction Continue
 exit 17
-'@ | Set-Content (Join-Path $fakeBin 'codex.ps1')
+'@ | Set-Content (Join-Path $fakeBin 'native-client.ps1')
+    if ($IsWindows) {
+        "@echo off`r`n`"$pwsh`" -NoProfile -File `"%~dp0native-client.ps1`"`r`nexit /b %errorlevel%" | Set-Content (Join-Path $fakeBin 'codex.cmd')
+    } else {
+        "#!/usr/bin/env pwsh`n& (Join-Path `$PSScriptRoot 'native-client.ps1')`nexit `$LASTEXITCODE" | Set-Content (Join-Path $fakeBin 'codex')
+        & chmod +x (Join-Path $fakeBin 'codex')
+        if ($LASTEXITCODE -ne 0) { throw 'Could not make native test client executable.' }
+    }
+    $driver = Join-Path $testRoot 'native-preference-driver.ps1'
+    @'
+param([string]$Runner, [string]$Output)
+$PSNativeCommandUseErrorActionPreference = $true
+& $Runner -Target codex -CaseId design-agreement -OutputDirectory $Output
+$clientExit = $LASTEXITCODE
+if (-not $PSNativeCommandUseErrorActionPreference) { throw 'Runner changed its caller preference.' }
+exit $clientExit
+'@ | Set-Content $driver
     $failureOutput = Join-Path $testRoot 'failed-client'
     try {
         $env:PATH = $fakeBin + [IO.Path]::PathSeparator + $savedPath
-        $failure = @(& $pwsh -NoProfile -File $runner -Target codex -CaseId design-agreement -OutputDirectory $failureOutput 2>&1)
+        $failure = @(& $pwsh -NoProfile -File $driver -Runner $runner -Output $failureOutput 2>&1)
         $failureExit = $LASTEXITCODE
     } finally { $env:PATH = $savedPath }
     $run = @(Get-ChildItem -LiteralPath $failureOutput -Directory)[0].FullName

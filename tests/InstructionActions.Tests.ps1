@@ -90,6 +90,26 @@ try {
     } finally { $env:PATH = $savedPath }
     Assert-True ($missingExit -ne 0 -and ($missing -join ' ') -match 'Required action client is unavailable: codex') 'Missing client was not identified during preflight.'
     Assert-True (-not (Test-Path $missingOutput)) 'Missing client created case artifacts or behavior results.'
+    $fakeBin = Join-Path $testRoot 'bin'
+    $null = New-Item -ItemType Directory -Path $fakeBin
+    @'
+Write-Output '{"type":"error","message":"mock client failure"}'
+Write-Error 'mock diagnostic' -ErrorAction Continue
+exit 17
+'@ | Set-Content (Join-Path $fakeBin 'codex.ps1')
+    $failureOutput = Join-Path $testRoot 'failed-client'
+    try {
+        $env:PATH = $fakeBin + [IO.Path]::PathSeparator + $savedPath
+        $failure = @(& $pwsh -NoProfile -File $runner -Target codex -CaseId design-agreement -OutputDirectory $failureOutput 2>&1)
+        $failureExit = $LASTEXITCODE
+    } finally { $env:PATH = $savedPath }
+    $run = @(Get-ChildItem -LiteralPath $failureOutput -Directory)[0].FullName
+    $summary = Get-Content (Join-Path $run 'summary.json') -Raw | ConvertFrom-Json
+    $failedCase = Join-Path $run 'codex/design-agreement'
+    Assert-True ($failureExit -ne 0 -and $summary.results[0].failureKind -eq 'execution') 'Client failure was scored as behavior.'
+    Assert-True ((Get-Content (Join-Path $failedCase 'client-0.jsonl') -Raw) -match 'mock client failure') 'Nonzero client stdout was lost.'
+    Assert-True ((Get-Content (Join-Path $failedCase 'client-0.stderr.txt') -Raw) -match 'mock diagnostic') 'Nonzero client stderr was lost.'
+    Assert-True (Test-Path (Join-Path $failedCase 'prompt-0.txt')) 'Failed invocation prompt was lost.'
     Write-Host "Instruction action dispatcher and observation tests: OK ($assertions assertions)"
 } finally {
     $resolved = [IO.Path]::GetFullPath($testRoot)

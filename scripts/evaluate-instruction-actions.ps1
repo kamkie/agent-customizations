@@ -66,6 +66,8 @@ following current user request according to the active instructions:
 $currentRequest
 "@
             $responsePath = Join-Path $caseRoot "response-$step.json"
+            $stderrPath = Join-Path $caseRoot "client-$step.stderr.txt"
+            $prompt | Set-Content (Join-Path $caseRoot "prompt-$step.txt")
             if ($agentTarget -eq 'codex') {
                 $arguments = @('exec','--ephemeral','--ignore-user-config','--ignore-rules','--strict-config',
                     '--sandbox','workspace-write','--color','never','--json','--cd',$workspace,
@@ -77,9 +79,10 @@ $currentRequest
                     $arguments += @('--disable', $feature)
                 }
                 if ($IsWindows) { $arguments += @('-c', 'windows.sandbox="elevated"') }
-                $raw = @($prompt | & codex @arguments '-')
-                if ($LASTEXITCODE -ne 0) { throw 'Codex action client failed.' }
+                $raw = @($prompt | & codex @arguments '-' 2> $stderrPath)
+                $clientExit = $LASTEXITCODE
                 $raw | Set-Content (Join-Path $caseRoot "client-$step.jsonl")
+                if ($clientExit -ne 0) { throw "Codex action client failed with exit $clientExit; diagnostics: $stderrPath" }
                 foreach ($line in $raw) {
                     $event = $line | ConvertFrom-Json
                     if ($event.type -like 'item.*' -and $event.item.type -notin @('agent_message','reasoning')) {
@@ -92,10 +95,11 @@ $currentRequest
             try {
                 $raw = @(& claude --print --no-session-persistence --permission-mode dontAsk --setting-sources '' `
                     --disable-slash-commands --tools '' --strict-mcp-config --mcp-config $mcpConfig `
-                    --system-prompt-file $instructionsPath --json-schema $schema --output-format json $prompt)
-                if ($LASTEXITCODE -ne 0) { throw 'Claude action client failed.' }
+                    --system-prompt-file $instructionsPath --json-schema $schema --output-format json $prompt 2> $stderrPath)
+                $clientExit = $LASTEXITCODE
             } finally { Pop-Location }
             $raw | Set-Content (Join-Path $caseRoot "client-$step.json")
+            if ($clientExit -ne 0) { throw "Claude action client failed with exit $clientExit; diagnostics: $stderrPath" }
             $envelope = ($raw -join "`n") | ConvertFrom-Json
             $structured = Get-ActionProperty $envelope 'structured_output'
             $response = if ($structured) { $structured } else { $envelope.result | ConvertFrom-Json }

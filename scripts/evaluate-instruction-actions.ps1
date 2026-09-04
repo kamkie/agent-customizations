@@ -24,9 +24,10 @@ foreach ($client in $targets) {
     }
 }
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path ([IO.Path]::GetTempPath()) ('instruction-actions-' + [guid]::NewGuid().ToString('N')) }
+$OutputDirectory = Resolve-ActionOutputDirectory $OutputDirectory
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 # Each run uses its own child so an existing output directory is never a workspace.
-$runRoot = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) ([guid]::NewGuid().ToString('N'))
+$runRoot = Join-Path $OutputDirectory ([guid]::NewGuid().ToString('N'))
 $results = [Collections.Generic.List[object]]::new()
 foreach ($agentTarget in $targets) {
     foreach ($case in $cases) {

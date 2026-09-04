@@ -110,6 +110,14 @@ exit 17
     Assert-True ((Get-Content (Join-Path $failedCase 'client-0.jsonl') -Raw) -match 'mock client failure') 'Nonzero client stdout was lost.'
     Assert-True ((Get-Content (Join-Path $failedCase 'client-0.stderr.txt') -Raw) -match 'mock diagnostic') 'Nonzero client stderr was lost.'
     Assert-True (Test-Path (Join-Path $failedCase 'prompt-0.txt')) 'Failed invocation prompt was lost.'
+    Push-Location $testRoot
+    try {
+        $resolvedOutput = Resolve-ActionOutputDirectory 'relative-output'
+        Assert-True ($resolvedOutput -eq (Join-Path $testRoot 'relative-output')) 'Relative output did not use the PowerShell location.'
+        $rejected = $false
+        try { Resolve-ActionOutputDirectory 'Env:ACTION_TEST_OUTPUT' | Out-Null } catch { $rejected = $true }
+        Assert-True $rejected 'Non-filesystem output provider was accepted.'
+    } finally { Pop-Location }
     Write-Host "Instruction action dispatcher and observation tests: OK ($assertions assertions)"
 } finally {
     $resolved = [IO.Path]::GetFullPath($testRoot)

@@ -149,7 +149,10 @@
     "autonomous-irreversible-unverified": {
       "mode": "careful",
       "autonomous": false,
-      "primaryAction": "autonomous-readiness-checkpoint"
+      "primaryAction": "autonomous-readiness-checkpoint",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
     },
     "campaign-delivery-ready": {
       "mode": "standard",

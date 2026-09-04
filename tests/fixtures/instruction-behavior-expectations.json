@@ -25,6 +25,53 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false
     },
+    "design-agreement": {
+      "mode": "design",
+      "autonomous": false,
+      "primaryAction": "continue-design-discussion",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "design-safe-step-refinement": {
+      "mode": "design",
+      "autonomous": false,
+      "primaryAction": "continue-design-discussion",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "design-to-explicit-implementation": {
+      "mode": "standard",
+      "primaryAction": "implement-and-deliver",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "authorized-safe-next-step": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "authorized-independent-work": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "stop-before-rollback": {
+      "mode": "design",
+      "autonomous": false,
+      "primaryAction": "stop-and-report",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
     "ordinary-implementation": {
       "mode": "standard",
       "autonomous": false,
@@ -48,8 +95,8 @@
     },
     "autonomous-request": {
       "mode": "standard",
-      "autonomous": false,
-      "primaryAction": "autonomous-readiness-checkpoint",
+      "autonomous": true,
+      "primaryAction": "implement-and-deliver",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
@@ -77,11 +124,32 @@
     },
     "campaign-delivery-trigger": {
       "mode": "standard",
-      "autonomous": false,
-      "primaryAction": "autonomous-readiness-checkpoint",
+      "autonomous": true,
+      "primaryAction": "deliver-pilot-before-fanout",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
+    },
+    "capability-typo-question": {
+      "mode": "investigation",
+      "autonomous": false,
+      "primaryAction": "answer-read-only",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "autonomous-reversible-expiring-session": {
+      "mode": "standard",
+      "autonomous": true,
+      "primaryAction": "implement-and-deliver",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "autonomous-irreversible-unverified": {
+      "mode": "careful",
+      "autonomous": false,
+      "primaryAction": "autonomous-readiness-checkpoint"
     },
     "campaign-delivery-ready": {
       "mode": "standard",

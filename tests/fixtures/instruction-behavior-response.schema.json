@@ -19,8 +19,11 @@
       "type": "string",
       "enum": [
         "answer-read-only",
+        "continue-design-discussion",
         "produce-design-artifact",
         "implement-and-deliver",
+        "continue-authorized-work",
+        "stop-and-report",
         "commit-only",
         "recheck-and-diagnose",
         "autonomous-readiness-checkpoint",

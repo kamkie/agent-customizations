@@ -100,9 +100,9 @@ available. For safely resumable work, uncertain future session expiry does not
 block progress. If access becomes unavailable, use only an authorized recovery
 path; otherwise preserve non-secret progress, identify the exact blocked step,
 and request the missing input while continuing independent work. Never print,
-copy into prompts
-or files, or retain credentials merely to make the run autonomous. Do not bypass
-authentication or refresh access beyond the granted authority.
+copy into prompts or files, or retain credentials merely to make the run
+autonomous. Do not bypass authentication or refresh access beyond the granted
+authority.
 
 ## Questions, design, and authorization
 

@@ -31,69 +31,49 @@ context.
 | false positive | You can state a one-line reason the alleged defect is wrong | Never "fix" it |
 | review-scope violation | The range did not cause it and it was not carried forward | Reject it; do not modify the change |
 
-## Carry unresolved findings forward
+## Carry only unresolved defects
 
-An unresolved in-scope finding is one you did not fix: plausible ones you left,
-false positives, and confirmed ones you ruled out of task scope. Later rounds
-see only repair commits, so restate each unresolved finding in the next focus
-file with your reasoning and ask the reviewer to accept or contest it.
+The [entrypoint](../SKILL.md#then-judge) owns the re-review decision. An
+evidence-backed false-positive rejection closes the finding without requiring
+reviewer agreement. Record the alleged failure, relevant code or instruction,
+and why the failure does not follow. Do not carry it merely to obtain consensus.
 
-A finding is resolved when it is fixed, when the reviewer accepts your reasoning,
-or when it is escalated to the user.
+Carry credible unresolved findings only when a required later repair review can
+help resolve them. State the evidence and the remaining question. Escalate a
+confirmed defect outside the authorized scope or a material decision the agent
+cannot resolve. An unsupported wording concern alone is not a user blocker.
 
-## Decide on another round
+## Apply the round decision
 
-Review starts with a budget of three successful, correctly scoped rounds. Each
-such round consumes one. Failed or scope-invalid runs consume nothing.
+Review the complete range from the last independently reviewed head to current
+HEAD and classify its effect using the entrypoint's rule. A formatting-only
+change or a stronger assertion of unchanged behavior can use targeted checks;
+a production behavior change, an instruction decision change, or uncertain
+material risk needs scoped re-review. Do not split a risky range into small
+commits to avoid review.
 
-A direct user request to run another review round adds one to the budget and
-requests that round. It runs without a reviewer vote or implementer decision. A
-request to increase the budget by N adds N without by itself requesting a run.
-Completed rounds remain counted; the implementer cannot reset or increase the
-budget.
+A user's explicit request for another round adds one to the three-round budget.
+Only the user can increase that budget. If necessary re-review remains when
+the budget is exhausted, report the exact unreviewed range and ask for the
+needed review authority. Do not reset the counter or claim review coverage.
 
-For agent-initiated continuation:
+The reviewer vote is advisory. Record an absent vote and explain a decision
+that differs from an available vote. Disagreement alone does not require a vote,
+another paid invocation, or a new approval checkpoint.
 
-1. Continue only when the current round produced a confirmed finding and its fix
-   changed the diff.
-2. Require remaining budget. If none remains, ask how many rounds the user wants
-   to add; a positive whole-number answer adds that amount.
-3. Ask for the reviewer's vote inside the review that already runs. Record an
-   absent or unparseable vote instead of inferring one.
-4. The implementer decides. Report any decision to stop against a reviewer vote
-   to continue.
-5. Escalate a finding that survives two rounds of disagreement.
+## Account for later commits
 
-Small or low-risk changes normally finish in one round. Round 3 is an escape
-hatch under the initial budget.
-
-## Escalate instead of swallowing
-
-| Situation | Why the loop cannot resolve it | Required action |
-| --- | --- | --- |
-| No-diff stop leaves an unresolved finding | The required later-round base equals `HEAD`, so there is no repair range | Escalate in that round |
-| Confirmed but outside task scope | It produces no authorized repair diff | Escalate; a verified defect must not pass silently |
-| Round-1 `to-claude` finding is disputed and no later round is permitted | The built-in PR reviewer never saw your reasoning, and no later focus can carry it | Escalate the disagreement in round 1 |
-| No reviewer path can enforce the later-round range | A full re-audit can invent findings in unchanged material | Stop and ask the user how to proceed |
-| A commit landed after the last completed review and no next round is permitted | The current head remains unreviewed | Block the handoff and escalate |
-
-## Post-review commits block the handoff
-
-Any commit after the last completed review makes the change not review-complete
-until a successful scoped round reviews that range. Do not mark the change ready,
-done, or reviewed while its head is unreviewed. If no next round is permitted,
-escalate with the exact unreviewed commits; higher-precedence repository policy
-decides whether explicit risk acceptance is allowed.
+A successful reviewer run covers only its recorded range and head. For each
+later range, record either the next independent review or a behavior-neutral
+disposition with the inspected diff, rationale, and relevant validation result.
+This disposition is not an independent review of that range. Unknown effects
+or meaningful risk still block completion. The repository owns final Ready,
+blocking-review, owner-approval, and merge gates.
 
 ## Report contract
 
-1. A table: severity | file:line | class | action | fix commit.
-2. Every reviewed `base..head`, its scope, and whether it consumed budget.
-3. Rounds used / current budget, every user-authorized increase, and why the loop
-   stopped.
-4. Every rejected scope violation and the reason the current range did not cause
-   it.
-5. Commits after the last completed review, named and declared unreviewed.
-6. Reviewer-versus-implementer vote disagreements and rounds with no usable vote.
-7. Every unresolved finding, with its class and why it was left.
-8. Validation commands that ran, and any that could not run and why.
+Provide a concise finding table with severity, location, classification,
+reasoning/action, and credited fix commit where applicable. Record the reviewed
+ranges, any behavior-neutral later ranges, checks and limitations, rounds
+used/budget, and the reason to stop or continue. Identify genuine unresolved
+defects and required user decisions separately from rejected suggestions.

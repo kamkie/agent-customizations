@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tool", "path", "content", "check", "message"],
+  "properties": {
+    "tool": {"type": "string", "enum": ["read_file", "write_file", "run_check", "publish", "finish"]},
+    "path": {"type": "string"},
+    "content": {"type": "string"},
+    "check": {"type": "string"},
+    "message": {"type": "string"}
+  }
+}

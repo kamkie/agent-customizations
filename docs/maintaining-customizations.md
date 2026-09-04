@@ -107,11 +107,26 @@ reference does not prove that the entrypoint is self-contained.
 
 Keep forward-test prompts separate from their expected behavior so the agent
 cannot read its rubric. Use `scripts/evaluate-instructions.ps1` to run each case
-in a fresh, tool-disabled session and score the structured result. These live
+in a fresh, read-only classification session and score the structured result. These live
 evaluations use the selected agent CLI and are intentionally separate from the
 deterministic `verify.ps1` and `test.ps1` checks; run the affected target and
 case set when instruction behavior changes, then report the exact cases,
 targets, and results.
+
+For consequential changes to authorization, continuation, or stop behavior, also
+run the applicable cases in `scripts/evaluate-instruction-actions.ps1`. This
+small suite dispatches actual bounded file/tool requests in disposable
+repositories and scores effects and ordering against separate expectations.
+Use the faster classification cases for routine wording checks. Action cases
+use a controlled JSON tool protocol with user-message injection between requests;
+they do not establish native-tool integration or in-flight cancellation behavior.
+Record the exact targets, cases, observed results, and retained trace location.
+
+Delivery requirements have one owner: `AGENTS.md` owns repository stages, gates,
+and evidence refresh points; the review skill owns portable triage and re-review
+decisions. Summaries link to those owners instead of maintaining another gate
+list. Use the same Prepare -> Implement -> Validate -> Review -> Ready labels in
+human-facing progress; show authorized merge or deployment separately.
 
 ## Validate and deliver
 

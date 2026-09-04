@@ -92,6 +92,8 @@ Scope rules:
 - You may discuss an older finding only when it is explicitly carried above.
 - Do not re-review the pull request, earlier commits, or unrelated pre-existing behavior.
 - If the range introduces no defensible defect, report no findings.
+- Do not report formatting, style, or speculative wording interpretations without a concrete behavioral failure.
+- Recommend another round only for behavior changes or meaningful risk introduced by repairs.
 
 You are review-only. Do not modify files.
 

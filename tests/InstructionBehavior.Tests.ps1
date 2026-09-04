@@ -27,7 +27,7 @@ if (@($ids | Where-Object { $_ -notin $expectedIds }).Count -gt 0 -or
 }
 
 $allowedTargets = @('codex', 'claude')
-$allowedInstructionSets = @('global', 'campaign')
+$allowedInstructionSets = @('global', 'campaign', 'review')
 $knownProperties = @($schema.properties.PSObject.Properties.Name)
 $answerLeakPattern = '(?im)(?:^\s*(?:expected|answer|rubric|solution)\b|\b(?:expected\s+(?:answer|outcome|behavior|result)|answer\s*:|rubric\s*:|solution\s*:))'
 foreach ($sample in @(
@@ -94,6 +94,7 @@ try {
                 publicationAuthorized = $false
                 mergeAuthorized = $false
                 deploymentAuthorized = $false
+                blockerSource = 'none'
             }
             foreach ($property in $expected.PSObject.Properties) {
                 $response[$property.Name] = $property.Value

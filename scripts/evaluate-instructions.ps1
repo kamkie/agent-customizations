@@ -66,6 +66,10 @@ function Write-CompiledInstructions {
 
     switch ($InstructionSet) {
         'global' { }
+        'review' {
+            $skillPath = Join-Path $repositoryRoot 'skills\cross-agent-review\SKILL.md'
+            $content = $content.TrimEnd() + "`n`n" + [IO.File]::ReadAllText($skillPath) + "`n"
+        }
         'campaign' {
             if ($AgentTarget -ne 'codex') {
                 throw "Instruction set '$InstructionSet' is not supported for target '$AgentTarget'."
@@ -96,6 +100,10 @@ remote branch plus a pull or merge request. It does not mean merge or deployment
 is authorized. The autonomous field reports whether the independent persistence
 modifier is active. Choose the narrowest primaryAction that matches the required
 next behavior.
+
+blockerSource identifies the observed source of a blocker: none, repository,
+skill, tool, access, or ambiguity. Do not infer a more specific cause than the
+scenario establishes.
 
 Request:
 $($Case.prompt)

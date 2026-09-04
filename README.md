@@ -51,8 +51,10 @@ tools' live configuration directories are deployment targets.
 - `scripts/verify.ps1` — validates structure and scans managed sources for
   common publication hazards.
 - `scripts/evaluate-instructions.ps1` — runs input-only scenarios in fresh,
-  tool-disabled Codex or Claude sessions and scores their structured behavior
+  read-only Codex or Claude sessions and scores their structured behavior
   against separately stored expectations.
+- `scripts/evaluate-instruction-actions.ps1` — exercises a bounded tool protocol
+  in disposable repositories and scores file effects and call order.
 - `scripts/status.ps1` — reports drift between this repository and live agent
   installations.
 - `scripts/install.ps1` — explicitly deploys reviewed sources to one or both
@@ -109,6 +111,25 @@ CLI and may incur usage):
 ```powershell
 pwsh ./scripts/evaluate-instructions.ps1 -Target all
 ```
+
+Run the small live action suite for a consequential instruction change:
+
+```powershell
+pwsh ./scripts/evaluate-instruction-actions.ps1 -Target all
+```
+
+Both live suites consume CLI usage and should run under `managed-jobs` when
+launched by an agent. The action suite uses a controlled JSON tool protocol:
+requests execute real bounded file edits and local checks; publication always
+returns unavailable without contacting a remote. User messages are injected
+between tool requests to test authorization and stop boundaries. It retains
+traces and disposable repositories at its printed artifact path. It does not
+test native CLI tool integration or real-time interruption of an in-flight tool.
+The deterministic dispatcher/scorer tests run in `test.ps1` without paid agents.
+On Windows the Codex action client selects the documented elevated sandbox;
+prepare that sandbox before running the suite. It does not fall back to full
+access. Failed behavior checks remain failures with traces; do not weaken their
+expectations just because the agent answered classification cases correctly.
 
 Compare both live installations:
 

@@ -135,6 +135,27 @@ first. Briefly report the known remaining state from existing evidence and wait
 for explicit direction before taking further action. This stop rule takes
 precedence over persistence, delivery, cleanup, and self-correction defaults.
 
+### Reporting blockers
+
+State the exact blocked action, the observed source, and what can still proceed.
+Distinguish a repository rule or skill requirement (cite the source), a tool
+rejection (quote its stated reason), missing access, and unresolved scope or
+ownership. If a tool only says "blocked by policy", say that it did not identify
+the policy; do not invent an approval-review decision or a credential problem.
+Separate evidence from inference. Ask only for the specific input or authority
+needed, continue independent authorized work, and do not bypass a restriction.
+
+## Workspace ownership
+
+Before writing, inspect the checkout, local changes, and known agent ownership.
+If existing changes or another active agent make ownership or overlap unclear,
+ask how to coordinate before starting overlapping work. A dirty user checkout
+can remain untouched while an agent creates a clean worktree from the verified
+base when the task does not depend on those changes and ownership is clear.
+Do not reset, stash, overwrite, or absorb unrelated changes. If another agent is
+discovered later, pause potentially overlapping writes and clarify ownership;
+continue unrelated authorized work.
+
 ## Scope discipline
 
 Implement the requested behavior with the simplest coherent model and smallest
@@ -164,15 +185,22 @@ branch, commit, push, PR/MR, CI, review, and readiness protocol. `Implement and
 test` alone is not a complete delegation. The coordinator completes any missing
 delivery stages rather than leaving work stranded in a delegated checkout.
 
-Keep one coherent problem per PR/MR when repository policy is silent. Lead its
-description with the problem and rationale, then summarize the solution,
-validation, and remaining risk. Record required opposite-agent review and
-triage every finding. Mark the PR/MR ready before human handoff when its current
-head passes required checks and review, has no unresolved blocking feedback, and
-is cleanly mergeable. Immediately before that transition, refresh the head,
-feedback, checks, mergeability, and blocking reviews; keep it draft when any
-gate fails or the head changed. Refresh again after the transition and return it
-to draft if a gate changed.
+Use one visible delivery sequence: Prepare -> Implement -> Validate -> Review ->
+Ready. Show the current stage, completed evidence, remaining work, and any user
+decision needed. Treat merge and deployment as separate stages only when
+authorized. Stage labels communicate progress; they grant no authority.
+
+The active repository owns each stage's gates and their refresh points. Skills
+own how to perform the reusable work; do not duplicate repository gates in them.
+Keep one current delivery record with the head, validation, review disposition,
+and blockers. Refresh evidence at the repository's specified transitions or when
+the head, feedback, checks, ownership, or policy changes; reuse still-valid
+evidence instead of repeating the same checks between every command.
+
+When repository policy is silent, keep one coherent problem per PR/MR and make
+it ready after required validation and review, triaged feedback, and clean
+mergeability. Describe the problem and rationale, solution, validation, and
+remaining risk. Follow the review skill's proportional re-review rule.
 
 After merge, fetch the remote default branch and prove the result is reachable
 before cleanup. Stop task-specific processes and remove task-created temporary

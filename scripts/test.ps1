@@ -18,6 +18,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Repository verification test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionBehavior.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Instruction behavior evaluation contract test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionActions.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Instruction action dispatcher and observation test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\cross-agent-review\tests\Invoke-CrossAgentReview.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Cross-agent review range-routing test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\managed-jobs\tests\ManagedJobs.AtomicWrite.Tests.ps1')

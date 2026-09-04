@@ -67,7 +67,7 @@ try {
     Assert-True (-not (Test-Path (Join-Path $testRoot 'outside.txt'))) 'Path traversal wrote outside the workspace.'
     $rejected = $false
     try { Replay 'design-agreement' @((Action 'read_file' 'Greeting.txt')) | Out-Null } catch {
-        $rejected = $_.Exception -is [ArgumentException]
+        $rejected = $_.Exception.Data['failureKind'] -eq 'protocol'
     }
     Assert-True $rejected 'A noncanonical filename was not classified as a protocol violation.'
     $occupied = Join-Path $testRoot 'occupied'
@@ -133,6 +133,16 @@ exit $clientExit
     Assert-True ((Get-Content (Join-Path $failedCase 'client-0.jsonl') -Raw) -match 'mock client failure') 'Nonzero client stdout was lost.'
     Assert-True ((Get-Content (Join-Path $failedCase 'client-0.stderr.txt') -Raw) -match 'mock diagnostic') 'Nonzero client stderr was lost.'
     Assert-True (Test-Path (Join-Path $failedCase 'prompt-0.txt')) 'Failed invocation prompt was lost.'
+    "Write-Output 'non-JSON client notice'`nexit 0" | Set-Content (Join-Path $fakeBin 'native-client.ps1')
+    $malformedOutput = Join-Path $testRoot 'malformed-client'
+    try {
+        $env:PATH = $fakeBin + [IO.Path]::PathSeparator + $savedPath
+        $malformed = @(& $pwsh -NoProfile -File $driver -Runner $runner -Output $malformedOutput 2>&1)
+        $malformedExit = $LASTEXITCODE
+    } finally { $env:PATH = $savedPath }
+    $malformedRun = @(Get-ChildItem -LiteralPath $malformedOutput -Directory)[0].FullName
+    $malformedSummary = Get-Content (Join-Path $malformedRun 'summary.json') -Raw | ConvertFrom-Json
+    Assert-True ($malformedExit -ne 0 -and $malformedSummary.results[0].failureKind -eq 'execution') 'Client JSON parsing failure was attributed to agent protocol behavior.'
     Push-Location $testRoot
     try {
         $resolvedOutput = Resolve-ActionOutputDirectory 'relative-output'

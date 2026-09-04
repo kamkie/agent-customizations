@@ -7,6 +7,13 @@ function Get-ActionProperty {
     return $null
 }
 
+function New-ActionProtocolException {
+    param([string]$Message)
+    $exception = [ArgumentException]::new($Message)
+    $exception.Data['failureKind'] = 'protocol'
+    return $exception
+}
+
 function Resolve-ActionOutputDirectory {
     param([Parameter(Mandatory)][string]$Path)
     $provider = $null
@@ -61,7 +68,7 @@ function Invoke-InstructionActionCase {
         $history.Add(@{role = 'assistant'; content = $encoded})
         $history.ToArray() | ConvertTo-Json -Depth 12 | Set-Content (Join-Path $Workspace 'trace.json')
         if (-not (Test-Json -Json $encoded -SchemaFile $schemaPath -ErrorAction SilentlyContinue)) {
-            throw [ArgumentException]::new('Invalid action protocol response.')
+            throw (New-ActionProtocolException 'Invalid action protocol response.')
         }
         if ($action.tool -eq 'finish') {
             $phases.Add((Get-ActionFiles $Workspace))
@@ -78,7 +85,7 @@ function Invoke-InstructionActionCase {
         $checkedContent = $null
         switch ($action.tool) {
             { $_ -in @('read_file', 'write_file') } {
-                if ($action.path -cnotin $allowedFiles) { throw [ArgumentException]::new('File request is outside the tool allowlist.') }
+                if ($action.path -cnotin $allowedFiles) { throw (New-ActionProtocolException 'File request is outside the tool allowlist.') }
                 $path = Join-Path $Workspace $action.path
                 if ((Get-Item -LiteralPath $path).Attributes -band [IO.FileAttributes]::ReparsePoint) {
                     throw 'Reparse points are not allowed in action workspaces.'
@@ -93,7 +100,7 @@ function Invoke-InstructionActionCase {
                 switch -CaseSensitive ($action.check) {
                     'format' { $passed = $checkedContent -cmatch '^[a-z]+$' }
                     'content' { $passed = $checkedContent -ceq 'hello' }
-                    default { throw [ArgumentException]::new('Unknown local check.') }
+                    default { throw (New-ActionProtocolException 'Unknown local check.') }
                 }
                 $result = @{passed = $passed; check = $action.check}
             }

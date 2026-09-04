@@ -90,8 +90,11 @@ $currentRequest
                 if ($clientExit -ne 0) { throw "Codex action client failed with exit $clientExit; diagnostics: $stderrPath" }
                 foreach ($line in $raw) {
                     $event = $line | ConvertFrom-Json
+                    if ($event.type -like 'item.*' -and $event.item.type -eq 'error') {
+                        throw "Codex client reported: $($event.item.message)"
+                    }
                     if ($event.type -like 'item.*' -and $event.item.type -notin @('agent_message','reasoning')) {
-                        throw [ArgumentException]::new("Native CLI action is outside the controlled protocol: $($event.item.type)")
+                        throw (New-ActionProtocolException "Native CLI action is outside the controlled protocol: $($event.item.type)")
                     }
                 }
                 return Get-Content $responsePath -Raw | ConvertFrom-Json
@@ -117,7 +120,7 @@ $currentRequest
             $score = Test-InstructionActionResult -Actual $actual -Expected $expectations.($case.id)
             $results.Add(@{target = $agentTarget; case = $case.id; passed = $score.passed; failureKind = $(if ($score.passed) { 'none' } else { 'behavior' }); errors = $score.errors})
         } catch {
-            $kind = if ($_.Exception -is [ArgumentException]) { 'protocol' } else { 'execution' }
+            $kind = if ($_.Exception.Data['failureKind'] -eq 'protocol') { 'protocol' } else { 'execution' }
             $results.Add(@{target = $agentTarget; case = $case.id; passed = $false; failureKind = $kind; errors = @($_.Exception.Message)})
         }
         Write-Host "$agentTarget/$($case.id): $($results[$results.Count - 1] | ConvertTo-Json -Compress)"

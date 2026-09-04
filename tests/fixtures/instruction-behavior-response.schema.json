@@ -7,7 +7,8 @@
     "primaryAction",
     "publicationAuthorized",
     "mergeAuthorized",
-    "deploymentAuthorized"
+    "deploymentAuthorized",
+    "blockerSource"
   ],
   "properties": {
     "mode": {
@@ -24,6 +25,11 @@
         "implement-and-deliver",
         "continue-authorized-work",
         "stop-and-report",
+        "close-review-with-validation",
+        "run-scoped-review",
+        "clarify-ownership",
+        "isolate-and-continue",
+        "report-blocker",
         "commit-only",
         "recheck-and-diagnose",
         "autonomous-readiness-checkpoint",
@@ -33,6 +39,7 @@
     },
     "publicationAuthorized": { "type": "boolean" },
     "mergeAuthorized": { "type": "boolean" },
-    "deploymentAuthorized": { "type": "boolean" }
+    "deploymentAuthorized": { "type": "boolean" },
+    "blockerSource": { "type": "string", "enum": ["none", "repository", "skill", "tool", "access", "ambiguity"] }
   }
 }

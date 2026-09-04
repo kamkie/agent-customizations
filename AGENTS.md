@@ -54,106 +54,122 @@ unless a portable, reviewable installation mechanism is added deliberately.
 
 ## Full delivery workflow
 
-### Establish the exact starting state
+Use **Prepare -> Implement -> Validate -> Review -> Ready** in progress updates.
+Show the current stage, its evidence, and what remains. Merge and deployment are
+separate authorized stages. This section owns this repository's delivery gates;
+global guidance supplies defaults and skills supply reusable execution steps.
 
-1. Read this file, `README.md`, `config/manifest.json`, and every changed skill's
-   complete `SKILL.md` plus directly required references before editing.
-2. Fetch `origin` and prove that the intended base is the exact current
-   `origin/main`. Record the remote, branch or worktree owner, HEAD, upstream, and
-   `git status --short --branch`.
-3. Start from a clean agent-owned `codex/<short-task-slug>` or
-   `claude/<short-task-slug>` branch or worktree. Do not reset, stash, overwrite,
-   or absorb unrelated user work to manufacture a clean state. Stop on a dirty,
-   stale, ambiguous, or mismatched base.
+| Stage | Complete when |
+| --- | --- |
+| Prepare | The current base, task ownership, scope, and isolated branch or worktree are verified. |
+| Implement | The scoped change and directly affected tests or documentation are complete. |
+| Validate | The applicable commands below pass and their results are recorded. |
+| Review | Opposite-agent review is recorded; findings and any later commits have a disposition under the review skill. |
+| Ready | The single readiness gate below passes for the current remote head. |
+
+### Prepare: establish the exact starting state
+
+1. Read this file, `README.md`, `config/manifest.json`, and every changed
+   skill's complete `SKILL.md` plus directly required references before editing.
+2. Fetch `origin` and identify exact current `origin/main`. Record the remote,
+   branch or worktree owner, HEAD, upstream, and `git status --short --branch`.
+3. Start implementation from that base in a clean agent-owned
+   `codex/<short-task-slug>` or `claude/<short-task-slug>` branch or worktree.
+   A dirty user checkout is not the implementation base: preserve it and use an
+   isolated clean worktree when its changes are unrelated and ownership is clear.
+   If another agent or local changes create uncertain overlap or required inputs,
+   ask how to coordinate before writing. Do not reset, stash, overwrite, or
+   absorb unrelated work. Stop on a stale, ambiguous, or mismatched task base.
 
 ### Implement, validate, and commit
 
-- Keep the diff scoped to the authorized task. Preserve the public/private
-  boundary and keep changes to different skills in separate commits when
-  practical.
+- Keep one coherent problem in the PR, preserve the public/private boundary, and
+  keep changes to different skills in separate commits when practical.
 - Run `pwsh ./scripts/verify.ps1` and `git diff --check` for every change.
 - Run `pwsh ./scripts/test.ps1` after changing installation, status,
-  verification, manifest, or other deployment tooling.
-- Use `pwsh ./scripts/status.ps1` when the task concerns reviewed-versus-live
-  drift. A nonzero drift result is evidence, not permission to install.
-- Commit intentionally on the agent-owned branch and push it. Report every
-  validation command that could not run, why, and the remaining risk.
+  verification, manifest, or other deployment tooling. Run directly affected
+  behavioral checks as described in `docs/maintaining-customizations.md`.
+- Use `pwsh ./scripts/status.ps1` for reviewed-versus-live drift work. Drift is
+  evidence, not permission to install.
+- Commit intentionally and push. Report any validation that could not run, its
+  observed cause, and the remaining risk. A local commit is intermediate.
 
 ### Apply the temporary pull-request policy when active
 
 The [temporary bot-unavailable policy](docs/temporary-bot-unavailable.md) is
 active until this notice is removed.
 
-Immediately before pull-request creation or another author-side mutation, read
-the complete [temporary bot-unavailable policy](docs/temporary-bot-unavailable.md).
-It owns the current GitHub actor, credential boundary, draft creation rule, and
-owner-authored exact-head authorization gate. Do not load it for work that has
-not reached an author-side mutation.
+Immediately before PR creation or another author-side mutation, read that policy
+and its active notice. It alone owns the current GitHub actor, credential
+boundary, draft creation, and owner-authored exact-head authorization rule.
+Do not load it before reaching an author-side mutation.
 
-### Cross-review before human handoff
+### Review: opposite-agent review and triage
 
-- Every agent-authored PR receives opposite-agent review before it is marked
-  ready. A Codex-authored PR uses the `claude-runner` skill with the Opus reviewer
-  at medium effort: round 1 uses `/review <PR number>` from the authoring
-  checkout, and each later round uses a read-only prompt restricted to the exact
-  repair range from the previously reviewed head to the current head. A
-  Claude-authored PR receives Codex review by branch name without moving the work
-  out of its assigned checkout.
-- The `cross-agent-review` skill owns the executable loop for that review:
-  commit-before-review, per-finding triage, credited fix commits, and the bounded
-  round decision. This section stays authoritative for who reviews whom and for
-  the readiness and merge gates below.
-- Ensure the review result is recorded on the PR. If the reviewer returns
-  findings without posting them, add a concise PR comment naming the reviewer,
-  findings, and triage decision.
-- In a later round, reject a new finding outside the repair range unless the
-  reviewer identifies the changed line in that range that causes it. A reviewer
-  run that substantially ignores the range is invalid and does not consume a
-  round.
-- Triage every finding: fix it or answer it on the PR. Commits that implement a
-  review finding credit the reviewer with `Co-Authored-By: Claude
-  <noreply@anthropic.com>` or `Co-Authored-By: Codex <noreply@openai.com>`.
-- Before marking ready, re-fetch the head and review threads. Keep the PR draft
-  if the head changed, a finding is untriaged, or `CHANGES_REQUESTED` applies to
-  the current head. Re-fetch after the transition and revert to draft if this
-  gate changed.
-- Resolved feedback on an earlier head does not block readiness, but its review
-  remains a merge blocker until current-head approval. For pull requests not
-  authored by `kamkie`, CODEOWNERS then requests `kamkie` as the human owner
-  reviewer. A temporary owner-authored pull request follows the exact-head
-  authorization rule below instead.
+Every agent-authored PR receives an initial opposite-agent review before Ready.
+
+- For Codex-authored work, use `claude-runner` with Opus at medium effort.
+  Round 1 uses `/review <PR number>` from the authoring checkout. Necessary later
+  rounds use a read-only prompt restricted to the repair range since the last
+  reviewed head. Claude-authored work receives Codex review by branch name
+  without leaving its assigned checkout.
+- The `cross-agent-review` skill is the canonical owner of finding triage,
+  proportional re-review, rejected findings, post-review commit classification,
+  and round limits. A behavior-neutral repair may close with targeted validation
+  and a recorded disposition under that rule; do not add a blanket extra round.
+- Record the review result and each finding's disposition on the PR. When the
+  reviewer cannot post, the author posts the evidence. Finding repairs credit
+  `Co-Authored-By: Claude <noreply@anthropic.com>` or
+  `Co-Authored-By: Codex <noreply@openai.com>`.
+- A rejected finding with evidence is triaged; it does not require reviewer
+  agreement. Formal blocking reviews remain subject to the Ready/merge gates.
+  Repository policy does not permit bypassing GitHub protection.
+
+### Ready gate and refresh points
+
+Keep one delivery record. At each refresh below, fetch the remote head,
+thread-aware unresolved feedback, latest reviews and their commit SHAs, required
+checks, draft state, mergeability, and blocking-review state. Reuse an unchanged
+record between these events; do not reread it after every local command.
+
+Refresh after a push or a recorded review, immediately before and after marking
+Ready, and immediately before merge or enabling auto-merge. Also refresh when
+new feedback, check results, ownership, or policy changes invalidate evidence.
+
+Mark Ready only when the intended current remote head has passing required
+checks, review coverage or a documented behavior-neutral repair disposition,
+all findings triaged, no unresolved blocking feedback or applicable
+`CHANGES_REQUESTED`, and clean mergeability. If the head moves, reassess its
+changes and refresh affected evidence before proceeding. If a gate changes
+after Ready, return the PR to draft. Earlier resolved feedback is not untriaged
+work; an outstanding formal blocking review still prevents merge until cleared.
+
+For non-owner-authored PRs, CODEOWNERS requests `kamkie` as human reviewer.
+Owner-authored PRs use the temporary policy's exact-head authorization rule.
+Owner authorization is a merge gate, not permission invented by the author.
 
 ### Owner approval, checks, and merge
 
-After a review is recorded, a commit is pushed, or the PR is marked ready,
-re-fetch the PR's head SHA, thread-aware unresolved feedback, latest reviews,
-required checks, draft state, mergeability, and blocking-review state.
+Use the same refreshed delivery record. Apply the active owner-authorization
+rule from the temporary policy, or otherwise require the latest owner approval
+at the current head. Never manufacture approval or reuse stale authorization.
 
-- Apply the active owner-authorization rule. While the temporary bot-unavailable
-  policy is active, use its exact current-head gate; otherwise require the latest
-  owner approval to apply to the current head. Never manufacture or reuse stale
-  approval.
-- When applicable current-head owner authorization exists and cross-review,
-  triage, required checks, non-draft state, and clean mergeability all pass,
-  merge immediately as `kamkie` with the repository's merge-commit method and
-  `--match-head-commit <sha>`.
-- If every other gate passes but required checks are still pending and
-  applicable current-head owner authorization exists, enable guarded auto-merge
-  with `--merge --match-head-commit <sha>` instead of bypassing protection.
-- If approval or exact-head authorization is absent, a check failed, the head
-  changed, the PR is draft, the merge is not clean, or a blocking review
-  exists, leave the PR unmerged and report that exact state.
-- After merge, fetch `origin/main`, prove the PR result is reachable from it, and
-  report the landed commit. Do not claim completion from a stale local ref.
+When current-head owner authorization, review disposition, triage, passing
+required checks, non-draft state, and clean mergeability all pass, merge as
+`kamkie` with the merge-commit method and `--match-head-commit <sha>`.
+If only required checks are still pending and all other gates pass, enable
+guarded auto-merge with `--merge --match-head-commit <sha>`. Otherwise leave the
+PR unmerged and report the exact unmet gate.
+
+After merge, fetch `origin/main`, prove the landed result is reachable from it,
+and report that commit before applying the global cleanup rules. Deployment to
+live agent homes remains a separate explicitly authorized activation.
 
 ### Delegated work inherits the whole workflow
 
-Prompts for background tasks, visible Codex tasks, subagents, or other agent CLIs
-must include this full terminal contract. For another repository, discover and
-inject its exact branch, commit, push, PR/MR, CI, review, readiness, merge, and
-deployment rules. "Implement and test" is not a complete delegation. A local
-commit or hidden worktree is intermediate state, not delivery. A branch task is
-unfinished until its branch is pushed, its draft PR exists, cross-review is
-recorded, findings are triaged, and its exact ready, blocked, auto-merge, or
-merged state is verified. When delegated work stops short, the coordinator
-completes the missing handoff instead of asking the user to repeat authority.
+Prompts for delegated repository work must carry the discovered target contract:
+base and ownership, scope, validation, commit/push/PR authority, review
+disposition, Ready gates, and merge/deployment limits. Reference canonical rules
+instead of inventing another delivery sequence. The coordinator verifies the
+handoff and completes missing authorized stages; `implement and test` alone is
+not a complete delivery contract.

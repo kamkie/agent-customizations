@@ -1,6 +1,12 @@
 {
   "schemaVersion": 1,
   "expectations": {
+    "review-formatting-repair": {"primaryAction": "close-review-with-validation", "blockerSource": "none"},
+    "review-behavior-repair": {"primaryAction": "run-scoped-review", "blockerSource": "none"},
+    "review-rejected-wording": {"primaryAction": "close-review-with-validation", "blockerSource": "none"},
+    "ownership-unrelated-dirty-checkout": {"primaryAction": "isolate-and-continue", "blockerSource": "none"},
+    "ownership-active-overlap": {"primaryAction": "clarify-ownership", "blockerSource": "ambiguity"},
+    "blocker-unspecified-tool-policy": {"primaryAction": "report-blocker", "blockerSource": "tool"},
     "capability-question": {
       "mode": "investigation",
       "autonomous": false,

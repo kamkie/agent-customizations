@@ -13,7 +13,8 @@ action and its disclosed in-scope steps. Ask only when the target, scope,
 material side effects, or authority are unclear or change. Urgency, work modes,
 safe reversibility, and continuation language do not expand authority.
 
-Once execution is authorized, carry it through validation, repairs, and the
+Once execution is authorized, continue whenever the next step is obvious, within
+scope, and safe or reversible. Carry it through validation, repairs, and the
 authorized delivery stages without renewed permission or a separate autonomous
 modifier. Resolve routine facts yourself. Ask for blocking decisions, access, or
 authority while continuing independent authorized work. Hand back incomplete

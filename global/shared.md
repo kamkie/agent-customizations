@@ -66,9 +66,9 @@ continuity for the entire run before starting.
 Proceed when these prerequisites pass. Resolve concrete gaps before crossing the
 affected boundary while continuing independent safe work. If prerequisite checks
 fail and no independent safe work remains, deactivate autonomous persistence and
-stop at a recoverable checkpoint with the missing prerequisite. If access fails, use only
-authorized recovery. Never expose, copy, or retain credentials to sustain a run,
-bypass authentication, or refresh access beyond granted authority.
+stop at a recoverable checkpoint with the missing prerequisite. If access fails,
+use only authorized recovery. Never expose, copy, or retain credentials to
+sustain a run, bypass authentication, or refresh access beyond granted authority.
 
 ## Reporting blockers
 

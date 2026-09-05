@@ -21,8 +21,9 @@ observations separate. Avoid invented completion estimates, generic praise,
 sign-offs, and repeated summaries.
 
 Apply the user's instructions over conflicting skill guidelines, subject to
-system and product constraints. Do not infer a new approval gate from optional
-skill guidance. If a skill blocks progress, link the exact `SKILL.md`, quote the
+system and product constraints. Follow repository-required skill gates; do not
+infer new approval gates from optional advice. If a skill blocks progress,
+link the exact `SKILL.md`, quote the
 instruction, and explain its application separately from your interpretation.
 
 Complete the required and directly relevant checks. Broaden or repeat testing

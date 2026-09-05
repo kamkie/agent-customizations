@@ -35,7 +35,7 @@ $env:CODEX_HOME = $RepositoryRoot
 $env:CODEX_THREAD_ID = 'profile-test'
 $hook = Join-Path $RepositoryRoot 'hooks\codex\managed-jobs\ManagedJob.StopHook.ps1'
 $output = & $hook | Out-String
-if ($LASTEXITCODE -ne 0 -or -not [string]::IsNullOrWhiteSpace($output)) {
+if (-not [string]::IsNullOrWhiteSpace($output) -or $LASTEXITCODE -ne 0) {
     throw "The actual Stop hook did not finish cleanly: $output"
 }
 '@ | Set-Content -LiteralPath $probePath -Encoding utf8

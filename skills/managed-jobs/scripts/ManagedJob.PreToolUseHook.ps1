@@ -51,7 +51,7 @@ try {
     $guardLocked = $false
     try {
         try {
-            $stateRoot = if ($env:MANAGED_JOBS_ROOT) { $env:MANAGED_JOBS_ROOT } else { Join-Path $HOME '.agent-customizations\managed-jobs' }
+            $stateRoot = if ($env:MANAGED_JOBS_ROOT) { $env:MANAGED_JOBS_ROOT } else { Join-Path ([Environment]::GetFolderPath('UserProfile')) '.agent-customizations\managed-jobs' }
             $guardFile = Join-Path (Join-Path $stateRoot 'guard') 'denied-launches.json'
             $sha = [Security.Cryptography.SHA256]::Create()
             $fingerprint = [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($command.Trim())))

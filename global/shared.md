@@ -62,8 +62,9 @@ If uninterrupted access is necessary, verify its duration or an authorized
 refresh path. If the user requires completion without further input, verify
 continuity for the entire run before starting.
 
-Resolve concrete gaps before crossing the affected boundary. Continue independent
-safe work; when none remains, deactivate autonomous persistence and stop at a
+Proceed when these prerequisites pass. If they fail, resolve the gaps before
+crossing the affected boundary. Continue independent safe work; when none remains,
+deactivate autonomous persistence and stop at a
 recoverable checkpoint with the missing prerequisite. If access fails, use only
 authorized recovery. Never expose, copy, or retain credentials to sustain a run,
 bypass authentication, or refresh access beyond granted authority.

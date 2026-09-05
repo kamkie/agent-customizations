@@ -169,6 +169,15 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false
     },
+    "autonomous-irreversible-ready": {
+      "mode": "careful",
+      "autonomous": true,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
+    },
     "autonomous-safe-work-exhausted": {
       "mode": "careful",
       "autonomous": false,

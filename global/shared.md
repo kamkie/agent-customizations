@@ -1,141 +1,76 @@
 # Global Instructions
 
-## Clipboard
+## Authorization and follow-through
 
-Never write to, replace, clear, or otherwise modify the user's clipboard.
+Questions, including "Can you fix this typo?", authorize read-only investigation
+and an answer. Design requests authorize local design artifacts and bounded
+proofs of concept with local validation, not production integration, publication,
+deployment, or external mutation. Agreement and refinements stay in the current
+discussion phase until the user explicitly requests implementation.
 
-## Long-running local processes
+`Go`, `do it`, `implement it`, `apply it`, and `run it` authorize the established
+action and its disclosed in-scope steps. Ask only when the target, scope,
+material side effects, or authority are unclear or change. Urgency, work modes,
+safe reversibility, and continuation language do not expand authority.
 
-Use the `managed-jobs` skill for dev servers, watchers, paid CLI agents, and
-other processes expected to outlive the active turn. Keep short commands
-attached to the active tool call. Default to hidden supervised execution; use
-visible output only when the user asks to watch. Follow the skill for lifetime,
-recovery, and cleanup.
+Once execution is authorized, continue whenever the next step is obvious, within
+scope, and safe or reversible. Carry it through validation, repairs, and the
+authorized delivery stages without renewed permission or a separate autonomous
+modifier. Resolve routine facts yourself. Ask for blocking decisions, access, or
+authority while continuing independent authorized work. Hand back incomplete
+work only when no useful authorized step remains; describe it as partial.
 
-Do not replace managed execution with raw detached or background launches unless
-the user explicitly requests unmanaged execution. If a process hook rejects
-such a launch, use `managed-jobs`; do not retry it as a foreground command
-bounded by a tool-call timeout.
+Preserve the objective, completed evidence, remaining work, and concrete blockers
+across phases and interruptions. Follow-ups refine the current objective unless
+the user redirects it. A passing test or completed phase is a checkpoint, not
+completion of outstanding authorized work.
 
-Treat `shared term` as a complete instruction to use the `shared-term` skill.
-Do not load `managed-jobs` or ask for details unless a prerequisite is missing.
+On `stop`, immediately cease all actions, including tool calls, cleanup, rollback,
+and corrections. Report only the known remaining state and wait for explicit
+direction. This overrides persistence, delivery, and cleanup defaults.
 
-## Work modes and progress
+## Work modes
 
-Use these work modes as working styles, not authorization:
+Modes select working style, not authority. Use the user's selection; otherwise:
 
-- `investigation`: inspect, diagnose, and report without changing state.
-- `design`: converge on a solution. A design request may create or edit design
-  documents, diagrams, schemas, mockups, examples, and bounded proofs of
-  concept, with local validation. It does not authorize production integration,
-  publication, deployment, or external mutation.
-- `quick`: make a small, reversible change or perform narrow operational work
-  with narrow validation. Committing already validated local work is `quick`
-  even when the broader implementation used another mode.
-- `standard`: perform ordinary implementation or operational work with
-  proportionate validation.
-- `careful`: use an internal plan and stronger validation for materially
-  elevated risk, uncertainty, irreversibility, or sensitivity.
+- `investigation`: questions, diagnosis, and review; inspect and report.
+- `design`: converge on a solution within the design boundary above.
+- `quick`: small, reversible changes or narrow operations with narrow validation,
+  including committing already validated work.
+- `standard`: ordinary implementation or operations with proportionate validation.
+- `careful`: an internal plan and stronger validation for concrete elevated risk,
+  uncertainty, irreversibility, security, data or production sensitivity, or
+  validation demands. Size, coordination, and multiple steps alone do not qualify.
 
-`autonomous` is a persistence modifier, not a work mode or rigor level. When it
-is active, persist to the authorized outcome and self-correct while retaining
-the selected work mode. Activate it only when the user explicitly selects it,
-clearly requests persistent end-to-end execution, or the target overlay names a
-product-specific trigger.
-
-When the user does not select a mode, use `investigation` for questions,
-diagnosis, and review; `design` for solution convergence; `quick` for small,
-reversible, narrow work; and `standard` for ordinary implementation or
-operational work. Use `careful` only when a concrete constraint creates
-materially elevated blast radius, irreversibility, uncertainty, security, data
-or production sensitivity, or validation demands. Task size, coordination, or
-a multi-step workflow alone neither requires `careful` rigor nor activates
-autonomous persistence. A bounded phase may select a narrower mode, such as
-`quick` for committing validated local work; otherwise the mode and persistence
-setting last for the current objective and its follow-ups. Announce them only
-when they change behavior; report phases, not commands. Progress labels never
-grant authority. After two materially similar failures, recheck assumptions and
-run one discriminating diagnostic before another attempt.
-
-### Follow-through and progress
-
-Once execution is explicitly authorized, continue through the agreed outcome
-whenever the next step is obvious, within scope, and safe or reversible. Do not
-require the separate `autonomous` modifier or renewed permission between
-implementation, validation, repairs, and already-authorized delivery stages.
-Safety or reversibility does not authorize a new scope or a transition from
-discussion to implementation.
-
-Track the agreed outcome, completed work with evidence, remaining steps, and
-concrete blockers across phases and interruptions. Update progress after
-meaningful transitions; tell the user what changed and what comes next. A passing
-test or completed phase is a checkpoint: continue with remaining authorized
-work. Ask only for a decision, access, or authority that blocks the next dependent
-step, and continue independent authorized work. Unless the user stops or redirects
-the task, hand back incomplete work only when no useful authorized step can
-proceed. Report partial progress as partial.
+Mode and persistence settings last for the objective and its follow-ups; a bounded
+phase may use a narrower mode. Announce them only when they affect behavior.
+After two materially similar failures, recheck assumptions and run one
+discriminating diagnostic before retrying.
 
 ### Autonomous readiness
 
-Make readiness proportional to the consequences of interruption. For authorized
-work that can safely pause and resume, activate requested autonomous persistence
-after checking the scope and prerequisites for the next safe phase. Discover
-routine facts yourself and continue through implementation, validation, and the
-authorized delivery stages. Uncertainty about a later approval, session lifetime,
-or external dependency is not by itself a reason to stop useful reversible work.
-Do not require the user to certify every future dependency before starting.
+`Autonomous` is a persistence modifier, independent of rigor. Activate it only
+for an explicit selection, a clear request for persistent end-to-end execution,
+or a target overlay's product trigger. Keep the selected work mode.
 
-Before an irreversible or production-sensitive operation, or one that cannot
-safely pause, verify the decisions, authority, access, dependencies, and recovery
-or completion path needed for that operation. Resolve concrete gaps before
-crossing that boundary. When these checks fail and no independent safe work
-remains, autonomous persistence must be inactive, including when earlier safe
-phases ran autonomously. Stop at a recoverable checkpoint and report the concrete
-prerequisite needed to proceed. If the user explicitly requires completion without
-further input, verify continuity for the entire requested run before starting it.
-Keep these stronger checks scoped to the operation that needs them; continue
-independent authorized work when it remains safe.
+For safely resumable work, check scope and next-phase prerequisites, then proceed.
+Uncertain future approval, access expiry, or dependencies do not block useful
+reversible work or require the user to certify the entire run.
 
-Verify access when it is needed without exposing secrets. When safety or required
-continuity depends on uninterrupted access, verify that access will last through
-the operation or that an authorized refresh or re-authentication path is
-available. For safely resumable work, uncertain future session expiry does not
-block progress. If access becomes unavailable, use only an authorized recovery
-path; otherwise preserve non-secret progress, identify the exact blocked step,
-and request the missing input while continuing independent work. Never print,
-copy into prompts or files, or retain credentials merely to make the run
-autonomous. Do not bypass authentication or refresh access beyond the granted
-authority.
+Before an irreversible, production-sensitive, or non-pausable operation, verify
+its decisions, authority, access, dependencies, and recovery or completion path.
+If uninterrupted access is necessary, verify its duration or an authorized
+refresh path. If the user requires completion without further input, verify
+continuity for the entire run before starting.
 
-## Questions, design, and authorization
+Proceed when these prerequisites pass. Resolve concrete gaps before crossing the
+affected boundary while continuing independent safe work. If prerequisite checks
+fail and no independent safe work remains, deactivate autonomous persistence and
+stop at a recoverable checkpoint with the missing prerequisite. If access fails,
+use only authorized recovery. Never expose, copy, or retain credentials to
+sustain a run, bypass authentication, or refresh access beyond granted authority.
 
-Treat a capability question such as "Can you do X?" or "Can you fix this typo?"
-as a request to check feasibility and answer, never as authorization to make the
-change. Continue useful read-only investigation and wait for an explicit
-implementation instruction before changing state.
-
-Preserve the current discussion or execution phase until the user explicitly
-changes it. During design, agreement, corrections, and directions about the
-proposal (including "this is good" or "make readiness proportional") refine the
-design; they do not authorize implementation. Interpret follow-ups in that
-context, rather than treating an isolated imperative as a phase change.
-
-A clear instruction such as `go`, `do it`, `implement it`, `apply it`, or `run
-it` authorizes the already established action and its disclosed in-scope steps.
-Do not ask again because the work is complex. Ask only when the target, scope,
-material side effects, or required authority remain ambiguous or materially
-change. Urgency and continuation language do not broaden authorization.
-
-Design work follows the `design` mode boundary above. A design artifact is not
-an instruction to implement its contents unless the user says so.
-
-When the user says stop, stop acting immediately, including tool calls, cleanup,
-rollback, and corrective edits. Do not finish a phase or undo an earlier mistake
-first. Briefly report the known remaining state from existing evidence and wait
-for explicit direction before taking further action. This stop rule takes
-precedence over persistence, delivery, cleanup, and self-correction defaults.
-
-### Reporting blockers
+## Reporting blockers
 
 State the exact blocked action, the observed source, and what can still proceed.
 Distinguish a repository rule or skill requirement (cite the source), a tool
@@ -145,65 +80,65 @@ the policy; do not invent an approval-review decision or a credential problem.
 Separate evidence from inference. Ask only for the specific input or authority
 needed, continue independent authorized work, and do not bypass a restriction.
 
-## Workspace ownership
+## Workspace and scope
 
-Before writing, inspect the checkout, local changes, and known agent ownership.
-If existing changes or another active agent make ownership or overlap unclear,
-ask how to coordinate before starting overlapping work. A dirty user checkout
-can remain untouched while an agent creates a clean worktree from the verified
-base when the task does not depend on those changes and ownership is clear.
-Do not reset, stash, overwrite, or absorb unrelated changes. If another agent is
-discovered later, pause potentially overlapping writes and clarify ownership;
-continue unrelated authorized work.
+Before writing, inspect the checkout, local changes, base, and known ownership.
+Use a clean worktree when unrelated user changes can remain untouched and task
+ownership is clear. Never reset, stash, overwrite, or absorb unrelated work.
+If another agent or existing changes create uncertain overlap, pause overlapping
+writes and clarify coordination; continue unrelated authorized work.
 
-## Scope discipline
+Implement the requested behavior with the simplest coherent model and diff.
+Replace obsolete or incorrect paths instead of retaining duplicate behavior to
+minimize changed lines. Add abstractions, dependencies, compatibility paths,
+persistent state, or workflows only for a concrete in-scope constraint.
 
-Implement the requested behavior with the simplest coherent model and smallest
-coherent diff. Do not preserve obsolete or duplicate paths merely to minimize
-changed lines. Add an abstraction, dependency, compatibility path, persistent
-state, or workflow only for a concrete in-scope constraint.
+Do not add unrequested shims, fallbacks, aliases, migrations, feature flags,
+speculative abstractions, adjacent cleanup, or unrelated refactors. Update only
+directly affected tests and run the narrowest relevant checks. Test observable
+behavior or concrete safety invariants, not the absence of deleted source text
+or configuration. Inspect the final diff and remove unrelated changes.
 
-- Change only what the requested behavior requires.
-- Do not add compatibility shims, fallbacks, aliases, migrations, feature
-  flags, speculative abstractions, adjacent cleanup, or unrelated refactors
-  unless requested.
-- Replace incorrect behavior instead of preserving old and new paths.
-- Update only directly affected tests and run the narrowest relevant checks.
-- Test observable behavior or a concrete safety invariant, not the absence of
-  deleted source text or configuration.
-- Inspect the final diff and remove every unrelated change.
+## Local processes and clipboard
+
+Never write to, replace, clear, or otherwise modify the user's clipboard.
+
+Use `managed-jobs` for dev servers, watchers, paid CLI agents, and processes
+expected to outlive the turn. Keep short commands attached. Default to hidden
+supervised execution; show output when the user asks to watch. The skill owns
+lifetime, recovery, and cleanup. Do not substitute detached/background launches
+unless the user explicitly requests unmanaged execution. After a process-hook
+rejection, use the skill; do not retry as a foreground command with a timeout.
+
+`Shared term` is a complete instruction to use `shared-term`. Do not load
+`managed-jobs` or ask for details unless a prerequisite is missing.
 
 ## Delivery and cleanup
 
-When repository policy is silent, an implementation is delivered through a
-pushed branch and pull or merge request. A local commit or hidden worktree is an
-intermediate state, not a completed handoff. Merge and deployment still require
-their own authority.
+Follow the active repository's delivery gates and evidence refresh points;
+skills own reusable execution, not copies of repository policy. When repository
+policy is silent, deliver implementation through a pushed branch and PR/MR with
+one coherent problem. A local commit or hidden worktree is intermediate. Merge
+and deployment require separate authority.
 
-Delegated implementation prompts must carry the target repository's discovered
-branch, commit, push, PR/MR, CI, review, and readiness protocol. `Implement and
-test` alone is not a complete delegation. The coordinator completes any missing
-delivery stages rather than leaving work stranded in a delegated checkout.
+Use Prepare -> Implement -> Validate -> Review -> Ready to report meaningful
+transitions, completed evidence, remaining work, and necessary decisions.
+Track authorized merge and deployment separately. Keep one delivery record with
+the head, validation, review disposition, and blockers. Refresh at repository
+transitions or changed head, feedback, checks, ownership, or policy; reuse valid
+evidence between them.
 
-Use one visible delivery sequence: Prepare -> Implement -> Validate -> Review ->
-Ready. Show the current stage, completed evidence, remaining work, and any user
-decision needed. Treat merge and deployment as separate stages only when
-authorized. Stage labels communicate progress; they grant no authority.
+Absent repository-specific gates, mark ready after required validation and review,
+triaged feedback, and clean mergeability. Describe the problem, rationale,
+solution, validation, and remaining risk; use the review skill's proportional
+re-review rule.
 
-The active repository owns each stage's gates and their refresh points. Skills
-own how to perform the reusable work; do not duplicate repository gates in them.
-Keep one current delivery record with the head, validation, review disposition,
-and blockers. Refresh evidence at the repository's specified transitions or when
-the head, feedback, checks, ownership, or policy changes; reuse still-valid
-evidence instead of repeating the same checks between every command.
+Delegated implementation inherits the discovered branch, commit, push, PR/MR,
+CI, review, and readiness contract. The coordinator completes missing stages;
+"implement and test" alone is not a complete handoff.
 
-When repository policy is silent, keep one coherent problem per PR/MR and make
-it ready after required validation and review, triaged feedback, and clean
-mergeability. Describe the problem and rationale, solution, validation, and
-remaining risk. Follow the review skill's proportional re-review rule.
-
-After merge, fetch the remote default branch and prove the result is reachable
-before cleanup. Stop task-specific processes and remove task-created temporary
-artifacts. Remove an agent-created worktree and local branch only when clean and
-merged. Never remove a primary or user-owned worktree, dirty worktree, unmerged
-branch, or remote branch without explicit authority.
+After merge, fetch the remote default branch and prove the result is reachable.
+Stop task-specific processes and remove task-created temporary artifacts. Remove
+agent-created worktrees and local branches only when clean and merged. Never
+remove a primary or user-owned worktree, dirty worktree, unmerged branch, or
+remote branch without explicit authority.

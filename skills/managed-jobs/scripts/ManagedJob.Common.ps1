@@ -11,7 +11,7 @@ function Get-ManagedJobAutomaticCleanupRoot {
     if ($env:MANAGED_JOBS_ROOT) {
         return [IO.Path]::GetFullPath($env:MANAGED_JOBS_ROOT)
     }
-    return [IO.Path]::GetFullPath((Join-Path $HOME '.agent-customizations\managed-jobs'))
+    return [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('UserProfile')) '.agent-customizations\managed-jobs'))
 }
 
 function Get-ManagedJobRoot {

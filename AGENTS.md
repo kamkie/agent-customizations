@@ -35,7 +35,9 @@ or proposal-only until implementation is explicitly authorized.
 While the [temporary policy](docs/temporary-bot-unavailable.md) is active,
 owner-authored PRs require a new `merge PR <number> at <sha>` instruction after
 Ready: GitHub cannot record owner self-approval. Implementation authority stops
-at the ready PR. Installation, live deployment, release, repository administration,
+at the ready PR.
+
+Installation, live deployment, release, repository administration,
 protection bypass, and fabricated approval are never part of delivery authority.
 These actions require their own explicit authority.
 

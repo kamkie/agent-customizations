@@ -57,7 +57,7 @@ supplies defaults and skills own reusable execution.
    worktree owner, HEAD, upstream, and `git status --short --branch`.
 3. Start from that verified base in a clean agent-owned `codex/<short-task-slug>`
    or `claude/<short-task-slug>` branch/worktree. Preserve dirty user checkouts;
-   use an isolated worktree only when unrelated changes and ownership are clear.
+   use an isolated worktree when unrelated changes and ownership are clear.
    Clarify overlapping agent work or required local inputs before writing.
    Never reset, stash, overwrite, or absorb unrelated work. Stop on a stale,
    ambiguous, or mismatched base.

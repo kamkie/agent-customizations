@@ -67,11 +67,11 @@ $managedJobHome = [IO.Path]::GetFullPath(
     (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
 )
 $codexHome = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($(
-    if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
+    if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex' }
 )))
 $isCodexInstallation = $managedJobHome.Equals($codexHome, [StringComparison]::OrdinalIgnoreCase)
 $claudeHome = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($(
-    if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
+    if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path ([Environment]::GetFolderPath('UserProfile')) '.claude' }
 )))
 $isClaudeInstallation = $managedJobHome.Equals($claudeHome, [StringComparison]::OrdinalIgnoreCase)
 

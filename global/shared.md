@@ -80,7 +80,6 @@ the policy; do not invent an approval-review decision or a credential problem.
 Separate evidence from inference. Ask only for the specific input or authority
 needed, continue independent authorized work, and do not bypass a restriction.
 
-
 ## Workspace and scope
 
 Before writing, inspect the checkout, local changes, base, and known ownership.

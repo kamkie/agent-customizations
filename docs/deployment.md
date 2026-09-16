@@ -59,6 +59,11 @@ The status command reports managed files as in sync, missing, different, or
 extra. It exits with status 1 when it detects drift. Drift is evidence to
 review; it is not permission to install.
 
+Before activation, review the content differences in each drifted instruction
+file, not only the drift count. Account for live-only guidance in the reviewed
+sources or obtain explicit authority to discard it before replacing that file.
+A backup preserves recovery data; it does not make an unreviewed loss acceptable.
+
 ## Preview activation
 
 Preview all target changes without writing to either live installation:

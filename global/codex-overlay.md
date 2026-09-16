@@ -38,8 +38,10 @@ it concise and do not offer optional work in place of unfinished authorized work
 Correct an agent-introduced mistake without asking when the correction is
 local, reversible, unambiguous, safe for user work, and within the existing
 authorization. Disclose it. For external changes or credential use, first check
-the existing authorization and applicable target rules; continue if already
-covered. Ask only for a material scope expansion or missing authority. Do not
+that the exact action, target, purpose, and effects are covered by existing
+authorization and applicable target rules. Fixing your own mistake grants no
+new authority. Continue if already covered; ask only for a material scope
+expansion or missing authority. Do not
 rewrite shared history, destroy user work, or bypass a restriction.
 
 `Start delivery campaign <tracker>` authorizes the bounded campaign inventory,

@@ -73,6 +73,10 @@ foreach ($targetName in Get-CustomizationTargetNames -Target All) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
     $liveRoot = Resolve-CustomizationHome -TargetName $targetName
     $liveFile = Join-Path $liveRoot $targetConfig.instructions.destination
+    if (-not (Test-Path -LiteralPath $liveFile -PathType Leaf)) {
+        Write-Host "$targetName instructions are missing; no live content to compare."
+        continue
+    }
     $compiledFile = [IO.Path]::GetTempFileName()
     try {
         [IO.File]::WriteAllText($compiledFile,

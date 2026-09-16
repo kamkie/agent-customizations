@@ -101,6 +101,11 @@ is authorized. The autonomous field reports whether the independent persistence
 modifier is active. Choose the narrowest primaryAction that matches the required
 next behavior.
 
+The stop-and-report label means honoring an explicit user stop instruction.
+The report-blocker label covers reporting a blocker when no independent
+authorized work remains and no more specific primaryAction applies (for
+example, autonomous-readiness-checkpoint or clarify-ownership).
+
 blockerSource identifies the observed source of a blocker: none, repository,
 skill, tool, access, or ambiguity. Do not infer a more specific cause than the
 scenario establishes.

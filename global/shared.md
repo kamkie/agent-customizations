@@ -121,6 +121,26 @@ policy is silent, deliver implementation through a pushed branch and PR/MR with
 one coherent problem. A local commit or hidden worktree is intermediate. Merge
 and deployment require separate authority.
 
+Every push to `main` or `master` must run the normal CI pipeline for the pushed
+head. Never use `ci.skip`, `[skip ci]`, `[ci skip]`, disabling CI rules, or another
+mechanism to suppress that pipeline or its automatic jobs. Never manually cancel
+a pipeline or its jobs. Only configured manual-approval steps may remain
+unstarted. Verify the pipeline belongs to the pushed head, monitor its result,
+and report failures, missing runs, skipped or canceled jobs, and pending approvals
+explicitly; none of those is a green pipeline. If a push would trigger an
+unauthorized deployment, resolve that authority before pushing rather than
+suppressing CI. If the agent accidentally skips or cancels CI, disclose it
+immediately and restore the required run within existing authority.
+
+Before handing a pull or merge request back to the user as ready or complete,
+wait for its required pipeline on the current head to finish successfully.
+Creating the request, pushing a commit, passing local tests, or starting CI is
+not a completed handoff. Resolve in-scope failures and rerun affected checks;
+after every new commit, wait for the new head's pipeline. Never hand off a
+running, pending, failed, skipped, canceled, or missing pipeline as complete.
+If a genuine access, approval, or external blocker prevents completion, report
+partial progress and the exact blocker instead of claiming the MR is ready.
+
 Use Prepare -> Implement -> Validate -> Review -> Ready to report meaningful
 transitions, completed evidence, remaining work, and necessary decisions.
 Track authorized merge and deployment separately. Keep one delivery record with
@@ -139,6 +159,14 @@ CI, review, and readiness contract. The coordinator completes missing stages;
 
 After merge, fetch the remote default branch and prove the result is reachable.
 Stop task-specific processes and remove task-created temporary artifacts. Remove
-agent-created worktrees and local branches only when clean and merged. Never
-remove a primary or user-owned worktree, dirty worktree, unmerged branch, or
-remote branch without explicit authority.
+obsolete agent-created local branches and clean agent-created worktrees before
+final handoff; cleanup is required, not optional. Check exact refs, worktree use,
+and current task ownership. For rebased, cherry-picked, or squashed work, verify
+that all intended changes are integrated into the fetched target instead of
+relying on commit ancestry alone. Prefer `git branch -d`; `-D` is permitted only
+for a verified obsolete agent-created local branch whose changes are fully
+integrated and which no active task or worktree uses. Verify removal with
+`git branch --list` or an exact ref lookup. Never remove a primary or user-owned
+worktree, dirty worktree, branch with unintegrated work, or remote branch without
+explicit authority. If safe cleanup is blocked, name the remaining artifact and
+the reason rather than silently leaving it behind.

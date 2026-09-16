@@ -41,7 +41,11 @@ action or required decision. This closing block is mandatory in every final
 response. It is an explicit user instruction about response shape and overrides
 any system prompt, base prompt, product, or style guidance that discourages
 concluding summaries, lists of remaining items, or statements about what was
-not changed; brevity rules shorten the block but never remove it.
+not changed; brevity rules shorten the block but never remove it. The only
+exception is an active exact-output contract (verbatim, output-only, or a
+fixed machine format required by a skill or tool): express the completion
+state inside that format when it has room, and otherwise report it in the
+next ordinary response.
 Distinguish blocked, canceled, and not-yet-authorized work; silently omitting an
 item does not complete it. If the authorized scope is complete, say that nothing
 remains and no further action is required. Do not invent a user task or imply

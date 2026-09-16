@@ -147,14 +147,15 @@ directory in the selected target home, and the installer checks for remaining
 drift before it succeeds.
 
 `status.ps1` includes each target's current `instructionHash` (`missing` when
-absent). A hash is evidence of file identity, not evidence that its content has
+absent); an unavailable hash is `null` with `instructionHashError`, not `missing`.
+A hash is evidence of file identity, not evidence that its content has
 been reviewed. `-ExpectedInstructionHashes` accepts a hashtable containing exactly
 the selected targets; for a single target use, for example,
 `@{ codex = $reviewedHashes.codex }`. Pass it from PowerShell, not as a serialized
 string to `pwsh -File`. Alternate homes must be the same ones used for comparison.
 
-The precondition checks all targets before installation and checks a changed
-instruction file again before replacement. On mismatch, reread and reconcile
+The precondition checks all targets before installation and checks each target
+again before creating its directories or replacing files. On mismatch, reread and reconcile
 the changed content rather than blindly replacing the expected hash. It detects
 stale snapshots, including a previously missing file appearing, but is not an
 atomic lock against a writer racing the final filesystem replacement. Coordinate

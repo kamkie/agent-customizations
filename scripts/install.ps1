@@ -69,15 +69,15 @@ foreach ($targetName in $selectedTargets) {
     $skillsRoot = Join-Path $resolvedHome 'skills'
 
     if ($PSCmdlet.ShouldProcess($resolvedHome, "Install $($drift.Count) $($targetConfig.displayName) customization change(s)")) {
+        if ($ExpectedInstructionHashes) {
+            Assert-CustomizationInstructionHash -Path (Join-Path $resolvedHome $targetConfig.instructions.destination) -Expected $ExpectedInstructionHashes[$targetName]
+        }
         New-Item -ItemType Directory -Path $resolvedHome, $skillsRoot, $backupRoot -Force | Out-Null
 
         $instructionContent = Get-CustomizationInstructionContent -Target $targetConfig
         $instructionTarget = Join-Path $resolvedHome ([string]$targetConfig.instructions.destination)
         $instructionState = $status | Where-Object Kind -eq 'Instructions' | Select-Object -First 1
         if ($instructionState.State -ne 'InSync') {
-            if ($ExpectedInstructionHashes) {
-                Assert-CustomizationInstructionHash -Path $instructionTarget -Expected $ExpectedInstructionHashes[$targetName]
-            }
             if (Test-Path -LiteralPath $instructionTarget -PathType Leaf) {
                 Copy-Item -LiteralPath $instructionTarget -Destination (Join-Path $backupRoot ([string]$targetConfig.instructions.destination)) -Force
             }

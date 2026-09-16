@@ -164,6 +164,9 @@ integration. Preserve existing commits and ancestry; resolve integration
 conflicts through the merge. This preference does not authorize merging by
 itself.
 
+If repository policy forbids a merge commit and the user has not explicitly
+requested its required alternative, report the method conflict before integrating.
+
 After merge, fetch the remote default branch and prove the result is reachable.
 Stop task-specific processes and remove task-created temporary artifacts. Remove
 obsolete agent-created local branches and clean agent-created worktrees before

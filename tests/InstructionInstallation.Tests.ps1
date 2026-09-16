@@ -63,6 +63,54 @@ try {
     $claudeBefore = Get-CustomizationInstructionHash $claudeFile
     Install-Expected @{ codex = Get-CustomizationInstructionHash $codexFile } -target Codex
     Assert-True ((Get-CustomizationInstructionHash $claudeFile) -eq $claudeBefore) 'Single-target install changed the other target.'
+    # A script-only hook update must not ask for re-trust; a changed definition must.
+    function Install-CapturingWarnings($hashes) {
+        $warnings = @()
+        & $installer -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot `
+            -ExpectedInstructionHashes $hashes -AllowDirty -AllowNonMain -WarningVariable warnings | Out-Null
+        return @($warnings | ForEach-Object { [string]$_ })
+    }
+    $currentHashes = @{ codex = Get-CustomizationInstructionHash $codexFile; claude = Get-CustomizationInstructionHash $claudeFile }
+    $codexHookEntry = @((Get-CustomizationTarget -Name 'codex').hooks.entries)[0]
+    $installedHookScript = Join-Path $codexRoot ([string]$codexHookEntry.script)
+    Add-Content -LiteralPath $installedHookScript -Value '# script-only drift' -Encoding utf8
+    $scriptOnlyWarnings = Install-CapturingWarnings $currentHashes
+    Assert-True (-not ($scriptOnlyWarnings -match 'trust each definition')) 'A script-only hook update wrongly asked for Codex hook re-trust.'
+    Assert-True (-not ($scriptOnlyWarnings -match 'captured hook snapshot')) 'A script-only hook update wrongly warned about the Claude hook snapshot.'
+    $codexHooksPath = Join-Path $codexRoot ([string](Get-CustomizationTarget -Name 'codex').hooks.destination)
+    $codexHooks = Get-Content -LiteralPath $codexHooksPath -Raw | ConvertFrom-Json
+    $codexHooks.hooks.($codexHookEntry.event)[0].hooks[0].timeout = 99
+    $codexHooks | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $codexHooksPath -Encoding utf8
+    $definitionWarnings = Install-CapturingWarnings $currentHashes
+    Assert-True ($definitionWarnings -match 'trust each definition') 'A changed Codex hook definition did not ask for re-trust.'
+    # A first install into an existing Claude settings.json with unrelated settings
+    # and no hooks property must report Missing, install, and keep those settings.
+    $freshClaudeRoot = Join-Path $root 'claude-fresh'
+    $null = New-Item -ItemType Directory -Path $freshClaudeRoot -Force
+    $freshSettingsPath = Join-Path $freshClaudeRoot ([string](Get-CustomizationTarget -Name 'claude').hooks.destination)
+    [ordered]@{ model = 'opus'; permissions = [ordered]@{ allow = @('Read') } } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $freshSettingsPath -Encoding utf8
+    $freshStatus = @(Get-CustomizationStatus -TargetName 'claude' -HomePath $freshClaudeRoot | Where-Object Kind -eq 'Hook')
+    Assert-True ($freshStatus.Count -gt 0 -and @($freshStatus | Where-Object RegistrationState -ne 'Missing').Count -eq 0) 'Settings without a hooks property should report every hook registration as Missing.'
+    $freshWarnings = @()
+    & $installer -Target Claude -ClaudeHome $freshClaudeRoot -ExpectedInstructionHashes @{ claude = 'missing' } `
+        -AllowDirty -AllowNonMain -WarningVariable freshWarnings | Out-Null
+    $freshSettings = Get-Content -LiteralPath $freshSettingsPath -Raw | ConvertFrom-Json
+    Assert-True ($freshSettings.model -eq 'opus' -and @($freshSettings.permissions.allow) -contains 'Read') 'First install dropped unrelated settings.'
+    Assert-True ($freshSettings.PSObject.Properties.Name -contains 'hooks') 'First install did not create the hooks property.'
+    Assert-True (@($freshWarnings | ForEach-Object { [string]$_ }) -match 'captured hook snapshot') 'A first-time hook registration should warn that a new session is needed.'
+    # An empty settings object has no properties at all; it must behave the same way.
+    $emptyClaudeRoot = Join-Path $root 'claude-empty'
+    $null = New-Item -ItemType Directory -Path $emptyClaudeRoot -Force
+    $emptySettingsPath = Join-Path $emptyClaudeRoot ([string](Get-CustomizationTarget -Name 'claude').hooks.destination)
+    Set-Content -LiteralPath $emptySettingsPath -Value '{}' -Encoding utf8
+    $emptyStatus = @(Get-CustomizationStatus -TargetName 'claude' -HomePath $emptyClaudeRoot | Where-Object Kind -eq 'Hook')
+    Assert-True ($emptyStatus.Count -gt 0 -and @($emptyStatus | Where-Object RegistrationState -ne 'Missing').Count -eq 0) 'An empty settings object should report every hook registration as Missing.'
+    $emptyWarnings = @()
+    & $installer -Target Claude -ClaudeHome $emptyClaudeRoot -ExpectedInstructionHashes @{ claude = 'missing' } `
+        -AllowDirty -AllowNonMain -WarningVariable emptyWarnings | Out-Null
+    $emptySettings = Get-Content -LiteralPath $emptySettingsPath -Raw | ConvertFrom-Json
+    Assert-True ($null -ne $emptySettings.PSObject.Properties['hooks']) 'First install into an empty settings object did not create the hooks property.'
+    Assert-True (@($emptyWarnings | ForEach-Object { [string]$_ }) -match 'captured hook snapshot') 'A first-time registration into an empty settings object should warn that a new session is needed.'
     Write-Host "Instruction installation precondition tests: OK ($assertions assertions)"
 } finally {
     $full = [IO.Path]::GetFullPath($root)

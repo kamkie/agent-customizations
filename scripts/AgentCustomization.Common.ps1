@@ -235,7 +235,9 @@ function Get-CustomizationHookState {
         return 'Different'
     }
 
-    if (-not $config -or -not $config.hooks) { return 'Missing' }
+    # Settings may exist without any hooks property (a first install into an
+    # existing settings.json); under StrictMode that property must be probed.
+    if (-not $config -or $null -eq $config.PSObject.Properties['hooks'] -or -not $config.hooks) { return 'Missing' }
     $candidateCount = 0
     $exactCount = 0
     foreach ($eventProperty in $config.hooks.PSObject.Properties) {
@@ -386,12 +388,16 @@ function Get-CustomizationStatus {
         foreach ($entry in @($target.hooks.entries)) {
             $hookSource = Join-Path $repositoryRoot ([string]$entry.source)
             $hookTarget = Join-Path $HomePath ([string]$entry.script)
+            # The registration (the JSON definition the agent fingerprints and
+            # asks the user to trust) is tracked separately from the script it
+            # runs, so a script-only update does not look like a definition change.
+            $registrationState = Get-CustomizationHookState -HooksPath $hooksPath -Entry $entry -HomePath $HomePath -Format $hookFormat
             $hookState = if (-not (Test-Path -LiteralPath $hookTarget -PathType Leaf)) {
                 'Missing'
             } elseif (-not (Test-FilesEqual -Source $hookSource -Target $hookTarget)) {
                 'Different'
             } else {
-                Get-CustomizationHookState -HooksPath $hooksPath -Entry $entry -HomePath $HomePath -Format $hookFormat
+                $registrationState
             }
             $results.Add([pscustomobject]@{
                 Target = $TargetName
@@ -399,6 +405,7 @@ function Get-CustomizationStatus {
                 Name = [string]$entry.id
                 RelativePath = ([string]$target.hooks.destination) + '#' + ([string]$entry.event)
                 State = $hookState
+                RegistrationState = $registrationState
             })
         }
     }

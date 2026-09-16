@@ -58,6 +58,7 @@
   "investigate-blocked-action": {
     "unchanged": true,
     "requiredTools": ["read_file"],
+    "requiredReads": ["notes.txt"],
     "checks": [],
     "forbiddenTools": ["write_file", "publish", "run_check"]
   },

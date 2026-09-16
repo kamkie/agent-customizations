@@ -152,10 +152,13 @@ foreach ($targetName in $selectedTargets) {
 
     Write-Host "Installed $($targetConfig.displayName) customizations to $resolvedHome"
     Write-Host "Previous files, when present, were backed up under $backupRoot"
-    if ($targetName -eq 'codex' -and $hookDrift.Count -gt 0) {
+    # Only a changed definition needs re-trust or a new session; the agents run
+    # the script file by path, so a script-only update takes effect immediately.
+    $hookRegistrationDrift = @($hookDrift | Where-Object { $_.RegistrationState -ne 'InSync' })
+    if ($targetName -eq 'codex' -and $hookRegistrationDrift.Count -gt 0) {
         Write-Warning 'Codex skips any new or changed personal hook definition until you start Codex, open /hooks, and trust each definition marked for review.'
     }
-    if ($targetName -eq 'claude' -and $hookDrift.Count -gt 0) {
+    if ($targetName -eq 'claude' -and $hookRegistrationDrift.Count -gt 0) {
         Write-Warning 'Claude Code applies changed hook definitions when a new session starts; sessions already running keep their captured hook snapshot.'
     }
 }

@@ -63,6 +63,26 @@ try {
     $claudeBefore = Get-CustomizationInstructionHash $claudeFile
     Install-Expected @{ codex = Get-CustomizationInstructionHash $codexFile } -target Codex
     Assert-True ((Get-CustomizationInstructionHash $claudeFile) -eq $claudeBefore) 'Single-target install changed the other target.'
+    # A script-only hook update must not ask for re-trust; a changed definition must.
+    function Install-CapturingWarnings($hashes) {
+        $warnings = @()
+        & $installer -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot `
+            -ExpectedInstructionHashes $hashes -AllowDirty -AllowNonMain -WarningVariable warnings | Out-Null
+        return @($warnings | ForEach-Object { [string]$_ })
+    }
+    $currentHashes = @{ codex = Get-CustomizationInstructionHash $codexFile; claude = Get-CustomizationInstructionHash $claudeFile }
+    $codexHookEntry = @((Get-CustomizationTarget -Name 'codex').hooks.entries)[0]
+    $installedHookScript = Join-Path $codexRoot ([string]$codexHookEntry.script)
+    Add-Content -LiteralPath $installedHookScript -Value '# script-only drift' -Encoding utf8
+    $scriptOnlyWarnings = Install-CapturingWarnings $currentHashes
+    Assert-True (-not ($scriptOnlyWarnings -match 'trust each definition')) 'A script-only hook update wrongly asked for Codex hook re-trust.'
+    Assert-True (-not ($scriptOnlyWarnings -match 'captured hook snapshot')) 'A script-only hook update wrongly warned about the Claude hook snapshot.'
+    $codexHooksPath = Join-Path $codexRoot ([string](Get-CustomizationTarget -Name 'codex').hooks.destination)
+    $codexHooks = Get-Content -LiteralPath $codexHooksPath -Raw | ConvertFrom-Json
+    $codexHooks.hooks.($codexHookEntry.event)[0].hooks[0].timeout = 99
+    $codexHooks | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $codexHooksPath -Encoding utf8
+    $definitionWarnings = Install-CapturingWarnings $currentHashes
+    Assert-True ($definitionWarnings -match 'trust each definition') 'A changed Codex hook definition did not ask for re-trust.'
     Write-Host "Instruction installation precondition tests: OK ($assertions assertions)"
 } finally {
     $full = [IO.Path]::GetFullPath($root)

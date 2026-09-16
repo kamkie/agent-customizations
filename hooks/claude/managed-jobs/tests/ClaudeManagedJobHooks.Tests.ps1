@@ -287,7 +287,10 @@ try {
         'pwsh -c "claude -p hello"',
         'CLAUDE_CODE_EFFORT_LEVEL=medium claude -p "hello"',
         'env claude -p "hello"',
-        'bash -c ''cd /tmp && claude -p "hello"'''
+        'bash -c ''cd /tmp && claude -p "hello"''',
+        "echo ready`nclaude -p hello",
+        'CLAUDE_CODE_EFFORT_LEVEL="medium" claude -p hello',
+        'env LEVEL="medium" claude -p hello'
     )) {
         $headlessPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

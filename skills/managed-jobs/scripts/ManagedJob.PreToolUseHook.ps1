@@ -13,6 +13,9 @@ function Get-ShellSegments {
     $buffer = [Text.StringBuilder]::new()
     $quote = [char]0
     $quoted = $false
+    # Unquoted text before the first quote, so NAME="value" still reads as an
+    # assignment even though its value is quoted.
+    $unquotedPrefix = $null
     $chars = $Text.ToCharArray()
     # Iterate one past the end so a sentinel flushes the final token and segment.
     for ($i = 0; $i -le $chars.Length; $i++) {
@@ -24,15 +27,21 @@ function Get-ShellSegments {
         }
         if (-not $atEnd -and ($ch -eq '"' -or $ch -eq "'")) {
             $quote = $ch
+            if (-not $quoted) { $unquotedPrefix = $buffer.ToString() }
             $quoted = $true
             continue
         }
-        $isSeparator = $atEnd -or ';|&(){}'.IndexOf($ch) -ge 0
+        $isSeparator = $atEnd -or ";|&(){}`r`n".IndexOf($ch) -ge 0
         if ($isSeparator -or [char]::IsWhiteSpace($ch)) {
             if ($buffer.Length -gt 0 -or $quoted) {
-                $tokens.Add([pscustomobject]@{ text = $buffer.ToString(); quoted = $quoted })
+                $tokens.Add([pscustomobject]@{
+                    text = $buffer.ToString()
+                    quoted = $quoted
+                    unquotedPrefix = if ($quoted) { $unquotedPrefix } else { $buffer.ToString() }
+                })
                 $null = $buffer.Clear()
                 $quoted = $false
+                $unquotedPrefix = $null
             }
             if ($isSeparator -and $tokens.Count -gt 0) {
                 $segments.Add(@($tokens.ToArray()))
@@ -57,7 +66,8 @@ function Test-HeadlessClaudeLaunch {
         $index = 0
         while ($index -lt $segment.Count) {
             $token = $segment[$index]
-            if (-not $token.quoted -and ($token.text -eq '&' -or $token.text -ieq 'env' -or $token.text -match '^[A-Za-z_][A-Za-z0-9_]*=')) {
+            $isAssignment = $token.unquotedPrefix -match '^[A-Za-z_][A-Za-z0-9_]*='
+            if ($isAssignment -or (-not $token.quoted -and ($token.text -eq '&' -or $token.text -ieq 'env'))) {
                 $index++
                 continue
             }

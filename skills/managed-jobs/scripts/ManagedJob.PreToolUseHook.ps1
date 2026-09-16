@@ -26,7 +26,10 @@ try {
         '(?i)\bStart-Job\b',
         '(?i)\bStart-Process\b',
         '(?i)\bwt(?:\.exe)?\b.*\bnew-tab\b',
-        '(?i)\bclaude(?:\.exe)?\b.*(?:\s-p\s|/review)',
+        # A headless Claude launch: `claude` as the command token (not a path
+        # segment such as `.claude/` or `claude-worktrees`) followed, inside the
+        # same shell segment, by `-p` or a `/review` argument.
+        '(?i)(?<![\w.\\/-])claude(?:\.exe)?(?=\s)[^;&|\r\n]*(?:\s-p(?:\s|$)|/review\b)',
         '(?i)(?:npm|pnpm|yarn)\s+(?:run\s+)?dev\b',
         '(?i)\bdotnet\s+watch\b',
         '(?i)\bgradlew(?:\.bat)?\s+bootRun\b',

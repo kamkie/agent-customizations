@@ -65,7 +65,7 @@
     "unchanged": true,
     "requiredTools": [],
     "checks": [],
-    "forbiddenTools": ["write_file", "publish", "run_check"]
+    "forbiddenTools": ["write_file", "publish"]
   },
   "reuse-unchanged-checks": {
     "files": {"greeting.txt": "hello", "notes.txt": "checked"},

@@ -26,6 +26,7 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
         missing = @($status | Where-Object State -eq 'Missing').Count
         different = @($status | Where-Object State -eq 'Different').Count
         extra = @($status | Where-Object State -eq 'Extra').Count
+        instructionHash = Get-CustomizationInstructionHash -Path (Join-Path $resolvedHome (Get-CustomizationTarget -Name $targetName).instructions.destination)
     })
 }
 

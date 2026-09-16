@@ -435,3 +435,18 @@ function Get-CustomizationStatus {
 
     return $results
 }
+# A precondition from the reviewed live snapshot, not deployment authorization.
+function Get-CustomizationInstructionHash {
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return 'missing' }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Instruction target is not a file: $Path" }
+    (Get-FileHash -LiteralPath $Path -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
+}
+
+function Assert-CustomizationInstructionHash {
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Expected)
+    $actual = Get-CustomizationInstructionHash -Path $Path
+    if ($actual -ne $Expected) {
+        throw "Live instructions changed since review: $Path (expected $Expected, found $actual). Compare the new content before installation."
+    }
+}

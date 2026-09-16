@@ -69,10 +69,13 @@ the repository root (diff exit code 1 means differences were found):
 
 ```powershell
 . ./scripts/AgentCustomization.Common.ps1
+$reviewedHashes = @{}
 foreach ($targetName in Get-CustomizationTargetNames -Target All) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
     $liveRoot = Resolve-CustomizationHome -TargetName $targetName
     $liveFile = Join-Path $liveRoot $targetConfig.instructions.destination
+    # Capture before reading the diff; do not refresh it after a concurrent edit.
+    $reviewedHashes[$targetName] = Get-CustomizationInstructionHash -Path $liveFile
     if (-not (Test-Path -LiteralPath $liveFile -PathType Leaf)) {
         Write-Host "$targetName instructions are missing; no live content to compare."
         continue
@@ -119,10 +122,10 @@ git pull --ff-only
 git status --short --branch
 ```
 
-Install both targets:
+Install both targets, keeping the hashes from the content comparison above:
 
 ```powershell
-pwsh ./scripts/install.ps1
+./scripts/install.ps1 -ExpectedInstructionHashes $reviewedHashes
 ```
 
 Install only one target:
@@ -142,6 +145,22 @@ ordered shared and overlay instruction sources into its destination file.
 Existing files are backed up under a timestamped `customization-backups`
 directory in the selected target home, and the installer checks for remaining
 drift before it succeeds.
+
+`status.ps1` includes each target's current `instructionHash` (`missing` when
+absent). A hash is evidence of file identity, not evidence that its content has
+been reviewed. `-ExpectedInstructionHashes` accepts a hashtable containing exactly
+the selected targets; for a single target use, for example,
+`@{ codex = $reviewedHashes.codex }`. Pass it from PowerShell, not as a serialized
+string to `pwsh -File`. Alternate homes must be the same ones used for comparison.
+
+The precondition checks all targets before installation and checks a changed
+instruction file again before replacement. On mismatch, reread and reconcile
+the changed content rather than blindly replacing the expected hash. It detects
+stale snapshots, including a previously missing file appearing, but is not an
+atomic lock against a writer racing the final filesystem replacement. Coordinate
+active writers before activation. The option adds no deployment authority;
+omitting it preserves the existing installer interface, not an exemption from
+the content-review requirement above.
 
 ## Apply hook changes
 

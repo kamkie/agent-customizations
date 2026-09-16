@@ -10,8 +10,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if ($CodexModelInstructionsFile) {
-    $CodexModelInstructionsFile = [IO.Path]::GetFullPath($CodexModelInstructionsFile)
-    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Codex model instructions file not found: $CodexModelInstructionsFile" }
+    # Resolve against PowerShell's current location, not the process directory.
+    $resolvedModelFile = Resolve-Path -LiteralPath $CodexModelInstructionsFile -ErrorAction SilentlyContinue
+    if (-not $resolvedModelFile -or -not (Test-Path -LiteralPath $resolvedModelFile.ProviderPath -PathType Leaf)) { throw "Codex model instructions file not found: $CodexModelInstructionsFile" }
+    $CodexModelInstructionsFile = $resolvedModelFile.ProviderPath
 }
 # Capture native exit codes ourselves, including when a caller enables native
 # ErrorActionPreference integration. Preserve stdout before reporting failures.

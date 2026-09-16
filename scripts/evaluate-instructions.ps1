@@ -18,8 +18,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($CodexModelInstructionsFile) {
-    $CodexModelInstructionsFile = [IO.Path]::GetFullPath($CodexModelInstructionsFile)
-    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Codex model instructions file not found: $CodexModelInstructionsFile" }
+    # Resolve against PowerShell's current location, not the process directory.
+    $resolvedModelFile = Resolve-Path -LiteralPath $CodexModelInstructionsFile -ErrorAction SilentlyContinue
+    if (-not $resolvedModelFile -or -not (Test-Path -LiteralPath $resolvedModelFile.ProviderPath -PathType Leaf)) { throw "Codex model instructions file not found: $CodexModelInstructionsFile" }
+    $CodexModelInstructionsFile = $resolvedModelFile.ProviderPath
 }
 . (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path

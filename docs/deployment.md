@@ -64,6 +64,27 @@ file, not only the drift count. Account for live-only guidance in the reviewed
 sources or obtain explicit authority to discard it before replacing that file.
 A backup preserves recovery data; it does not make an unreviewed loss acceptable.
 
+For existing live instruction files, compare against their composed sources from
+the repository root (diff exit code 1 means differences were found):
+
+```powershell
+. ./scripts/AgentCustomization.Common.ps1
+foreach ($targetName in Get-CustomizationTargetNames -Target All) {
+    $targetConfig = Get-CustomizationTarget -Name $targetName
+    $liveRoot = Resolve-CustomizationHome -TargetName $targetName
+    $liveFile = Join-Path $liveRoot $targetConfig.instructions.destination
+    $compiledFile = [IO.Path]::GetTempFileName()
+    try {
+        [IO.File]::WriteAllText($compiledFile,
+            (Get-CustomizationInstructionContent -Target $targetConfig))
+        git diff --no-index -- $compiledFile $liveFile
+        if ($LASTEXITCODE -gt 1) { throw "Cannot compare $targetName instructions." }
+    } finally {
+        Remove-Item -LiteralPath $compiledFile
+    }
+}
+```
+
 ## Preview activation
 
 Preview all target changes without writing to either live installation:

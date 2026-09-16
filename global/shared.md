@@ -166,6 +166,8 @@ itself.
 
 If repository policy forbids a merge commit and the user has not explicitly
 requested its required alternative, report the method conflict before integrating.
+Authorization to rebase or cherry-pick does not authorize a separate branch or
+pull-request merge.
 
 After merge, fetch the remote default branch and prove the result is reachable.
 Stop task-specific processes and remove task-created temporary artifacts. Remove

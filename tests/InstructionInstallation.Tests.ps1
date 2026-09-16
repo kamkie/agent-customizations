@@ -26,6 +26,7 @@ try {
     $statusOutput = @(& pwsh -NoProfile -File (Join-Path $PSScriptRoot '../scripts/status.ps1') -Target Codex -CodexHome $nonFileHome -SummaryOnly)
     Assert-True ($LASTEXITCODE -eq 1) 'A non-file instruction target should still report drift.'
     $report = ($statusOutput -join "`n") | ConvertFrom-Json
+    Assert-True ($report.instructionHashErrors -eq 1) 'Unavailable hash was not counted independently of ordinary drift.'
     Assert-True ($null -eq $report.targets[0].instructionHash -and $report.targets[0].instructionHashError -like '*not a file*') 'Unavailable hash erased or misrepresented the status report.'
     $null = New-Item -ItemType Directory -Path $codexRoot, $claudeRoot -Force
     [IO.File]::WriteAllText($codexFile, 'Reviewed local codex rule')

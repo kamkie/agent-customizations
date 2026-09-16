@@ -21,6 +21,12 @@ try {
     Assert-True ((Get-CustomizationInstructionHash $codexFile) -eq 'missing') 'Missing file hash differs.'
     Install-Expected @{ codex = 'missing'; claude = 'missing' } -Preview
     Assert-True (-not (Test-Path $root)) 'Preview wrote target state.'
+    $nonFileHome = Join-Path $root 'nonfile'
+    $null = New-Item -ItemType Directory -Path (Join-Path $nonFileHome 'AGENTS.md') -Force
+    $statusOutput = @(& pwsh -NoProfile -File (Join-Path $PSScriptRoot '../scripts/status.ps1') -Target Codex -CodexHome $nonFileHome -SummaryOnly)
+    Assert-True ($LASTEXITCODE -eq 1) 'A non-file instruction target should still report drift.'
+    $report = ($statusOutput -join "`n") | ConvertFrom-Json
+    Assert-True ($null -eq $report.targets[0].instructionHash -and $report.targets[0].instructionHashError -like '*not a file*') 'Unavailable hash erased or misrepresented the status report.'
     $null = New-Item -ItemType Directory -Path $codexRoot, $claudeRoot -Force
     [IO.File]::WriteAllText($codexFile, 'Reviewed local codex rule')
     [IO.File]::WriteAllText($claudeFile, 'Reviewed local claude rule')

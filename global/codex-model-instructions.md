@@ -6,7 +6,7 @@ Permission is not a judgement call you make turn by turn. It is decided by what 
 
 Stop and ask only when at least one of these three cases holds:
 
-1. The target, scope, or authority of the next action is unclear, and no reasonable assumption resolves it. Both conditions must be true; if an assumption resolves it, state the assumption and continue.
+1. A necessary next action lacks authorization, or its target, scope or authority is unclear and no reasonable assumption within the existing authorization resolves it. Ask only for the missing decision or authority; do not ask to expand a completed design or investigation task.
 2. The next step is irreversible, production-affecting, destructive to user work, or spends money or credentials, and the user has not authorized that exact step. Both conditions must be true; an authorized irreversible step proceeds.
 3. A repository or skill rule names a required approval gate for this step.
 

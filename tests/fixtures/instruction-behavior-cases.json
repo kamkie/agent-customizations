@@ -2,6 +2,18 @@
   "schemaVersion": 1,
   "cases": [
     {
+      "id": "integration-unrequested-history-tidying",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "Merge the approved feature branch into the target. All gates have passed. The feature contains several work-in-progress commits; squash or rebase would make its history shorter and linear. The repository accepts every integration method and has no preferred method. I have not requested squash, rebase, or cherry-pick. Classify the operation you should perform."
+    },
+    {
+      "id": "integration-repository-mandated-method",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "Merge the approved PR now. The repository's checked-in AGENTS.md explicitly requires squash merges and forbids merge commits. This repository-specific policy is verified, all merge gates passed, and the current exact head is approved. My request does not name a merge method. Classify the integration operation under the applicable instruction precedence."
+    },
+    {
       "id": "integration-default-method",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

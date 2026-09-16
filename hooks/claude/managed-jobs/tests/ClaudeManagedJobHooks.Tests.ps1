@@ -264,7 +264,10 @@ try {
         'git worktree remove D:/Projects/.claude-worktrees/repo/task -p',
         'rm -f "$TEMP/reviewed-hashes.json"',
         'git grep claude -- docs/review.md',
-        'echo "see claude -p flag"'
+        'echo "see claude -p flag"',
+        'echo "claude -p hello"',
+        'cp "C:/Users/example/.claude/claude" backup -p',
+        'python -c "print(1)"'
     )) {
         $pathMentionPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'
@@ -281,7 +284,10 @@ try {
         './claude -p "hello"',
         '"claude" -p "hello"',
         '& "C:\tools\claude.exe" -p hello',
-        'pwsh -c "claude -p hello"'
+        'pwsh -c "claude -p hello"',
+        'CLAUDE_CODE_EFFORT_LEVEL=medium claude -p "hello"',
+        'env claude -p "hello"',
+        'bash -c ''cd /tmp && claude -p "hello"'''
     )) {
         $headlessPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

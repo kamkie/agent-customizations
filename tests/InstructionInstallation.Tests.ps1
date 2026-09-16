@@ -83,6 +83,21 @@ try {
     $codexHooks | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $codexHooksPath -Encoding utf8
     $definitionWarnings = Install-CapturingWarnings $currentHashes
     Assert-True ($definitionWarnings -match 'trust each definition') 'A changed Codex hook definition did not ask for re-trust.'
+    # A first install into an existing Claude settings.json with unrelated settings
+    # and no hooks property must report Missing, install, and keep those settings.
+    $freshClaudeRoot = Join-Path $root 'claude-fresh'
+    $null = New-Item -ItemType Directory -Path $freshClaudeRoot -Force
+    $freshSettingsPath = Join-Path $freshClaudeRoot ([string](Get-CustomizationTarget -Name 'claude').hooks.destination)
+    [ordered]@{ model = 'opus'; permissions = [ordered]@{ allow = @('Read') } } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $freshSettingsPath -Encoding utf8
+    $freshStatus = @(Get-CustomizationStatus -TargetName 'claude' -HomePath $freshClaudeRoot | Where-Object Kind -eq 'Hook')
+    Assert-True ($freshStatus.Count -gt 0 -and @($freshStatus | Where-Object RegistrationState -ne 'Missing').Count -eq 0) 'Settings without a hooks property should report every hook registration as Missing.'
+    $freshWarnings = @()
+    & $installer -Target Claude -ClaudeHome $freshClaudeRoot -ExpectedInstructionHashes @{ claude = 'missing' } `
+        -AllowDirty -AllowNonMain -WarningVariable freshWarnings | Out-Null
+    $freshSettings = Get-Content -LiteralPath $freshSettingsPath -Raw | ConvertFrom-Json
+    Assert-True ($freshSettings.model -eq 'opus' -and @($freshSettings.permissions.allow) -contains 'Read') 'First install dropped unrelated settings.'
+    Assert-True ($freshSettings.PSObject.Properties.Name -contains 'hooks') 'First install did not create the hooks property.'
+    Assert-True (@($freshWarnings | ForEach-Object { [string]$_ }) -match 'captured hook snapshot') 'A first-time hook registration should warn that a new session is needed.'
     Write-Host "Instruction installation precondition tests: OK ($assertions assertions)"
 } finally {
     $full = [IO.Path]::GetFullPath($root)

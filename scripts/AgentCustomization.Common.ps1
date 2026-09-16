@@ -235,7 +235,9 @@ function Get-CustomizationHookState {
         return 'Different'
     }
 
-    if (-not $config -or -not $config.hooks) { return 'Missing' }
+    # Settings may exist without any hooks property (a first install into an
+    # existing settings.json); under StrictMode that property must be probed.
+    if (-not $config -or $config.PSObject.Properties.Name -notcontains 'hooks' -or -not $config.hooks) { return 'Missing' }
     $candidateCount = 0
     $exactCount = 0
     foreach ($eventProperty in $config.hooks.PSObject.Properties) {

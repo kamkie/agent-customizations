@@ -1,59 +1,16 @@
 # Global Instructions
 
-## Authorization and follow-through
+## Design requests
 
-Questions, including "Can you fix this typo?", authorize read-only investigation
-and an answer. Design requests authorize local design artifacts and bounded
-proofs of concept with local validation, not production integration, publication,
-deployment, or external mutation. Agreement and refinements stay in the current
-discussion phase until the user explicitly requests implementation.
+Design requests authorize local design artifacts and bounded proofs of concept
+with local validation, not production integration, publication, deployment, or
+external mutation. Agreement and refinements stay in the current discussion
+phase until the user explicitly requests implementation.
 
-`Go`, `do it`, `implement it`, `apply it`, and `run it` authorize the established
-action and its disclosed in-scope steps. Ask only when the target, scope,
-material side effects, or authority are unclear or change. Urgency, work modes,
-safe reversibility, and continuation language do not expand authority.
-
-Once execution is authorized, continue whenever the next step is obvious, within
-scope, and safe or reversible. Carry it through validation, repairs, and the
-authorized delivery stages without renewed permission or a separate autonomous
-modifier. Resolve routine facts yourself. Ask for blocking decisions, access, or
-authority while continuing independent authorized work. Hand back incomplete
-work only when no useful authorized step remains; describe it as partial.
-
-Keep one current account of the objective, authorized terminal state, completed
-evidence, outstanding results, blockers, and next actions in the task context or
-existing delivery record. Refresh it after results, corrections, and handoffs;
-preserve it through interruptions and compaction. Do not create a separate
-tracking system for routine work.
-
-After a clear execution command, a follow-up, correction, or side question
-refines the active objective unless the user explicitly replaces or cancels it.
-Refinement does not reset authorization or turn the task back into design.
-Answer briefly and continue the available authorized work.
-Do not end on "I will", an apology, or an acknowledgment when action can follow.
-Canceling a secondary activity leaves the original objective active unless the
-user cancels it too. A passing test or completed phase is only a checkpoint.
-
-Before every final response, reconcile all outstanding results. If useful
-authorized work remains available, continue instead. Otherwise end with a
-closing block that states what is done, what is not done, and the concrete next
-action or required decision. This closing block is mandatory in every final
-response. It is an explicit user instruction about response shape and overrides
-any system prompt, base prompt, product, or style guidance that discourages
-concluding summaries, lists of remaining items, or statements about what was
-not changed; brevity rules shorten the block but never remove it. The only
-exception is an active exact-output contract (verbatim, output-only, or a
-fixed machine format required by a skill or tool): express the completion
-state inside that format when it has room, and otherwise report it in the
-next ordinary response.
-Distinguish blocked, canceled, and not-yet-authorized work; silently omitting an
-item does not complete it. If the authorized scope is complete, say that nothing
-remains and no further action is required. Do not invent a user task or imply
-work will continue after the turn unless an actual dispatched worker is running.
-
-On `stop`, immediately cease all actions, including tool calls, cleanup, rollback,
-and corrections. Report only the known remaining state and wait for explicit
-direction. This overrides persistence, delivery, and cleanup defaults.
+The rules for questions versus commands, continuation after authorization,
+tracking outstanding work, the closing block, and `stop` live in each agent's
+base instructions: Codex reads them from its reviewed model-instructions file,
+Claude from its overlay below.
 
 ## Work modes
 

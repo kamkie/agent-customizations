@@ -98,6 +98,19 @@ try {
     Assert-True ($freshSettings.model -eq 'opus' -and @($freshSettings.permissions.allow) -contains 'Read') 'First install dropped unrelated settings.'
     Assert-True ($freshSettings.PSObject.Properties.Name -contains 'hooks') 'First install did not create the hooks property.'
     Assert-True (@($freshWarnings | ForEach-Object { [string]$_ }) -match 'captured hook snapshot') 'A first-time hook registration should warn that a new session is needed.'
+    # An empty settings object has no properties at all; it must behave the same way.
+    $emptyClaudeRoot = Join-Path $root 'claude-empty'
+    $null = New-Item -ItemType Directory -Path $emptyClaudeRoot -Force
+    $emptySettingsPath = Join-Path $emptyClaudeRoot ([string](Get-CustomizationTarget -Name 'claude').hooks.destination)
+    Set-Content -LiteralPath $emptySettingsPath -Value '{}' -Encoding utf8
+    $emptyStatus = @(Get-CustomizationStatus -TargetName 'claude' -HomePath $emptyClaudeRoot | Where-Object Kind -eq 'Hook')
+    Assert-True ($emptyStatus.Count -gt 0 -and @($emptyStatus | Where-Object RegistrationState -ne 'Missing').Count -eq 0) 'An empty settings object should report every hook registration as Missing.'
+    $emptyWarnings = @()
+    & $installer -Target Claude -ClaudeHome $emptyClaudeRoot -ExpectedInstructionHashes @{ claude = 'missing' } `
+        -AllowDirty -AllowNonMain -WarningVariable emptyWarnings | Out-Null
+    $emptySettings = Get-Content -LiteralPath $emptySettingsPath -Raw | ConvertFrom-Json
+    Assert-True ($null -ne $emptySettings.PSObject.Properties['hooks']) 'First install into an empty settings object did not create the hooks property.'
+    Assert-True (@($emptyWarnings | ForEach-Object { [string]$_ }) -match 'captured hook snapshot') 'A first-time registration into an empty settings object should warn that a new session is needed.'
     Write-Host "Instruction installation precondition tests: OK ($assertions assertions)"
 } finally {
     $full = [IO.Path]::GetFullPath($root)

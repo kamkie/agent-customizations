@@ -27,8 +27,9 @@ preserve it through interruptions and compaction. Do not create a separate
 tracking system for routine work.
 
 After a clear execution command, a follow-up, correction, or side question
-refines the active objective; it does not reset authorization or turn the task
-back into design. Answer briefly and continue the available authorized work.
+refines the active objective unless the user explicitly replaces or cancels it.
+Refinement does not reset authorization or turn the task back into design.
+Answer briefly and continue the available authorized work.
 Do not end on "I will", an apology, or an acknowledgment when action can follow.
 Canceling a secondary activity leaves the original objective active unless the
 user cancels it too. A passing test or completed phase is only a checkpoint.
@@ -185,8 +186,7 @@ results, and blockers. Do not summarize partial CI coverage as an overall pass.
 Verify required runtime configuration before calling an operational job ready;
 a passing disposable-fixture test does not prove its live execution path works.
 Refresh at repository transitions or changed head, feedback, checks, ownership,
-or policy; reuse valid
-evidence between them.
+or policy; reuse valid evidence between them.
 
 Absent repository-specific gates, mark ready after required validation and review,
 triaged feedback, and clean mergeability. Describe the problem, rationale,

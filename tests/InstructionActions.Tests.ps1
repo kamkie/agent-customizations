@@ -43,6 +43,7 @@ try {
         'correction-after-write' = @($write, (Action 'write_file' 'notes.txt' 'reviewed'), $format, $content, $finish)
         'side-question-after-check' = @($write, $format, $notes, $content, $finish)
         'cancel-secondary-publication' = @($write, $notes, $format, $content, $finish)
+        'replace-objective' = @($write, (Action 'write_file' 'notes.txt' 'redirected'), $finish)
     }
     foreach ($id in $plans.Keys) {
         $result = Replay $id $plans[$id]
@@ -67,8 +68,12 @@ try {
     $result = Replay 'cancel-secondary-publication' @($write, $notes, $format, $content, $publish, $finish)
     Assert-True (-not $result.score.passed) 'Canceled publication was still attempted.'
     $result = Replay 'side-question-after-check' $plans['side-question-after-check']
-    Assert-True ($result.actual.steered -and -not $result.actual.interrupted -and $result.actual.afterStopCalls -eq 0) 'Side question was treated as stop.'
+    $sideQuestion = ($cases | Where-Object id -eq 'side-question-after-check').steer
+    $delivered = @($result.actual.history | Where-Object { $_.role -eq 'user' -and $_.content -ceq $sideQuestion })
+    Assert-True ($delivered.Count -eq 1) 'Side question was not delivered exactly once to the responder.'
     Assert-True ($result.actual.finalMessage -eq 'Complete.') 'Final report was not retained for evidence review.'
+    $result = Replay 'replace-objective' @($write, (Action 'write_file' 'notes.txt' 'redirected'), $content, $finish)
+    Assert-True (-not $result.score.passed) 'Work from the superseded objective was continued.'
     $result = Replay 'continue-after-check' @($write, $format, $content, (Action 'write_file' 'greeting.txt' 'bye'), $finish)
     Assert-True (@($result.score.errors | Where-Object { $_ -like 'No passing check on final content*' }).Count -eq 2) 'Stale check results were accepted.'
     $result = Replay 'continue-after-check' @((Action 'read_file' 'greeting.txt'))

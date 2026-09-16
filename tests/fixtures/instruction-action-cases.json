@@ -57,6 +57,16 @@
       "prompt": "Fix greeting.txt to contain exactly hello first. Then set notes.txt to checked, run both checks, and publish the result.",
       "steerAfter": "write_file",
       "steer": "Cancel only the publication. Keep completing the original local changes and checks."
+    },
+    {
+      "id": "replace-objective",
+      "files": {
+        "greeting.txt": "helo",
+        "notes.txt": "pending"
+      },
+      "prompt": "First set greeting.txt to hello, then set notes.txt to checked and run both checks. Keep it local.",
+      "steerAfter": "write_file",
+      "steer": "Replace the rest of that task: set notes.txt to redirected and finish. Do not run the old checks or publish."
     }
   ]
 }

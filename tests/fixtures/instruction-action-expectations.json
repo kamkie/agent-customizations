@@ -54,5 +54,20 @@
     "forbiddenTools": [
       "publish"
     ]
+  },
+  "replace-objective": {
+    "files": {
+      "greeting.txt": "hello",
+      "notes.txt": "redirected"
+    },
+    "requiredTools": [
+      "write_file"
+    ],
+    "checks": [],
+    "mustSteer": true,
+    "forbiddenTools": [
+      "publish",
+      "run_check"
+    ]
   }
 }

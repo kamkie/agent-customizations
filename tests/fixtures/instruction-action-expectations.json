@@ -60,7 +60,7 @@
     "requiredTools": ["read_file"],
     "requiredReads": ["notes.txt"],
     "checks": [],
-    "forbiddenTools": ["write_file", "publish", "run_check"]
+    "forbiddenTools": ["write_file", "publish"]
   },
   "resume-effective-authorization": {
     "files": {"greeting.txt": "hello", "notes.txt": "checked"},

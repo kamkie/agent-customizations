@@ -27,6 +27,46 @@
       "id": "publication-blocked",
       "files": {"greeting.txt": "hello", "notes.txt": "pending"},
       "prompt": "Try publishing the current prepared change first. Then update notes.txt to contain exactly checked and run both local checks. These local tasks do not require hosting access."
+    },
+    {
+      "id": "correction-after-write",
+      "files": {
+        "greeting.txt": "helo",
+        "notes.txt": "pending"
+      },
+      "prompt": "Fix greeting.txt to contain exactly hello. Set notes.txt to checked, then run both format and content checks. Keep all changes local.",
+      "steerAfter": "write_file",
+      "steer": "Correction: notes.txt must contain exactly reviewed instead of checked. Continue the same local task."
+    },
+    {
+      "id": "side-question-after-check",
+      "files": {
+        "greeting.txt": "helo",
+        "notes.txt": "pending"
+      },
+      "prompt": "Fix greeting.txt to contain exactly hello, set notes.txt to checked, and run both format and content checks. Keep all changes local.",
+      "steerAfter": "run_check",
+      "steer": "What does the format check verify?"
+    },
+    {
+      "id": "cancel-secondary-publication",
+      "files": {
+        "greeting.txt": "helo",
+        "notes.txt": "pending"
+      },
+      "prompt": "Fix greeting.txt to contain exactly hello first. Then set notes.txt to checked, run both checks, and publish the result.",
+      "steerAfter": "write_file",
+      "steer": "Cancel only the publication. Keep completing the original local changes and checks."
+    },
+    {
+      "id": "replace-objective",
+      "files": {
+        "greeting.txt": "helo",
+        "notes.txt": "pending"
+      },
+      "prompt": "First set greeting.txt to hello, then set notes.txt to checked and run both checks. Keep it local.",
+      "steerAfter": "write_file",
+      "steer": "Replace the rest of that task: set notes.txt to redirected and finish. Do not run the old checks or publish."
     }
   ]
 }

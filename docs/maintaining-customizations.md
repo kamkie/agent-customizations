@@ -52,6 +52,10 @@ duplicate the README or general architecture documentation.
 - Keep target-specific behavior in the target's instruction file. Change both
   Codex and Claude guidance only when the behavior is intentionally shared and
   valid for both agents.
+- Classify each imported live rule before copying it. Preserve the user's stated
+  reuse scope: a global preference does not become repository-only because its
+  latest occurrence was local. When rejecting an ownership review finding, cite
+  the owning contract; passing behavior tests does not establish portability.
 
 ## Maintain skill entrypoints and references
 
@@ -121,6 +125,15 @@ Use the faster classification cases for routine wording checks. Action cases
 use a controlled JSON tool protocol with user-message injection between requests;
 they do not establish native-tool integration or in-flight cancellation behavior.
 Record the exact targets, cases, observed results, and retained trace location.
+
+For continuation changes, preserve the question-only and stop cases and inject
+corrections, side questions, and cancellation of secondary work between actions.
+Score actual effects and remaining checks, not promises to continue. Inspect the
+retained final messages for completed work, outstanding items and next action;
+the action scorer does not establish semantic completeness of free-text reports.
+Compare a failed unchanged boundary case against the unchanged source before
+attributing it to the new instructions; retain both results without weakening
+the expectation or calling the failing boundary verified.
 
 Delivery requirements have one owner: `AGENTS.md` owns repository stages, gates,
 and evidence refresh points; the review skill owns portable triage and re-review

@@ -2,9 +2,17 @@
 param(
     [ValidateSet('codex', 'claude', 'all')][string]$Target = 'all',
     [string[]]$CaseId,
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    # Optional replacement for Codex's built-in model instructions. The Codex
+    # client runs with --ignore-user-config, so the reviewed file must be passed
+    # explicitly to evaluate it; omit it to evaluate against the stock prompt.
+    [string]$CodexModelInstructionsFile
 )
 $ErrorActionPreference = 'Stop'
+if ($CodexModelInstructionsFile) {
+    $CodexModelInstructionsFile = [IO.Path]::GetFullPath($CodexModelInstructionsFile)
+    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Codex model instructions file not found: $CodexModelInstructionsFile" }
+}
 # Capture native exit codes ourselves, including when a caller enables native
 # ErrorActionPreference integration. Preserve stdout before reporting failures.
 $PSNativeCommandUseErrorActionPreference = $false
@@ -84,6 +92,7 @@ $currentRequest
                     $arguments += @('--disable', $feature)
                 }
                 if ($IsWindows) { $arguments += @('-c', 'windows.sandbox="elevated"') }
+                if ($CodexModelInstructionsFile) { $arguments += @('-c', ('model_instructions_file="' + ($CodexModelInstructionsFile -replace '\\', '/') + '"')) }
                 $raw = @($prompt | & codex @arguments '-' 2> $stderrPath)
                 $clientExit = $LASTEXITCODE
                 $raw | Set-Content (Join-Path $caseRoot "client-$step.jsonl")

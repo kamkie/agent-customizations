@@ -8,10 +8,19 @@ param(
 
     [string]$ResponseDirectory,
 
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+
+    # Optional replacement for Codex's built-in model instructions. The Codex
+    # client runs with --ignore-user-config, so the reviewed file must be passed
+    # explicitly to evaluate it; omit it to evaluate against the stock prompt.
+    [string]$CodexModelInstructionsFile
 )
 
 $ErrorActionPreference = 'Stop'
+if ($CodexModelInstructionsFile) {
+    $CodexModelInstructionsFile = [IO.Path]::GetFullPath($CodexModelInstructionsFile)
+    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Codex model instructions file not found: $CodexModelInstructionsFile" }
+}
 . (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $manifest = Get-CustomizationManifest
@@ -148,8 +157,10 @@ function Read-AgentResponse {
             $arguments = @(
                 'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules',
                 '--sandbox', 'read-only', '--color', 'never', '--cd', $workspace,
-                '--output-schema', $schemaPath, '--output-last-message', $responsePath, '-'
+                '--output-schema', $schemaPath, '--output-last-message', $responsePath
             )
+            if ($CodexModelInstructionsFile) { $arguments += @('-c', ('model_instructions_file="' + ($CodexModelInstructionsFile -replace '\\', '/') + '"')) }
+            $arguments += '-'
             # --ignore-rules disables execpolicy .rules files; AGENTS.md remains
             # the project instruction channel under evaluation.
             $prompt | & codex @arguments | Out-Host

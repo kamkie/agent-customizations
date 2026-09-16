@@ -382,6 +382,27 @@ function Get-CustomizationStatus {
         State = $instructionState
     })
 
+    # A replacement for the agent's built-in model instructions, deployed as one
+    # file. The agent's config must point at it (see docs/deployment.md).
+    if ($null -ne $target.PSObject.Properties['modelInstructions']) {
+        $modelSource = Join-Path $repositoryRoot ([string]$target.modelInstructions.source)
+        $modelTarget = Join-Path $HomePath ([string]$target.modelInstructions.destination)
+        $modelState = if (-not (Test-Path -LiteralPath $modelTarget -PathType Leaf)) {
+            'Missing'
+        } elseif (Test-FilesEqual -Source $modelSource -Target $modelTarget) {
+            'InSync'
+        } else {
+            'Different'
+        }
+        $results.Add([pscustomobject]@{
+            Target = $TargetName
+            Kind = 'ModelInstructions'
+            Name = [string]$target.modelInstructions.destination
+            RelativePath = [string]$target.modelInstructions.destination
+            State = $modelState
+        })
+    }
+
     if ($target.PSObject.Properties.Name -contains 'hooks') {
         $hooksPath = Join-Path $HomePath ([string]$target.hooks.destination)
         $hookFormat = Get-CustomizationHookHandlerFormat -Target $target

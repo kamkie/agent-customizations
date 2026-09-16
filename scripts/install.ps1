@@ -86,6 +86,18 @@ foreach ($targetName in $selectedTargets) {
             Move-Item -LiteralPath $temporaryInstruction -Destination $instructionTarget -Force
         }
 
+        $modelState = $status | Where-Object Kind -eq 'ModelInstructions' | Select-Object -First 1
+        if ($modelState -and $modelState.State -ne 'InSync') {
+            $modelSource = Join-Path $repositoryRoot ([string]$targetConfig.modelInstructions.source)
+            $modelTarget = Join-Path $resolvedHome ([string]$targetConfig.modelInstructions.destination)
+            if (Test-Path -LiteralPath $modelTarget -PathType Leaf) {
+                Copy-Item -LiteralPath $modelTarget -Destination (Join-Path $backupRoot ([string]$targetConfig.modelInstructions.destination)) -Force
+            }
+            $temporaryModel = Join-Path $resolvedHome ('.model-instructions.install-' + [guid]::NewGuid().ToString('N'))
+            Copy-Item -LiteralPath $modelSource -Destination $temporaryModel -Force
+            Move-Item -LiteralPath $temporaryModel -Destination $modelTarget -Force
+        }
+
         foreach ($skillName in @($targetConfig.skills)) {
             $skillDrift = @($status | Where-Object { $_.Kind -eq 'Skill' -and $_.Name -eq $skillName -and $_.State -ne 'InSync' })
             if ($skillDrift.Count -eq 0) { continue }

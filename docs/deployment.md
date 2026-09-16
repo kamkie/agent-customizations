@@ -174,11 +174,38 @@ state.
 Claude Code applies changed hook definitions when a new session starts.
 Sessions already running keep the hook snapshot captured at startup.
 
+## Point Codex at the reviewed model instructions
+
+The Codex target deploys `global/codex-model-instructions.md` to
+`~/.codex/model-instructions-astra.md`. That file replaces Codex's built-in
+model instructions; it is the captured stock prompt for the current model with
+the reviewed authorization, continuation, and closing-block rules applied, so
+it must be re-based when OpenAI changes the stock prompt (compare the
+`base_instructions` recorded in a fresh session's `session_meta`).
+
+Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not
+managed by this repository; add the key once, at the top level, before any
+`[table]` section:
+
+```toml
+model_instructions_file = "C:/Users/<you>/.codex/model-instructions-astra.md"
+```
+
+Status reports the file as `ModelInstructions`; it does not verify the
+`config.toml` key. To evaluate the reviewed file, pass it explicitly, because
+the evaluation clients ignore user configuration:
+
+```powershell
+pwsh ./scripts/evaluate-instructions.ps1 -Target codex -CodexModelInstructionsFile global/codex-model-instructions.md
+pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -CodexModelInstructionsFile global/codex-model-instructions.md
+```
+
 ## Scope boundary
 
 For each selected target, the manifest owns:
 
 - the ordered sources composing the target's global instruction file;
+- the optional replacement model-instructions file for that target;
 - the compatible skills listed for that target;
 - the reviewed hook scripts; and
 - the reviewed hook registrations in `hooks.json` for Codex or `settings.json`

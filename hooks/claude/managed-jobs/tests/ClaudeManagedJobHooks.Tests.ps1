@@ -258,6 +258,49 @@ try {
     } | ConvertTo-Json -Compress
     $foregroundOutput = ($foregroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
     Assert-True ([string]::IsNullOrWhiteSpace($foregroundOutput)) 'The launch guard should stay silent for an ordinary foreground command.'
+    foreach ($pathMention in @(
+        'mkdir -p "C:/Users/example/AppData/Local/Temp/claude/session/scratchpad"; cp a.txt b.txt',
+        'cat ~/.claude/skills/cross-agent-review/references/reviewer-stance.md',
+        'git worktree remove D:/Projects/.claude-worktrees/repo/task -p',
+        'rm -f "$TEMP/reviewed-hashes.json"',
+        'git grep claude -- docs/review.md',
+        'echo "see claude -p flag"',
+        'echo "claude -p hello"',
+        'cp "C:/Users/example/.claude/claude" backup -p',
+        'python -c "print(1)"',
+        "echo \`nclaude -p hello",
+        "Write-Output ```r`nclaude -p hello"
+    )) {
+        $pathMentionPayload = [ordered]@{
+            hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+            tool_input = [ordered]@{ command = $pathMention }
+        } | ConvertTo-Json -Compress
+        $pathMentionOutput = ($pathMentionPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+        Assert-True ([string]::IsNullOrWhiteSpace($pathMentionOutput)) "A path or file name that merely contains 'claude' or 'review' must not trigger the headless-Claude pattern: $pathMention"
+    }
+    foreach ($headlessLaunch in @(
+        'claude -p "summarize the failing test"',
+        'echo done; claude.exe -p "hello"',
+        'claude "/review 116"',
+        'C:/tools/claude.exe -p "hello"',
+        './claude -p "hello"',
+        '"claude" -p "hello"',
+        '& "C:\tools\claude.exe" -p hello',
+        'pwsh -c "claude -p hello"',
+        'CLAUDE_CODE_EFFORT_LEVEL=medium claude -p "hello"',
+        'env claude -p "hello"',
+        'bash -c ''cd /tmp && claude -p "hello"''',
+        "echo ready`nclaude -p hello",
+        'CLAUDE_CODE_EFFORT_LEVEL="medium" claude -p hello',
+        'env LEVEL="medium" claude -p hello'
+    )) {
+        $headlessPayload = [ordered]@{
+            hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+            tool_input = [ordered]@{ command = $headlessLaunch }
+        } | ConvertTo-Json -Compress
+        $headlessDecision = ($headlessPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+        Assert-True ($headlessDecision.hookSpecificOutput.permissionDecision -eq 'deny') "A headless Claude launch must still be denied: $headlessLaunch"
+    }
 
     Remove-Item Env:CLAUDE_CODE_SESSION_ID -ErrorAction SilentlyContinue
     $payloadStopOutput = ($stopPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String)

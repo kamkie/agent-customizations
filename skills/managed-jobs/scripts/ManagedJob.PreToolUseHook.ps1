@@ -2,6 +2,105 @@ param([string]$ManagedHookId)
 
 $ErrorActionPreference = 'Stop'
 
+# Split a command line into shell segments and each segment into tokens.
+# Quotes group a token; `;`, `|`, `&`, `(`, `{`, and newlines end a segment.
+# Each token records whether it was quoted so a shell command string can be
+# inspected as a nested command line.
+function Get-ShellSegments {
+    param([string]$Text)
+    $segments = [Collections.Generic.List[object]]::new()
+    $tokens = [Collections.Generic.List[object]]::new()
+    $buffer = [Text.StringBuilder]::new()
+    $quote = [char]0
+    $quoted = $false
+    # Unquoted text before the first quote, so NAME="value" still reads as an
+    # assignment even though its value is quoted.
+    $unquotedPrefix = $null
+    $chars = $Text.ToCharArray()
+    # Iterate one past the end so a sentinel flushes the final token and segment.
+    for ($i = 0; $i -le $chars.Length; $i++) {
+        $atEnd = $i -eq $chars.Length
+        $ch = if ($atEnd) { [char]0 } else { $chars[$i] }
+        if (-not $atEnd -and $quote -ne [char]0) {
+            if ($ch -eq $quote) { $quote = [char]0 } else { $null = $buffer.Append($ch) }
+            continue
+        }
+        # A backslash (Bash) or backtick (PowerShell) before a line break continues
+        # the current command; consume the pair as plain whitespace.
+        if (-not $atEnd -and ($ch -eq '\' -or $ch -eq '`') -and $i + 1 -lt $chars.Length -and ($chars[$i + 1] -eq "`n" -or $chars[$i + 1] -eq "`r")) {
+            $i++
+            if ($chars[$i] -eq "`r" -and $i + 1 -lt $chars.Length -and $chars[$i + 1] -eq "`n") { $i++ }
+            $ch = ' '
+        }
+        if (-not $atEnd -and ($ch -eq '"' -or $ch -eq "'")) {
+            $quote = $ch
+            if (-not $quoted) { $unquotedPrefix = $buffer.ToString() }
+            $quoted = $true
+            continue
+        }
+        $isSeparator = $atEnd -or ";|&(){}`r`n".IndexOf($ch) -ge 0
+        if ($isSeparator -or [char]::IsWhiteSpace($ch)) {
+            if ($buffer.Length -gt 0 -or $quoted) {
+                $tokens.Add([pscustomobject]@{
+                    text = $buffer.ToString()
+                    quoted = $quoted
+                    unquotedPrefix = if ($quoted) { $unquotedPrefix } else { $buffer.ToString() }
+                })
+                $null = $buffer.Clear()
+                $quoted = $false
+                $unquotedPrefix = $null
+            }
+            if ($isSeparator -and $tokens.Count -gt 0) {
+                $segments.Add(@($tokens.ToArray()))
+                $tokens.Clear()
+            }
+            continue
+        }
+        $null = $buffer.Append($ch)
+    }
+    return $segments.ToArray()
+}
+
+# True when any shell segment runs claude or claude.exe as its executable
+# (after leading VAR=value assignments, `env`, or the PowerShell call operator)
+# with a `-p` flag or a `/review` slash-command argument, including a command
+# string handed to a shell with -c, -Command, or /c. Paths that merely contain
+# "claude" and file names that merely contain "review" are not launches.
+function Test-HeadlessClaudeLaunch {
+    param([string]$Text, [int]$Depth = 0)
+    if ($Depth -gt 3 -or [string]::IsNullOrWhiteSpace($Text)) { return $false }
+    foreach ($segment in Get-ShellSegments -Text $Text) {
+        $index = 0
+        while ($index -lt $segment.Count) {
+            $token = $segment[$index]
+            $isAssignment = $token.unquotedPrefix -match '^[A-Za-z_][A-Za-z0-9_]*='
+            if ($isAssignment -or (-not $token.quoted -and ($token.text -eq '&' -or $token.text -ieq 'env'))) {
+                $index++
+                continue
+            }
+            break
+        }
+        if ($index -ge $segment.Count) { continue }
+        $executable = $segment[$index].text
+        $baseName = $executable -replace '^.*[\\/]', ''
+        $arguments = @($segment | Select-Object -Skip ($index + 1))
+        if ($baseName -ieq 'claude' -or $baseName -ieq 'claude.exe') {
+            foreach ($argument in $arguments) {
+                if ($argument.text -eq '-p' -or $argument.text -match '^/review\b') { return $true }
+            }
+            continue
+        }
+        if ($baseName -imatch '^(?:bash|sh|zsh|pwsh|powershell|cmd)(?:\.exe)?$') {
+            for ($i = 0; $i -lt $arguments.Count - 1; $i++) {
+                if ($arguments[$i].text -imatch '^(?:-c|-Command|/c)$' -and (Test-HeadlessClaudeLaunch -Text $arguments[$i + 1].text -Depth ($Depth + 1))) {
+                    return $true
+                }
+            }
+        }
+    }
+    return $false
+}
+
 try {
     $payloadText = [Console]::In.ReadToEnd()
     if (-not $payloadText) { exit 0 }
@@ -26,7 +125,6 @@ try {
         '(?i)\bStart-Job\b',
         '(?i)\bStart-Process\b',
         '(?i)\bwt(?:\.exe)?\b.*\bnew-tab\b',
-        '(?i)\bclaude(?:\.exe)?\b.*(?:\s-p\s|/review)',
         '(?i)(?:npm|pnpm|yarn)\s+(?:run\s+)?dev\b',
         '(?i)\bdotnet\s+watch\b',
         '(?i)\bgradlew(?:\.bat)?\s+bootRun\b',
@@ -34,6 +132,9 @@ try {
         '(?i)(?:--background|--bg)\b'
     )
     $matched = $patterns | Where-Object { $command -match $_ } | Select-Object -First 1
+    # A headless Claude launch is recognized by executable position, not by a
+    # substring, so paths under .claude/ or names containing "review" pass.
+    if (-not $matched -and (Test-HeadlessClaudeLaunch -Text $command)) { $matched = 'headless-claude' }
 
     # The controller exemption never covers a compound command that also uses a
     # raw detach primitive or a natively backgrounded tool call.

@@ -28,8 +28,9 @@ Modes select working style, not authority. Use the user's selection; otherwise:
 Mode and persistence settings last for the objective and its follow-ups; a bounded
 phase may use a narrower mode. Announce them only when they affect behavior.
 Before repeating inspection, validation or a rewrite, identify the changed
-input, unresolved question or fresh state the action will establish. Reuse valid
-evidence when none exists. After two materially similar failures, or repeated
+input, unresolved question or fresh state the action will establish. Reuse
+still-valid evidence instead of repeating work without that justification.
+After two materially similar failures, or repeated
 activity without progress toward an acceptance criterion, recheck the leading
 assumption and run one discriminating diagnostic. Use its result to continue,
 choose a different permitted approach, or name the exact blocker. Do not silently

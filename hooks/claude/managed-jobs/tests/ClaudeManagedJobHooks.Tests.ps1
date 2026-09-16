@@ -262,7 +262,9 @@ try {
         'mkdir -p "C:/Users/example/AppData/Local/Temp/claude/session/scratchpad"; cp a.txt b.txt',
         'cat ~/.claude/skills/cross-agent-review/references/reviewer-stance.md',
         'git worktree remove D:/Projects/.claude-worktrees/repo/task -p',
-        'rm -f "$TEMP/reviewed-hashes.json"'
+        'rm -f "$TEMP/reviewed-hashes.json"',
+        'git grep claude -- docs/review.md',
+        'echo "see claude -p flag"'
     )) {
         $pathMentionPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'
@@ -274,7 +276,12 @@ try {
     foreach ($headlessLaunch in @(
         'claude -p "summarize the failing test"',
         'echo done; claude.exe -p "hello"',
-        'claude "/review 116"'
+        'claude "/review 116"',
+        'C:/tools/claude.exe -p "hello"',
+        './claude -p "hello"',
+        '"claude" -p "hello"',
+        '& "C:\tools\claude.exe" -p hello',
+        'pwsh -c "claude -p hello"'
     )) {
         $headlessPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

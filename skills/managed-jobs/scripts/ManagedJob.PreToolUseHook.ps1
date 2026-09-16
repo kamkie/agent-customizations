@@ -26,10 +26,12 @@ try {
         '(?i)\bStart-Job\b',
         '(?i)\bStart-Process\b',
         '(?i)\bwt(?:\.exe)?\b.*\bnew-tab\b',
-        # A headless Claude launch: `claude` as the command token (not a path
-        # segment such as `.claude/` or `claude-worktrees`) followed, inside the
-        # same shell segment, by `-p` or a `/review` argument.
-        '(?i)(?<![\w.\\/-])claude(?:\.exe)?(?=\s)[^;&|\r\n]*(?:\s-p(?:\s|$)|/review\b)',
+        # A headless Claude launch: the executable token of a shell segment is
+        # claude or claude.exe (optionally quoted, path-qualified, or after the
+        # PowerShell call operator), followed in that segment by `-p` or an
+        # argument starting with `/review`. Paths that merely contain "claude"
+        # and file names that merely contain "review" do not qualify.
+        '(?im)(?:^|[;&|({"''])\s*(?:&\s*)?["'']?(?:[^\s"'';&|]*[\\/])?claude(?:\.exe)?["'']?(?=\s)[^;&|\r\n]*(?:\s-p(?:\s|$)|\s["'']?/review\b)',
         '(?i)(?:npm|pnpm|yarn)\s+(?:run\s+)?dev\b',
         '(?i)\bdotnet\s+watch\b',
         '(?i)\bgradlew(?:\.bat)?\s+bootRun\b',

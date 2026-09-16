@@ -25,6 +25,13 @@ function Get-ShellSegments {
             if ($ch -eq $quote) { $quote = [char]0 } else { $null = $buffer.Append($ch) }
             continue
         }
+        # A backslash (Bash) or backtick (PowerShell) before a line break continues
+        # the current command; consume the pair as plain whitespace.
+        if (-not $atEnd -and ($ch -eq '\' -or $ch -eq '`') -and $i + 1 -lt $chars.Length -and ($chars[$i + 1] -eq "`n" -or $chars[$i + 1] -eq "`r")) {
+            $i++
+            if ($chars[$i] -eq "`r" -and $i + 1 -lt $chars.Length -and $chars[$i + 1] -eq "`n") { $i++ }
+            $ch = ' '
+        }
         if (-not $atEnd -and ($ch -eq '"' -or $ch -eq "'")) {
             $quote = $ch
             if (-not $quoted) { $unquotedPrefix = $buffer.ToString() }

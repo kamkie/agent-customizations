@@ -267,7 +267,9 @@ try {
         'echo "see claude -p flag"',
         'echo "claude -p hello"',
         'cp "C:/Users/example/.claude/claude" backup -p',
-        'python -c "print(1)"'
+        'python -c "print(1)"',
+        "echo \`nclaude -p hello",
+        "Write-Output ```r`nclaude -p hello"
     )) {
         $pathMentionPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

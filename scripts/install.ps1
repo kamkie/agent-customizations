@@ -3,6 +3,7 @@ param(
     [ValidateSet('All', 'Codex', 'Claude')][string]$Target = 'All',
     [string]$CodexHome,
     [string]$ClaudeHome,
+    [hashtable]$ExpectedInstructionHashes,
     [switch]$AllowDirty,
     [switch]$AllowNonMain
 )
@@ -33,7 +34,26 @@ if (Test-Path -LiteralPath (Join-Path $repositoryRoot '.git')) {
     }
 }
 
-foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
+$selectedTargets = @(Get-CustomizationTargetNames -Target $Target)
+if ($PSBoundParameters.ContainsKey('ExpectedInstructionHashes')) {
+    if ($null -eq $ExpectedInstructionHashes -or
+        @($ExpectedInstructionHashes.Keys | Where-Object { $_ -notin $selectedTargets }).Count -gt 0 -or
+        @($selectedTargets | Where-Object { -not $ExpectedInstructionHashes.ContainsKey($_) }).Count -gt 0) {
+        throw 'ExpectedInstructionHashes must contain exactly the selected target names.'
+    }
+    # Check every selected target before writing any target. A stale second
+    # target must not cause an avoidable partial installation of the first.
+    foreach ($targetName in $selectedTargets) {
+        $expected = [string]$ExpectedInstructionHashes[$targetName]
+        if ($expected -cnotmatch '^(missing|[a-fA-F0-9]{64})$') { throw "Invalid expected instruction hash for $targetName." }
+        $targetConfig = Get-CustomizationTarget -Name $targetName
+        $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
+        $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
+        Assert-CustomizationInstructionHash -Path (Join-Path $resolvedHome $targetConfig.instructions.destination) -Expected $expected
+    }
+}
+
+foreach ($targetName in $selectedTargets) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
     $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
     $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
@@ -49,6 +69,9 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
     $skillsRoot = Join-Path $resolvedHome 'skills'
 
     if ($PSCmdlet.ShouldProcess($resolvedHome, "Install $($drift.Count) $($targetConfig.displayName) customization change(s)")) {
+        if ($ExpectedInstructionHashes) {
+            Assert-CustomizationInstructionHash -Path (Join-Path $resolvedHome $targetConfig.instructions.destination) -Expected $ExpectedInstructionHashes[$targetName]
+        }
         New-Item -ItemType Directory -Path $resolvedHome, $skillsRoot, $backupRoot -Force | Out-Null
 
         $instructionContent = Get-CustomizationInstructionContent -Target $targetConfig

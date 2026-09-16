@@ -17,6 +17,15 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
     $status = @(Get-CustomizationStatus -TargetName $targetName -HomePath $resolvedHome)
     foreach ($item in $status) { $allStatus.Add($item) }
     $drift = @($status | Where-Object State -ne 'InSync')
+    $instructionHash = $null
+    $instructionHashError = $null
+    try {
+        $instructionHash = Get-CustomizationInstructionHash -Path (Join-Path $resolvedHome (Get-CustomizationTarget -Name $targetName).instructions.destination)
+    } catch {
+        # An unavailable fingerprint must not erase the existing drift report.
+        # Null cannot be passed as a valid installation precondition.
+        $instructionHashError = $_.Exception.Message
+    }
     $summaries.Add([pscustomobject]@{
         target = $targetName
         home = $resolvedHome
@@ -26,6 +35,8 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
         missing = @($status | Where-Object State -eq 'Missing').Count
         different = @($status | Where-Object State -eq 'Different').Count
         extra = @($status | Where-Object State -eq 'Extra').Count
+        instructionHash = $instructionHash
+        instructionHashError = $instructionHashError
     })
 }
 
@@ -36,6 +47,8 @@ if (-not $SummaryOnly) {
 [pscustomobject]@{
     targets = $summaries
     drift = @($allStatus | Where-Object State -ne 'InSync').Count
+    instructionHashErrors = @($summaries | Where-Object { $_.instructionHashError }).Count
 } | ConvertTo-Json -Depth 5
 
-if (@($allStatus | Where-Object State -ne 'InSync').Count -gt 0) { exit 1 }
+if (@($allStatus | Where-Object State -ne 'InSync').Count -gt 0 -or
+    @($summaries | Where-Object { $_.instructionHashError }).Count -gt 0) { exit 1 }

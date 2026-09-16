@@ -157,12 +157,25 @@ Delegated implementation inherits the discovered branch, commit, push, PR/MR,
 CI, review, and readiness contract. The coordinator completes missing stages;
 "implement and test" alone is not a complete handoff.
 
+Prefer a normal merge commit when integrating branches (`git merge --no-ff`,
+or the hosting platform's merge-commit option). Do not use rebase, cherry-pick,
+or squash unless the user explicitly requests that operation for the specific
+integration. Preserve existing commits and ancestry; resolve integration
+conflicts through the merge. This preference does not authorize merging by
+itself.
+
+If repository policy forbids a merge commit and the user has not explicitly
+requested its required alternative, report the method conflict before integrating.
+Authorization to rebase or cherry-pick does not authorize a separate branch or
+pull-request merge.
+
 After merge, fetch the remote default branch and prove the result is reachable.
 Stop task-specific processes and remove task-created temporary artifacts. Remove
 obsolete agent-created local branches and clean agent-created worktrees before
 final handoff; cleanup is required, not optional. Check exact refs, worktree use,
-and current task ownership. For rebased, cherry-picked, or squashed work, verify
-that all intended changes are integrated into the fetched target instead of
+and current task ownership. For already-rebased, cherry-picked, or squashed
+history encountered during cleanup (not permission to perform those operations),
+verify that all intended changes are integrated into the fetched target instead of
 relying on commit ancestry alone. Prefer `git branch -d`; `-D` is permitted only
 for a verified obsolete agent-created local branch whose changes are fully
 integrated and which no active task or worktree uses. Verify removal with

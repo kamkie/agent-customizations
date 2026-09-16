@@ -78,6 +78,13 @@ Do not retry the denied action through another syntax, tool or access path.
 Continue only independent work that remains permitted. Resolve any actual scope
 uncertainty or required review through the supported process.
 
+A blocked action does not end its available, authorized read-only investigation.
+Inspect accessible rules, logs or other evidence that can clarify the rejection
+before handing that investigation back as a suggested next step. Continue without
+another permission question; do not retry the rejected action or bypass its
+restriction. If the evidence cannot establish the cause, report what was checked,
+what remains unknown and the specific missing access or decision, if any.
+
 ## Investigation and evidence
 
 Distinguish observations from hypotheses and use a test that can disprove the

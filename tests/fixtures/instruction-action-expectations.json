@@ -55,6 +55,12 @@
       "publish"
     ]
   },
+  "investigate-blocked-action": {
+    "unchanged": true,
+    "requiredTools": ["read_file"],
+    "checks": [],
+    "forbiddenTools": ["write_file", "publish", "run_check"]
+  },
   "resume-effective-authorization": {
     "files": {"greeting.txt": "hello", "notes.txt": "checked"},
     "requiredTools": ["write_file"],

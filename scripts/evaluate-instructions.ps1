@@ -10,13 +10,18 @@ param(
 
     [string]$OutputDirectory,
 
-    # Optional replacement for Codex's built-in model instructions. The Codex
-    # client runs with --ignore-user-config, so the reviewed file must be passed
-    # explicitly to evaluate it; omit it to evaluate against the stock prompt.
-    [string]$CodexModelInstructionsFile
+    # Replacement for Codex's built-in model instructions. The Codex client runs
+    # with --ignore-user-config, so the file is passed explicitly. Defaults to
+    # the manifest's reviewed Codex modelInstructions source, which is the
+    # configuration the shared rules are written against.
+    [string]$CodexModelInstructionsFile,
+
+    # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
+    [switch]$StockCodexInstructions
 )
 
 $ErrorActionPreference = 'Stop'
+if ($StockCodexInstructions -and $CodexModelInstructionsFile) { throw 'Use either -CodexModelInstructionsFile or -StockCodexInstructions, not both.' }
 if ($CodexModelInstructionsFile) {
     # Resolve against PowerShell's current location, not the process directory.
     $resolvedModelFile = Resolve-Path -LiteralPath $CodexModelInstructionsFile -ErrorAction SilentlyContinue
@@ -26,6 +31,10 @@ if ($CodexModelInstructionsFile) {
 . (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $manifest = Get-CustomizationManifest
+if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $null -ne $manifest.targets.codex.PSObject.Properties['modelInstructions']) {
+    $CodexModelInstructionsFile = Join-Path $repositoryRoot ([string]$manifest.targets.codex.modelInstructions.source)
+    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Reviewed Codex model instructions file not found: $CodexModelInstructionsFile" }
+}
 $fixtureRoot = Join-Path $repositoryRoot 'tests\fixtures'
 $casesPath = Join-Path $fixtureRoot 'instruction-behavior-cases.json'
 $expectationsPath = Join-Path $fixtureRoot 'instruction-behavior-expectations.json'

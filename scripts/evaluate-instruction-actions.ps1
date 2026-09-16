@@ -3,12 +3,16 @@ param(
     [ValidateSet('codex', 'claude', 'all')][string]$Target = 'all',
     [string[]]$CaseId,
     [string]$OutputDirectory,
-    # Optional replacement for Codex's built-in model instructions. The Codex
-    # client runs with --ignore-user-config, so the reviewed file must be passed
-    # explicitly to evaluate it; omit it to evaluate against the stock prompt.
-    [string]$CodexModelInstructionsFile
+    # Replacement for Codex's built-in model instructions. The Codex client runs
+    # with --ignore-user-config, so the file is passed explicitly. Defaults to
+    # the manifest's reviewed Codex modelInstructions source, which is the
+    # configuration the shared rules are written against.
+    [string]$CodexModelInstructionsFile,
+    # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
+    [switch]$StockCodexInstructions
 )
 $ErrorActionPreference = 'Stop'
+if ($StockCodexInstructions -and $CodexModelInstructionsFile) { throw 'Use either -CodexModelInstructionsFile or -StockCodexInstructions, not both.' }
 if ($CodexModelInstructionsFile) {
     # Resolve against PowerShell's current location, not the process directory.
     $resolvedModelFile = Resolve-Path -LiteralPath $CodexModelInstructionsFile -ErrorAction SilentlyContinue
@@ -21,12 +25,16 @@ $PSNativeCommandUseErrorActionPreference = $false
 . (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 . (Join-Path $PSScriptRoot 'InstructionActions.Common.ps1')
 $repo = Get-CustomizationRepositoryRoot
+$manifest = Get-CustomizationManifest
+if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $null -ne $manifest.targets.codex.PSObject.Properties['modelInstructions']) {
+    $CodexModelInstructionsFile = Join-Path $repo ([string]$manifest.targets.codex.modelInstructions.source)
+    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Reviewed Codex model instructions file not found: $CodexModelInstructionsFile" }
+}
 $fixtures = Join-Path $repo 'tests/fixtures'
 $cases = (Get-Content (Join-Path $fixtures 'instruction-action-cases.json') -Raw | ConvertFrom-Json).cases
 $expectations = Get-Content (Join-Path $fixtures 'instruction-action-expectations.json') -Raw | ConvertFrom-Json
 $schemaPath = Join-Path $fixtures 'instruction-action-response.schema.json'
 $schema = Get-Content $schemaPath -Raw
-$manifest = Get-CustomizationManifest
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 if ($PSBoundParameters.ContainsKey('CaseId') -and -not $CaseId.Count) { throw 'CaseId was supplied but contains no case names.' }
 if (@($CaseId | Where-Object { $_ -notin $cases.id }).Count) { throw 'Unknown action case.' }

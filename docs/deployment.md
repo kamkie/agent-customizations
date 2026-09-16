@@ -192,12 +192,15 @@ model_instructions_file = "C:/Users/<you>/.codex/model-instructions-astra.md"
 ```
 
 Status reports the file as `ModelInstructions`; it does not verify the
-`config.toml` key. To evaluate the reviewed file, pass it explicitly, because
-the evaluation clients ignore user configuration:
+`config.toml` key. The evaluation clients ignore user configuration, so both
+evaluation scripts pass the manifest's reviewed file explicitly by default; the
+shared rules are written against that configuration. Pass another file with
+`-CodexModelInstructionsFile`, or `-StockCodexInstructions` to measure the stock
+prompt:
 
 ```powershell
-pwsh ./scripts/evaluate-instructions.ps1 -Target codex -CodexModelInstructionsFile global/codex-model-instructions.md
-pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -CodexModelInstructionsFile global/codex-model-instructions.md
+pwsh ./scripts/evaluate-instructions.ps1 -Target codex
+pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -StockCodexInstructions
 ```
 
 ## Scope boundary

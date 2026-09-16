@@ -219,6 +219,12 @@ Authorization to rebase or cherry-pick does not authorize a separate branch or
 pull-request merge.
 
 After merge, fetch the remote default branch and prove the result is reachable.
+Restoring the primary checkout is part of the merge, not a separate request:
+when it is clean and on the merged branch, check out the default branch,
+fast-forward it to the fetched remote, and delete the merged local branch with
+`git branch -d` after verifying integration. Leaving the primary checkout on the
+merged branch is an incomplete merge. A dirty primary checkout blocks this step;
+report it instead of stashing or resetting.
 Stop task-specific processes and remove task-created temporary artifacts. Remove
 obsolete agent-created local branches and clean agent-created worktrees before
 final handoff; cleanup is required, not optional. Check exact refs, worktree use,
@@ -230,5 +236,6 @@ for a verified obsolete agent-created local branch whose changes are fully
 integrated and which no active task or worktree uses. Verify removal with
 `git branch --list` or an exact ref lookup. Never remove a primary or user-owned
 worktree, dirty worktree, branch with unintegrated work, or remote branch without
-explicit authority. If safe cleanup is blocked, name the remaining artifact and
-the reason rather than silently leaving it behind.
+explicit authority; the merged local branch handled above is the one exception.
+If safe cleanup is blocked, name the remaining artifact and the reason rather
+than silently leaving it behind.

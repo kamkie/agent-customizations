@@ -69,7 +69,10 @@ Claude Code loads personal instructions from `~/.claude/CLAUDE.md` and
 personal skills from `~/.claude/skills`. Codex uses `~/.codex/AGENTS.md` and
 `~/.codex/skills`. The manifest composes `global/shared.md` with the applicable
 target overlay during installation, reuses portable skills where possible, and
-keeps tool-specific skills on their compatible target.
+keeps tool-specific skills on their compatible target. For Codex it also deploys
+`global/codex-model-instructions.md`, a reviewed replacement for the built-in
+model instructions that `config.toml` must reference (see
+[deployment](docs/deployment.md#point-codex-at-the-reviewed-model-instructions)).
 
 ## Why deployment is explicit
 

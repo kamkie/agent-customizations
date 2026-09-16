@@ -59,6 +59,19 @@ try {
         Assert-True ($backups.Count -eq 1) 'Instruction backup missing.'
         Assert-True ((Get-CustomizationInstructionHash $backups[0].FullName) -eq $hashes[$entry.name]) 'Backup differs from accepted snapshot.'
     }
+    # The Codex model-instructions replacement installs as one managed file and
+    # reports as its own status kind.
+    $codexTarget = Get-CustomizationTarget -Name 'codex'
+    $modelSource = Join-Path $PSScriptRoot ('../' + [string]$codexTarget.modelInstructions.source)
+    $modelInstalled = Join-Path $codexRoot ([string]$codexTarget.modelInstructions.destination)
+    Assert-True ([IO.File]::ReadAllBytes($modelInstalled).Length -gt 0 -and ([IO.File]::ReadAllText($modelInstalled) -ceq [IO.File]::ReadAllText($modelSource))) 'Model instructions were not installed from the reviewed source.'
+    $modelStatus = Get-CustomizationStatus -TargetName 'codex' -HomePath $codexRoot | Where-Object Kind -eq 'ModelInstructions'
+    Assert-True ($modelStatus.State -eq 'InSync') 'Installed model instructions should report InSync.'
+    Add-Content -LiteralPath $modelInstalled -Value '# local drift' -Encoding utf8
+    $modelStatus = Get-CustomizationStatus -TargetName 'codex' -HomePath $codexRoot | Where-Object Kind -eq 'ModelInstructions'
+    Assert-True ($modelStatus.State -eq 'Different') 'Edited model instructions should report Different.'
+    Install-Expected @{ codex = Get-CustomizationInstructionHash $codexFile } -target Codex
+    Assert-True ([IO.File]::ReadAllText($modelInstalled) -ceq [IO.File]::ReadAllText($modelSource)) 'Reinstall did not restore the reviewed model instructions.'
     # A single target requires only its own key; another target stays untouched.
     $claudeBefore = Get-CustomizationInstructionHash $claudeFile
     Install-Expected @{ codex = Get-CustomizationInstructionHash $codexFile } -target Codex

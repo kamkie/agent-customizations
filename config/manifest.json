@@ -12,6 +12,10 @@
         ],
         "destination": "AGENTS.md"
       },
+      "modelInstructions": {
+        "source": "global/codex-model-instructions.md",
+        "destination": "model-instructions-astra.md"
+      },
       "hooks": {
         "destination": "hooks.json",
         "entries": [

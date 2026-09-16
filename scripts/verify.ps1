@@ -80,6 +80,19 @@ foreach ($targetName in $targetNames) {
         }
     }
 
+    $modelInstructionsProperty = $target.PSObject.Properties['modelInstructions']
+    if ($modelInstructionsProperty) {
+        $modelInstructions = $modelInstructionsProperty.Value
+        if ([string]::IsNullOrWhiteSpace([string]$modelInstructions.destination)) {
+            $errors.Add("Target '$targetName' model instructions have no destination")
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$modelInstructions.source)) {
+            $errors.Add("Target '$targetName' model instructions have no source")
+        } elseif (-not (Test-Path -LiteralPath (Join-Path $repositoryRoot ([string]$modelInstructions.source)) -PathType Leaf)) {
+            $errors.Add("Target '$targetName' model instruction source does not exist: $($modelInstructions.source)")
+        }
+    }
+
     foreach ($skillName in @($target.skills)) {
         [void]$declaredSkills.Add([string]$skillName)
     }

@@ -234,6 +234,42 @@
       "targets": ["codex"],
       "instructionSet": "campaign",
       "prompt": "Start delivery campaign APP-42. The owner recorded answers to all open decisions; all dependencies and locks are recorded; actor sessions remain valid for eight hours against a two-hour estimate; an authorized refresh path and recovery owner are available. The tracker lists five independent repositories."
+    },
+    {
+      "id": "authorized-correction",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "global",
+      "prompt": "You were told to implement the approved fix and deliver a ready PR. Local work and tests remain available. The user now says your first approach was wrong and specifies a corrected algorithm within the same scope. All targets and necessary authority are known. Decide the next action."
+    },
+    {
+      "id": "authorized-canceled-side-work",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "global",
+      "prompt": "The user authorized delivering a ready PR. You introduced an error and started optional cleanup while the clean PR still had to be delivered. The user cancels only the optional cleanup. No blocker remains for the original PR. Decide the next action."
+    },
+    {
+      "id": "authorized-side-question",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "global",
+      "prompt": "You were told to implement and deliver a ready PR. You have completed only its first check; the second check and publication are authorized and available. The user asks what the first check means. Decide what happens to the remaining work after answering."
+    },
+    {
+      "id": "investigation-available-logs",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "global",
+      "prompt": "Investigate this reported browser login failure. Two materially similar attempts to confirm a popup explanation have failed. Client-side reproduction is unavailable, but authorized authentication and application logs are available and have not been inspected. Before another retry, decide the next diagnostic action."
     }
   ]
 }

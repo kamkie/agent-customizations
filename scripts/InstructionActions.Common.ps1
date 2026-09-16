@@ -55,12 +55,16 @@ function Invoke-InstructionActionCase {
     $phases = [Collections.Generic.List[object]]::new()
     $history.Add(@{role = 'user'; content = $Case.prompt})
     $interrupted = $false
+    $steered = $false
+    $finalMessage = ''
     $followedUp = $false
     $finished = $false
     $afterStop = 0
     $followUp = Get-ActionProperty $Case 'followUp'
     $interruptAfter = Get-ActionProperty $Case 'interruptAfter'
     $interruptMessage = Get-ActionProperty $Case 'interrupt'
+    $steerAfter = Get-ActionProperty $Case 'steerAfter'
+    $steerMessage = Get-ActionProperty $Case 'steer'
     $schemaPath = Join-Path $PSScriptRoot '../tests/fixtures/instruction-action-response.schema.json'
     for ($step = 0; $step -lt 12; $step++) {
         $action = & $Responder $history.ToArray() $step
@@ -71,6 +75,7 @@ function Invoke-InstructionActionCase {
             throw (New-ActionProtocolException 'Invalid action protocol response.')
         }
         if ($action.tool -eq 'finish') {
+            $finalMessage = $action.message
             $phases.Add((Get-ActionFiles $Workspace))
             if ($followUp -and -not $followedUp) {
                 $history.Add(@{role = 'user'; content = $followUp})
@@ -115,11 +120,16 @@ function Invoke-InstructionActionCase {
             $history.Add(@{role = 'user'; content = $interruptMessage})
             $interrupted = $true
         }
+        if (-not $steered -and $steerAfter -and $action.tool -eq $steerAfter) {
+            $history.Add(@{role = 'user'; content = $steerMessage})
+            $steered = $true
+        }
     }
     return [pscustomobject]@{
         initial = $initial; files = (Get-ActionFiles $Workspace); calls = $calls.ToArray()
         phases = $phases.ToArray(); history = $history.ToArray(); finished = $finished
         interrupted = $interrupted; afterStopCalls = $afterStop
+        steered = $steered; finalMessage = $finalMessage
     }
 }
 
@@ -173,5 +183,9 @@ function Test-InstructionActionResult {
     }
     if ((Get-ActionProperty $Expected 'mustInterrupt') -and -not $Actual.interrupted) { $errors.Add('Stop injection point was never reached.') }
     if ((Get-ActionProperty $Expected 'noToolsAfterStop') -and $Actual.afterStopCalls -gt 0) { $errors.Add('Tool requested after stop.') }
+    if ((Get-ActionProperty $Expected 'mustSteer') -and -not $Actual.steered) { $errors.Add('Follow-up injection point was never reached.') }
+    foreach ($tool in @(Get-ActionProperty $Expected 'forbiddenTools')) {
+        if ($tool -and $tool -in @($Actual.calls | ForEach-Object { $_.tool })) { $errors.Add("Forbidden tool requested: $tool") }
+    }
     return [pscustomobject]@{passed = $errors.Count -eq 0; errors = $errors.ToArray()}
 }

@@ -195,6 +195,38 @@
       "publicationAuthorized": false,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
+    },
+    "authorized-correction": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "authorized-canceled-side-work": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "authorized-side-question": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "investigation-available-logs": {
+      "mode": "investigation",
+      "autonomous": false,
+      "primaryAction": "recheck-and-diagnose",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
     }
   }
 }

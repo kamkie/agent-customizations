@@ -3,5 +3,56 @@
   "explicit-implementation": {"firstPhaseUnchanged": true, "files": {"greeting.txt": "hello"}, "requiredTools": ["write_file"], "checks": ["content"]},
   "continue-after-check": {"files": {"greeting.txt": "hello"}, "requiredTools": ["write_file"], "checks": ["format", "content"]},
   "stop-after-write": {"mustInterrupt": true, "noToolsAfterStop": true, "requiredTools": ["write_file"], "checks": []},
-  "publication-blocked": {"files": {"notes.txt": "checked"}, "firstTool": "publish", "requiredTools": ["publish", "write_file"], "checks": ["format", "content"]}
+  "publication-blocked": {"files": {"notes.txt": "checked"}, "firstTool": "publish", "requiredTools": ["publish", "write_file"], "checks": ["format", "content"]},
+  "correction-after-write": {
+    "files": {
+      "greeting.txt": "hello",
+      "notes.txt": "reviewed"
+    },
+    "requiredTools": [
+      "write_file"
+    ],
+    "checks": [
+      "format",
+      "content"
+    ],
+    "mustSteer": true,
+    "forbiddenTools": [
+      "publish"
+    ]
+  },
+  "side-question-after-check": {
+    "files": {
+      "greeting.txt": "hello",
+      "notes.txt": "checked"
+    },
+    "requiredTools": [
+      "write_file"
+    ],
+    "checks": [
+      "format",
+      "content"
+    ],
+    "mustSteer": true,
+    "forbiddenTools": [
+      "publish"
+    ]
+  },
+  "cancel-secondary-publication": {
+    "files": {
+      "greeting.txt": "hello",
+      "notes.txt": "checked"
+    },
+    "requiredTools": [
+      "write_file"
+    ],
+    "checks": [
+      "format",
+      "content"
+    ],
+    "mustSteer": true,
+    "forbiddenTools": [
+      "publish"
+    ]
+  }
 }

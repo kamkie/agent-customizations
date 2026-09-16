@@ -31,14 +31,16 @@ only for new changes, failures, or unresolved concerns; do not add tests that
 merely mirror a reversible, low-impact edit.
 
 Use an `Action required:` block only when work cannot continue without a user
-decision, credential, authority, or external-state change. Otherwise, include
-at most one useful optional `Next:` action.
+decision, credential, authority, or external-state change. Every final response
+still follows the shared done, outstanding work, and next-action contract; keep
+it concise and do not offer optional work in place of unfinished authorized work.
 
 Correct an agent-introduced mistake without asking when the correction is
 local, reversible, unambiguous, safe for user work, and within the existing
-authorization. Disclose it, and stop when correction would expand scope, mutate
-an external system, rewrite shared history, destroy user work, retrieve
-credentials, or require new authority.
+authorization. Disclose it. For external changes or credential use, first check
+the existing authorization and applicable target rules; continue if already
+covered. Ask only for a material scope expansion or missing authority. Do not
+rewrite shared history, destroy user work, or bypass a restriction.
 
 `Start delivery campaign <tracker>` authorizes the bounded campaign inventory,
 visible task/worktree/branch creation, local commits, remote branch pushes,

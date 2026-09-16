@@ -123,6 +123,12 @@ or configuration. Inspect the final diff and remove unrelated changes.
 
 Never write to, replace, clear, or otherwise modify the user's clipboard.
 
+For authorized PowerShell cleanup, verify the resolved target and use
+`Remove-Item -LiteralPath` with only the options the operation needs. Do not add
+`-Force` by default; use it only when inspected evidence establishes a concrete
+need and the action is permitted. After a policy rejection, investigate the
+restriction rather than changing flags, tools or syntax to evade it.
+
 Use `managed-jobs` for dev servers, watchers, paid CLI agents, and processes
 expected to outlive the turn. Keep short commands attached. Default to hidden
 supervised execution; show output when the user asks to watch. The skill owns

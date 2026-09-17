@@ -63,6 +63,9 @@ try {
     Assert-True (-not $result.score.passed) 'Invented action after completion passed.'
     $result = Replay 'explicit-implementation' @($badFinish, $write, $content, $finish)
     Assert-True (-not $result.score.passed) 'Unrequested implementation invitation after a completed question passed.'
+    $badFinish.message = '**Next:** no further action required'
+    $result = Replay 'explicit-implementation' @($badFinish, $write, $content, $finish)
+    Assert-True (@($result.score.errors | Where-Object { $_ -eq 'First-phase response lacks the required three-line closing block.' }).Count -eq 1) 'First phase with only a matching Next tail passed or was misdiagnosed.'
     $result = Replay 'design-agreement' @($write, (Action 'write_file' 'greeting.txt' 'helo'), $finish)
     Assert-True (-not $result.score.passed) 'A write then rollback during design passed.'
     $result = Replay 'explicit-implementation' @($write, $finish, $content, $finish)

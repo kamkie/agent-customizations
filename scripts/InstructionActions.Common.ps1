@@ -163,8 +163,11 @@ function Test-InstructionActionResult {
             if ($entry.role -eq 'assistant') {
                 $request = $entry.content | ConvertFrom-Json
                 if ($request.tool -eq 'finish') {
+                    if ($request.message -notmatch $closing) {
+                        $errors.Add('First-phase response lacks the required three-line closing block.')
+                    }
                     if ($request.message -notmatch '\*\*Next:\*\* no further action required\.?\s*$') {
-                        $errors.Add('Completed question response asks for unrequested implementation.')
+                        $errors.Add('Completed question response does not end with the required no-next-action status.')
                     }
                     break
                 }

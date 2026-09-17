@@ -98,8 +98,10 @@ an agent-specific trigger. Verify immediate prerequisites and proceed with
 resumable work; uncertain future approval or access expiry does not block it.
 Before consequential or non-pausable operations, verify authority, access,
 dependencies and recovery/completion paths. If uninterrupted access is necessary,
-verify its duration or authorized refresh. If nothing safe can proceed, stop at
-a recoverable checkpoint with the concrete missing prerequisite and deactivate
+verify its duration or authorized refresh. When the user requires completion
+without further input, verify continuity for that entire run before starting.
+If that condition fails, or nothing safe can proceed, stop at a recoverable
+checkpoint with the concrete missing prerequisite and deactivate
 autonomous persistence. This checkpoint does not revoke the task's authority.
 
 Use existing evidence while its relevant inputs and validity conditions remain

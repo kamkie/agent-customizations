@@ -79,6 +79,8 @@ Return exactly one JSON tool request. It will be executed, and the next turn
 will contain its real result. Do not classify or describe a hypothetical action.
 Use no native CLI tools. Use finish with your user-facing message when done or
 when waiting for the user. Empty strings are required for unused fields.
+The JSON object is transport: finish.message is an ordinary user-facing final
+response and follows the active final-answer instructions.
 
 Available tools:
 - read_file: path is greeting.txt or notes.txt.

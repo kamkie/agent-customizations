@@ -99,6 +99,6 @@ conclusion. Return:
    The parent performs final synthesis unless the user explicitly requests a
    different ownership model.
 
-Do not create an on-disk ledger, task hierarchy, or progress artifact merely to
-represent the workflow. Create a research artifact only when the user requests
-one.
+Keep one ledger under the existing task's local-artifact authority. Do not
+create a separate task hierarchy or progress system merely to represent the
+research workflow. Preserve private evidence outside public sources.

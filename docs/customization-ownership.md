@@ -31,33 +31,29 @@ state.
 
 ## Admit a portable skill
 
-Add a skill only when every applicable criterion below is satisfied and the
-review contains evidence for the judgment.
+A skill needs evidence of recurring use or a concrete cross-repository need,
+a bounded trigger and meaningful exclusions, explicit target/tool compatibility,
+a complete normal path, proportionate validation, and a publication/ownership
+review. Record these in the PR; session history is evidence to inspect, not
+content to import as policy. A machine-local fact or one repository's preference
+is not a global default merely because it is convenient to discover.
 
-1. **Repeated use:** evidence shows the workflow recurs, or there is a concrete
-   cross-repository need that justifies maintaining it as a reusable unit.
-2. **Bounded trigger:** the description identifies the verbs, objects, and
-   outcomes that should route work to the skill.
-3. **Negative triggers:** the skill states nearby cases it does not own, so a
-   broad description cannot capture unrelated work.
-4. **Portability:** instructions and examples use placeholders or discovered
-   values. They do not depend on one username, home directory, repository, or
-   private environment.
-5. **Target compatibility:** supported agents, operating systems, tools, and
-   required capabilities are explicit. Target-specific overlays remain separate
-   when behavior cannot be shared safely.
-6. **Evidence:** the proposal cites observed repetition, failure modes, or a
-   validated need. Chat history alone is not the durable justification.
-7. **Validation:** executable behavior has proportionate tests or verification;
-   documentation has link, structure, example, and hazard checks. The validation
-   method and its result are reviewable.
-8. **Public/private review:** every source, example, fixture, and reference is
-   checked for publication safety and correct ownership before admission.
+Examples and helpers must be portable. Keep internal registries, transcripts,
+credentials, tokens, absolute machine paths and repository-specific merge rules
+in their owning private/local contract. Split mixed proposals at that boundary.
 
-Do not admit a generic skill that contains internal registries, transcripts,
-credentials, tokens, absolute paths, repository-specific merge rules, or other
-private operations data. Do not turn a machine-local fact or a single
-repository preference into a portable default merely to make it easier to find.
+## Instruction sources and deployed surfaces
+
+`global/shared.md` owns the common execution contract and personal defaults.
+The manifest renders it once into Codex's replacement base and once into Claude's
+global file. Codex's base fragment owns only runtime/tool/rendering details;
+Codex AGENTS.md and the Claude overlay hold only target-specific additions.
+Generated live files are deployment outputs, never parallel editing sources.
+
+A rule's placement in the Codex base does not authorize external actions or
+bypass tool/system constraints. Repository contracts retain their explicitly
+assigned local decisions and gates. Keep the base's stock-update review focused
+on runtime changes without reintroducing duplicate or conflicting policy.
 
 ## Ownership and precedence
 

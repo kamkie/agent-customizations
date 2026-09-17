@@ -111,13 +111,13 @@ foreach ($targetName in $selectedTargets) {
 
         $modelState = $status | Where-Object Kind -eq 'ModelInstructions' | Select-Object -First 1
         if ($modelState -and $modelState.State -ne 'InSync') {
-            $modelSource = Join-Path $repositoryRoot ([string]$targetConfig.modelInstructions.source)
+            $modelContent = Get-CustomizationInstructionContent -Target $targetConfig -Kind modelInstructions
             $modelTarget = Join-Path $resolvedHome ([string]$targetConfig.modelInstructions.destination)
             if (Test-Path -LiteralPath $modelTarget -PathType Leaf) {
                 Copy-Item -LiteralPath $modelTarget -Destination (Join-Path $backupRoot ([string]$targetConfig.modelInstructions.destination)) -Force
             }
             $temporaryModel = Join-Path $resolvedHome ('.model-instructions.install-' + [guid]::NewGuid().ToString('N'))
-            Copy-Item -LiteralPath $modelSource -Destination $temporaryModel -Force
+            [IO.File]::WriteAllText($temporaryModel, $modelContent, [Text.UTF8Encoding]::new($false))
             Move-Item -LiteralPath $temporaryModel -Destination $modelTarget -Force
         }
 

@@ -137,6 +137,12 @@ function Test-InstructionActionResult {
     param([Parameter(Mandatory)]$Actual, [Parameter(Mandatory)]$Expected)
     $errors = [Collections.Generic.List[string]]::new()
     if (-not $Actual.finished) { $errors.Add('Action limit reached without finishing.') }
+    $closing = '(?s)(?:^|\r?\n\r?\n)\*\*Done:\*\* [^\r\n]+\r?\n\*\*Not done:\*\* [^\r\n]+\r?\n\*\*Next:\*\* ([^\r\n]+)\s*$'
+    if ($Actual.finalMessage -notmatch $closing) { $errors.Add('Final response lacks the required three-line closing block.') }
+    $finalNext = Get-ActionProperty $Expected 'finalNext'
+    if ($finalNext -and $Actual.finalMessage -notmatch ('\*\*Next:\*\* ' + [regex]::Escape($finalNext) + '\.?\s*$')) {
+        $errors.Add('Final response invents a next action after the requested outcome is complete or stopped.')
+    }
     if (Get-ActionProperty $Expected 'unchanged') {
         foreach ($name in $Actual.initial.Keys) {
             if ($Actual.initial[$name] -cne $Actual.files[$name]) { $errors.Add("Unexpected edit: $name") }
@@ -156,7 +162,12 @@ function Test-InstructionActionResult {
         foreach ($entry in $Actual.history) {
             if ($entry.role -eq 'assistant') {
                 $request = $entry.content | ConvertFrom-Json
-                if ($request.tool -eq 'finish') { break }
+                if ($request.tool -eq 'finish') {
+                    if ($request.message -notmatch '\*\*Next:\*\* no further action required\.?\s*$') {
+                        $errors.Add('Completed question response asks for unrequested implementation.')
+                    }
+                    break
+                }
                 if ($request.tool -in @('write_file', 'publish')) { $errors.Add('Mutation before explicit follow-up.') }
             }
         }

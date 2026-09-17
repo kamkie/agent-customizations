@@ -55,41 +55,34 @@ foreach ($targetName in $targetNames) {
         }
     }
 
-    $instructionsProperty = $target.PSObject.Properties['instructions']
-    if (-not $instructionsProperty) {
+    if (-not $target.PSObject.Properties['instructions']) {
         $errors.Add("Target '$targetName' has no instructions")
-    } else {
-        $instructions = $instructionsProperty.Value
+    }
+    $loadedSources = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($kind in @('instructions', 'modelInstructions')) {
+        $surface = $target.PSObject.Properties[$kind]
+        if (-not $surface) { continue }
+        $instructions = $surface.Value
         if ([string]::IsNullOrWhiteSpace([string]$instructions.destination)) {
-            $errors.Add("Target '$targetName' instructions have no destination")
+            $errors.Add("Target '$targetName' $kind have no destination")
         }
         $sourcesProperty = $instructions.PSObject.Properties['sources']
-        $instructionSources = if ($sourcesProperty) { @($sourcesProperty.Value) } else { @() }
+        $instructionSources = @(if ($sourcesProperty) { $sourcesProperty.Value })
         if ($instructionSources.Count -eq 0) {
-            $errors.Add("Target '$targetName' instructions have no sources")
+            $errors.Add("Target '$targetName' $kind have no sources")
         }
         foreach ($source in $instructionSources) {
             if ([string]::IsNullOrWhiteSpace([string]$source)) {
-                $errors.Add("Target '$targetName' instructions contain an empty source")
+                $errors.Add("Target '$targetName' $kind contain an empty source")
                 continue
+            }
+            if (-not $loadedSources.Add([string]$source)) {
+                $errors.Add("Target '$targetName' loads instruction source more than once: $source")
             }
             $instructionSource = Join-Path $repositoryRoot ([string]$source)
             if (-not (Test-Path -LiteralPath $instructionSource -PathType Leaf)) {
                 $errors.Add("Target '$targetName' instruction source does not exist: $source")
             }
-        }
-    }
-
-    $modelInstructionsProperty = $target.PSObject.Properties['modelInstructions']
-    if ($modelInstructionsProperty) {
-        $modelInstructions = $modelInstructionsProperty.Value
-        if ([string]::IsNullOrWhiteSpace([string]$modelInstructions.destination)) {
-            $errors.Add("Target '$targetName' model instructions have no destination")
-        }
-        if ([string]::IsNullOrWhiteSpace([string]$modelInstructions.source)) {
-            $errors.Add("Target '$targetName' model instructions have no source")
-        } elseif (-not (Test-Path -LiteralPath (Join-Path $repositoryRoot ([string]$modelInstructions.source)) -PathType Leaf)) {
-            $errors.Add("Target '$targetName' model instruction source does not exist: $($modelInstructions.source)")
         }
     }
 

@@ -5,7 +5,7 @@ param(
     [string]$OutputDirectory,
     # Replacement for Codex's built-in model instructions. The Codex client runs
     # with --ignore-user-config, so the file is passed explicitly. Defaults to
-    # the manifest's reviewed Codex modelInstructions source, which is the
+    # the manifest's composed Codex modelInstructions sources, which are the
     # configuration the shared rules are written against.
     [string]$CodexModelInstructionsFile,
     # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
@@ -26,10 +26,7 @@ $PSNativeCommandUseErrorActionPreference = $false
 . (Join-Path $PSScriptRoot 'InstructionActions.Common.ps1')
 $repo = Get-CustomizationRepositoryRoot
 $manifest = Get-CustomizationManifest
-if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $null -ne $manifest.targets.codex.PSObject.Properties['modelInstructions']) {
-    $CodexModelInstructionsFile = Join-Path $repo ([string]$manifest.targets.codex.modelInstructions.source)
-    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Reviewed Codex model instructions file not found: $CodexModelInstructionsFile" }
-}
+$useReviewedCodexInstructions = -not $CodexModelInstructionsFile -and -not $StockCodexInstructions
 $fixtures = Join-Path $repo 'tests/fixtures'
 $cases = (Get-Content (Join-Path $fixtures 'instruction-action-cases.json') -Raw | ConvertFrom-Json).cases
 $expectations = Get-Content (Join-Path $fixtures 'instruction-action-expectations.json') -Raw | ConvertFrom-Json
@@ -50,6 +47,13 @@ $OutputDirectory = Resolve-ActionOutputDirectory $OutputDirectory
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 # Each run uses its own child so an existing output directory is never a workspace.
 $runRoot = Join-Path $OutputDirectory ([guid]::NewGuid().ToString('N'))
+if ($useReviewedCodexInstructions -and 'codex' -in $targets) {
+    $null = New-Item -ItemType Directory -Path $runRoot -Force
+    $CodexModelInstructionsFile = Join-Path $runRoot 'codex-model-instructions.md'
+    [IO.File]::WriteAllText($CodexModelInstructionsFile,
+        (Get-CustomizationInstructionContent -Target $manifest.targets.codex -Kind modelInstructions),
+        [Text.UTF8Encoding]::new($false))
+}
 $results = [Collections.Generic.List[object]]::new()
 foreach ($agentTarget in $targets) {
     foreach ($case in $cases) {
@@ -59,6 +63,9 @@ foreach ($agentTarget in $targets) {
         & git -C $workspace init --quiet
         if ($LASTEXITCODE -ne 0) { throw 'Could not create disposable repository.' }
         $instructions = Get-CustomizationInstructionContent -Target $manifest.targets.$agentTarget
+        if ($agentTarget -eq 'codex' -and $StockCodexInstructions) {
+            $instructions = Get-CustomizationInstructionContent -Sources (@('global/shared.md') + @($manifest.targets.codex.instructions.sources))
+        }
         $instructionsPath = Join-Path $workspace $(if ($agentTarget -eq 'codex') { 'AGENTS.md' } else { 'CLAUDE.md' })
         [IO.File]::WriteAllText($instructionsPath, $instructions)
         $mcpConfig = Join-Path $caseRoot 'empty-mcp.json'

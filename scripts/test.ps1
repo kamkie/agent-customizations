@@ -16,6 +16,8 @@ $claudeSandbox = Join-Path $resolvedSandbox 'claude'
 try {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'verify.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Repository verification test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionComposition.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Instruction composition tests failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionInstallation.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Instruction installation precondition tests failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionBehavior.Tests.ps1')
@@ -132,15 +134,19 @@ try {
     foreach ($targetName in @('codex', 'claude')) {
         $target = Get-CustomizationTarget -Name $targetName
         $targetHome = if ($targetName -eq 'codex') { $codexSandbox } else { $claudeSandbox }
-        $installedInstructions = Join-Path $targetHome ([string]$target.instructions.destination)
-        $sourceParts = foreach ($source in @($target.instructions.sources)) {
-            $sourcePath = Join-Path $PSScriptRoot "..\$source"
-            [IO.File]::ReadAllText($sourcePath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
-        }
-        $expectedInstructions = ($sourceParts -join "`n`n") + "`n"
-        $actualInstructions = [IO.File]::ReadAllText($installedInstructions).Replace("`r`n", "`n")
-        if ($actualInstructions -cne $expectedInstructions) {
-            throw "$($target.displayName) installation did not compose its shared and target instruction sources."
+        foreach ($kind in @('instructions', 'modelInstructions')) {
+            $surface = $target.PSObject.Properties[$kind]
+            if (-not $surface) { continue }
+            $installedInstructions = Join-Path $targetHome ([string]$surface.Value.destination)
+            $sourceParts = foreach ($source in @($surface.Value.sources)) {
+                $sourcePath = Join-Path $PSScriptRoot "..\$source"
+                [IO.File]::ReadAllText($sourcePath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+            }
+            $expectedInstructions = ($sourceParts -join "`n`n") + "`n"
+            $actualInstructions = [IO.File]::ReadAllText($installedInstructions).Replace("`r`n", "`n")
+            if ($actualInstructions -cne $expectedInstructions) {
+                throw "$($target.displayName) installation did not compose $kind in source order."
+            }
         }
     }
 

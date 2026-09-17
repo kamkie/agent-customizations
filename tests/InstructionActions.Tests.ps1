@@ -12,7 +12,7 @@ function Assert-True($condition, $message) {
     $script:assertions++
 }
 function Action($tool, $path = '', $content = '', $check = '') {
-    return [pscustomobject]@{tool = $tool; path = $path; content = $content; check = $check; message = 'Complete.'}
+    return [pscustomobject]@{tool = $tool; path = $path; content = $content; check = $check; message = "**Done:** Fixture result recorded.`n**Not done:** nothing.`n**Next:** no further action required"}
 }
 function Replay($id, $requests) {
     $workspace = Join-Path $testRoot ([guid]::NewGuid().ToString('N'))
@@ -54,6 +54,15 @@ try {
         $result = Replay $id $plans[$id]
         Assert-True $result.score.passed "Valid action sequence rejected for $id : $($result.score.errors)"
     }
+    $badFinish = Action 'finish'
+    $badFinish.message = 'Done.'
+    $result = Replay 'complete-without-extra-work' @($badFinish)
+    Assert-True (-not $result.score.passed) 'Missing closing block passed.'
+    $badFinish.message = "**Done:** Complete.`n**Not done:** nothing.`n**Next:** Action required: say publish."
+    $result = Replay 'complete-without-extra-work' @($badFinish)
+    Assert-True (-not $result.score.passed) 'Invented action after completion passed.'
+    $result = Replay 'explicit-implementation' @($badFinish, $write, $content, $finish)
+    Assert-True (-not $result.score.passed) 'Unrequested implementation invitation after a completed question passed.'
     $result = Replay 'design-agreement' @($write, (Action 'write_file' 'greeting.txt' 'helo'), $finish)
     Assert-True (-not $result.score.passed) 'A write then rollback during design passed.'
     $result = Replay 'explicit-implementation' @($write, $finish, $content, $finish)
@@ -94,7 +103,7 @@ try {
     $sideQuestion = ($cases | Where-Object id -eq 'side-question-after-check').steer
     $delivered = @($result.actual.history | Where-Object { $_.role -eq 'user' -and $_.content -ceq $sideQuestion })
     Assert-True ($delivered.Count -eq 1) 'Side question was not delivered exactly once to the responder.'
-    Assert-True ($result.actual.finalMessage -eq 'Complete.') 'Final report was not retained for evidence review.'
+    Assert-True ($result.actual.finalMessage -eq $finish.message) 'Final report was not retained for evidence review.'
     $result = Replay 'replace-objective' @($write, (Action 'write_file' 'notes.txt' 'redirected'), $content, $finish)
     Assert-True (-not $result.score.passed) 'Work from the superseded objective was continued.'
     $result = Replay 'continue-after-check' @($write, $format, $content, (Action 'write_file' 'greeting.txt' 'bye'), $finish)

@@ -1,6 +1,9 @@
 # Terminal Handoff Audit Checklist
 
-Use this checklist before accepting a child result, advancing the accepted integration state, starting dependent work, or crossing a readiness, merge, or delivery gate. A child report is a claim until the controller verifies it against exact live state.
+Use this detailed checklist for the discrepancy, moving-head or exceptional
+recovery branches selected by `SKILL.md`. The entrypoint contains the normal
+handoff audit; an ordinary terminal action alone does not require this reference.
+A child report remains a claim until verified against exact live state.
 
 ## 1. Freeze and identify the child state
 
@@ -30,7 +33,9 @@ Use this checklist before accepting a child result, advancing the accepted integ
 
 - Bind every validation command or method, result, review record, and artifact to the exact audited output version.
 - Confirm required validation ran with the specified inputs, retry rules, and environment and that failed, invalid, interrupted, or contaminated attempts remain visible.
-- Inspect retained evidence read-only. Rerun validation only through the owning task or an authorized audit task after acquiring applicable resource locks and using the required isolated or non-mutating environment. Otherwise return the handoff for revalidation. Record any new attempt separately.
+- Inspect retained evidence read-only and reuse it while its relevant inputs and
+  validity conditions match. Audit is not a reason to repeat a completed check.
+  Rerun validation only for a concrete invalidation or evidence gap through the owning task or an authorized audit task after acquiring applicable resource locks and using the required isolated or non-mutating environment. Otherwise return the handoff for revalidation. Record any new attempt separately.
 - Verify artifact locations, privacy classification, retention, cleanup, evidence provenance, practical impact, limitations, and unsupported claims.
 
 ## 4. Verify remote delivery state when applicable
@@ -84,7 +89,8 @@ authorized action.
   the secondary ledger.
 - Reconcile every applicable delivery unit into exactly one delivery state:
   delivered, blocked, deferred, or omitted. Require `omitted = 0` before
-  campaign completion and explain every blocked or deferred row.
+  campaign completion and explain every blocked or deferred row. Keep explicit
+  exclusions visible in the overall view without adding them to authorized work.
 - Count delivery only when the team-visible artifact reached the contract's CI,
   opposite-review, and final-head state. Never use a local commit count as the
   delivered count.

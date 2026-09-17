@@ -18,14 +18,15 @@ active skill directory first and construct the same script path from it.
 
 1. Decide whether browser review materially improves the response. Keep ordinary
    answers in chat.
-2. For every matching artifact type, load its focused playbook before writing:
+2. Load the playbook for the dominant artifact type. Load another only when a
+   concrete part of the artifact needs its guidance:
 
        & $lavish playbook comparison
        & $lavish playbook plan
        & $lavish playbook input
 
    Available playbooks are diagram, table, comparison, plan, code, input, and
-   slides. Load all that apply.
+   slides. Do not load the full catalog for a simple artifact.
 3. Write one self-contained HTML file under .lavish/ unless the user chooses
    another location. Prefer the subject project's design tokens and components;
    otherwise use deliberate local CSS. Avoid remote scripts, fonts, and assets
@@ -51,7 +52,12 @@ Then keep the poll attached to the active turn:
 
     & $lavish poll .\.lavish\artifact.html --agent-reply 'What to review first'
 
-- Do not detach, background, or impose a normal-use timeout on the poll.
+- Keep one poll attached. Let the execution tool yield while that same process
+  waits; resume it through the tool's session interface instead of blocking
+  communication for more than 60 seconds or launching duplicate polls. Do not
+  detach, background or kill an active review through an arbitrary timeout.
+- A pending human review is a waiting state, not completed work. Preserve the
+  artifact and report the specific decision awaited under the task contract.
 - Apply submitted annotations and decisions, save the same HTML file, reply
   through --agent-reply, and poll again.
 - Treat browser layout findings as work only after the user queues them.

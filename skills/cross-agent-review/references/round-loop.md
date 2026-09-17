@@ -55,7 +55,8 @@ commits to avoid review.
 A user's explicit request for another round adds one to the three-round budget.
 Only the user can increase that budget. If necessary re-review remains when
 the budget is exhausted, report the exact unreviewed range and ask for the
-needed review authority. Do not reset the counter or claim review coverage.
+needed review authority. Do not reset the counter, claim review coverage, or
+present "ready as is" as overriding an applicable repository gate.
 
 The reviewer vote is advisory. Record an absent vote and explain a decision
 that differs from an available vote. Disagreement alone does not require a vote,

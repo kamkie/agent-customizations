@@ -13,8 +13,9 @@ traceable to observed evidence and a verifiable acceptance criterion.
 
 Use this workflow with Codex when a browser-control capability can inspect and
 interact with the target application. If that capability is unavailable or
-still fails after one reasonable retry, return a `blocked` verdict naming the
-missing capability and every surface left unreviewed. Do not substitute source
+cannot exercise a surface after available permitted diagnosis, mark that surface
+blocked and continue independent reachable review work. Return a `blocked`
+overall verdict when insufficient live coverage remains for a defensible result. Do not substitute source
 inspection or static screenshots for a live walkthrough. Discover the
 repository's runtime, test, and design contracts at execution time. Do not
 install or invoke this skill for an agent or environment that cannot exercise
@@ -32,8 +33,12 @@ the interface in a real browser.
   data. Never exercise destructive, financial, production, or externally
   consequential actions merely to complete a review.
 - Keep secrets and real personal data out of screenshots, logs, and reports.
+- Preserve the user's authenticated session. Isolate logout, account switching
+  and destructive tests in a separate permitted browser context. When isolation
+  is unavailable, leave that state untested rather than signing the user out.
 - Report an environment or access blocker instead of fabricating a walkthrough
-  or judging screens that were not exercised.
+  or judging screens that were not exercised. Refresh the affected state after
+  the user resolves access instead of carrying a stale blocker forward.
 
 ## Run the Common Path
 
@@ -55,9 +60,9 @@ the interface in a real browser.
    denied, use the repository's durable-process mechanism instead of retrying
    the server in the foreground. Record the base URL, readiness evidence,
    process owner, log location, and teardown responsibility. Do not install new
-   tooling or modify tracked setup files without authority. After one reasonable
-   repair or retry for an environment, launch, or access failure, return a
-   `blocked` verdict with the exact failure and unreviewed surfaces.
+   tooling or modify tracked setup files without authority. Diagnose a failure
+   with available permitted evidence, continue independent reachable surfaces,
+   and report precisely which review work remains blocked. Respect tool denials.
 
 4. **Walk the task.** Open the same entry point the user would use, perform the
    primary task with safe test data, observe the result, and follow the normal
@@ -95,12 +100,11 @@ the interface in a real browser.
    it. Unless the user or repository specifies another location, store evidence
    in a task-scoped temporary directory outside the source branch. Name files by
    review step and state, verify that each artifact exists, and redact or omit
-   sensitive content. Retain artifacts while writing the review. Before final
-   handoff, delete the task-scoped temporary directory unless the user asks to
-   keep it or the repository requires retained evidence. For retained artifacts,
-   report the exact location, sensitivity, and cleanup responsibility. For
-   deleted artifacts, preserve the exact observation in the finding and report
-   that the temporary evidence was removed; never leave a dangling path.
+   sensitive content. Keep the minimum evidence supporting the delivered
+   findings in the task-authorized artifact location; it is part of the result.
+   Remove discarded captures and scratch files. Apply a repository's stricter
+   retention rule when present, and report the exact retained location,
+   sensitivity and cleanup responsibility. Never link an artifact you deleted.
 
 8. **Write actionable findings.** Rank findings by the combination of impact,
    likely frequency, and reach, not by ease of repair. Each finding must include:
@@ -117,7 +121,8 @@ the interface in a real browser.
    findings over a long list of tastes and minor inconsistencies.
 
 9. **Finish and clean up.** Stop only the environment or process this review
-   started, unless the user asked to keep it available. Preserve and hand off
+   started, unless the user asked to keep it available. Already-terminal jobs
+   need no stop call. Preserve and hand off
    any intentionally surviving process using the active process-management
    contract. Apply the default evidence cleanup or authorized retention from
    step 7 and state what remains. Confirm that the source worktree remains

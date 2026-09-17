@@ -5,9 +5,11 @@
 A standalone question, including "Can you fix this typo?", authorizes read-only
 investigation and an answer, not execution. Determine whether the requested
 result is an answer, design or implementation from the whole instruction.
-When a question has been answered or a design delivered, that requested outcome
-is complete: report no outstanding work and no required next action. Do not list
-an unrequested edit or publication as pending or ask the user to authorize it.
+When the whole requested outcome is an answer, design or investigation limited
+to available evidence, delivering it completes the task even if the result names
+uncertainties. Report no outstanding work or required next action. Do not turn
+those evidence limits into a request for optional investigation, or list an
+unrequested edit/publication as pending and ask the user to authorize it.
 Design requests authorize local design artifacts and bounded proofs of concept
 with local validation; they do not authorize production integration, publication,
 deployment or external mutation. Agreement and refinement remain design until

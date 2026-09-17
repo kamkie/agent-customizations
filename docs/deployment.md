@@ -64,30 +64,41 @@ file, not only the drift count. Account for live-only guidance in the reviewed
 sources or obtain explicit authority to discard it before replacing that file.
 A backup preserves recovery data; it does not make an unreviewed loss acceptable.
 
-For existing live instruction files, compare against their composed sources from
-the repository root (diff exit code 1 means differences were found):
+Compare both the composed global instructions and any replacement model prompt
+from the repository root (diff exit code 1 means differences were found):
 
 ```powershell
 . ./scripts/AgentCustomization.Common.ps1
 $reviewedHashes = @{}
+$reviewedModelHashes = @{}
 foreach ($targetName in Get-CustomizationTargetNames -Target All) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
     $liveRoot = Resolve-CustomizationHome -TargetName $targetName
     $liveFile = Join-Path $liveRoot $targetConfig.instructions.destination
     # Capture before reading the diff; do not refresh it after a concurrent edit.
     $reviewedHashes[$targetName] = Get-CustomizationInstructionHash -Path $liveFile
-    if (-not (Test-Path -LiteralPath $liveFile -PathType Leaf)) {
+    if (Test-Path -LiteralPath $liveFile -PathType Leaf) {
+        $compiledFile = [IO.Path]::GetTempFileName()
+        try {
+            [IO.File]::WriteAllText($compiledFile,
+                (Get-CustomizationInstructionContent -Target $targetConfig))
+            git diff --no-index -- $compiledFile $liveFile
+            if ($LASTEXITCODE -gt 1) { throw "Cannot compare $targetName instructions." }
+        } finally {
+            Remove-Item -LiteralPath $compiledFile
+        }
+    } else {
         Write-Host "$targetName instructions are missing; no live content to compare."
-        continue
     }
-    $compiledFile = [IO.Path]::GetTempFileName()
-    try {
-        [IO.File]::WriteAllText($compiledFile,
-            (Get-CustomizationInstructionContent -Target $targetConfig))
-        git diff --no-index -- $compiledFile $liveFile
-        if ($LASTEXITCODE -gt 1) { throw "Cannot compare $targetName instructions." }
-    } finally {
-        Remove-Item -LiteralPath $compiledFile
+    if ($null -ne $targetConfig.PSObject.Properties['modelInstructions']) {
+        $liveModel = Join-Path $liveRoot $targetConfig.modelInstructions.destination
+        $reviewedModelHashes[$targetName] = Get-CustomizationInstructionHash -Path $liveModel
+        if (Test-Path -LiteralPath $liveModel -PathType Leaf) {
+            git diff --no-index -- $targetConfig.modelInstructions.source $liveModel
+            if ($LASTEXITCODE -gt 1) { throw "Cannot compare $targetName model instructions." }
+        } else {
+            Write-Host "$targetName model instructions are missing; no live content to compare."
+        }
     }
 }
 ```
@@ -125,14 +136,18 @@ git status --short --branch
 Install both targets, keeping the hashes from the content comparison above:
 
 ```powershell
-./scripts/install.ps1 -ExpectedInstructionHashes $reviewedHashes
+./scripts/install.ps1 -ExpectedInstructionHashes $reviewedHashes `
+    -ExpectedModelInstructionHashes $reviewedModelHashes
 ```
 
 Install only one target:
 
 ```powershell
-pwsh ./scripts/install.ps1 -Target Codex
-pwsh ./scripts/install.ps1 -Target Claude
+./scripts/install.ps1 -Target Codex `
+    -ExpectedInstructionHashes @{ codex = $reviewedHashes.codex } `
+    -ExpectedModelInstructionHashes @{ codex = $reviewedModelHashes.codex }
+./scripts/install.ps1 -Target Claude `
+    -ExpectedInstructionHashes @{ claude = $reviewedHashes.claude }
 ```
 
 The installer verifies the repository before writing and refuses dirty,
@@ -146,21 +161,32 @@ Existing files are backed up under a timestamped `customization-backups`
 directory in the selected target home, and the installer checks for remaining
 drift before it succeeds.
 
-`status.ps1` includes each target's current `instructionHash` (`missing` when
-absent); an unavailable hash is `null` with `instructionHashError`, not `missing`.
-A hash is evidence of file identity, not evidence that its content has
-been reviewed. `-ExpectedInstructionHashes` accepts a hashtable containing exactly
-the selected targets; for a single target use, for example,
-`@{ codex = $reviewedHashes.codex }`. Pass it from PowerShell, not as a serialized
-string to `pwsh -File`. Alternate homes must be the same ones used for comparison.
+`status.ps1` reports `instructionHash` for the composed instruction file and
+`modelInstructionHash` for the replacement model prompt. Each is `missing` when
+its managed file is absent, or `null` with its corresponding `*HashError` when
+the file cannot be hashed. For a target without a managed model prompt, both
+model fields are `null` (not applicable). The summary counts the two error kinds
+separately, and either causes a nonzero exit without erasing the drift report.
 
-The precondition checks all targets before installation and checks each target
-again before creating its directories or replacing files. On mismatch, reread and reconcile
+A hash proves file identity, not content review. `-ExpectedInstructionHashes`
+must contain exactly the selected targets. A guarded install that selects a
+managed model prompt also requires `-ExpectedModelInstructionHashes`, containing
+exactly those selected targets with a model prompt (currently `codex`). Old
+guarded Codex calls must add this second map; a global instruction hash alone
+cannot protect the separate base prompt. A model-only guard is rejected. Pass
+the maps from PowerShell, not as serialized strings to `pwsh -File`. Alternate
+homes must be the same ones used for comparison.
+
+The precondition checks both instruction files for all selected targets before
+installation and checks each target again before creating its directories or
+replacing files. A stale model hash therefore prevents changes to global
+instructions, skills, hooks and other selected targets, including in `-WhatIf`.
+On mismatch, reread and reconcile
 the changed content rather than blindly replacing the expected hash. It detects
 stale snapshots, including a previously missing file appearing, but is not an
 atomic lock against a writer racing the final filesystem replacement. Coordinate
-active writers before activation. The option adds no deployment authority;
-omitting it preserves the existing installer interface, not an exemption from
+active writers before activation. The options add no deployment authority;
+omitting both preserves the unguarded installer interface, not an exemption from
 the content-review requirement above.
 
 ## Apply hook changes

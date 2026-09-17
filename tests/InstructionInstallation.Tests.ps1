@@ -138,6 +138,8 @@ try {
     $report = ($statusOutput -join "`n") | ConvertFrom-Json
     $codexSummary = $report.targets | Where-Object target -eq 'codex'
     $claudeSummary = $report.targets | Where-Object target -eq 'claude'
+    Assert-True ($codexSummary.modelInstructionActivation -eq 'NotVerified') 'Synchronized files must not imply verified client activation.'
+    Assert-True ($null -eq $claudeSummary.modelInstructionActivation) 'Model selection is not applicable to Claude.'
     Assert-True ($codexSummary.modelInstructionHash -eq (Get-CustomizationInstructionHash $modelInstalled)) 'Status model hash does not identify the installed content.'
     Assert-True ($null -eq $claudeSummary.modelInstructionHash -and $null -eq $claudeSummary.modelInstructionHashError) 'Target without a model prompt must report the model hash as not applicable.'
     # A single target requires only its own key; another target stays untouched.
@@ -153,6 +155,8 @@ try {
         return @($warnings | ForEach-Object { [string]$_ })
     }
     $currentHashes = @{ codex = Get-CustomizationInstructionHash $codexFile; claude = Get-CustomizationInstructionHash $claudeFile }
+    $synchronizedWarnings = Install-CapturingWarnings $currentHashes
+    Assert-True ($synchronizedWarnings -match 'does not verify or activate') 'Already-synchronized Codex files must still disclose unverified activation.'
     $codexHookEntry = @((Get-CustomizationTarget -Name 'codex').hooks.entries)[0]
     $installedHookScript = Join-Path $codexRoot ([string]$codexHookEntry.script)
     Add-Content -LiteralPath $installedHookScript -Value '# script-only drift' -Encoding utf8

@@ -212,7 +212,11 @@ runtime/tool/rendering behavior, while shared policy has one owner. Review
 changes to the stock base when updating Codex, without copying its conflicting
 permission and completion defaults back over the shared contract.
 
-Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not
+Before replacing Codex's global AGENTS.md, verify that the effective client
+configuration selects the generated base at its actual installed path. If the
+selection is absent or wrong, resolve that activation within deployment
+authority first: the small overlay cannot supply the missing shared contract.
+Codex only loads the base when its configuration names it. `config.toml` is not
 managed by this repository; add the key once, at the top level, before any
 `[table]` section:
 
@@ -220,8 +224,12 @@ managed by this repository; add the key once, at the top level, before any
 model_instructions_file = "C:/Users/<you>/.codex/model-instructions-astra.md"
 ```
 
-Status reports the file as `ModelInstructions`; it does not verify the
-`config.toml` key. The evaluation clients ignore user configuration, so both
+Status reports file equality as `ModelInstructions` and separately reports
+`modelInstructionActivation: "NotVerified"`; zero file drift is not an activated
+or correctly selected client. The installer warns about this boundary even when
+files are already synchronized. Effective profiles, client overrides and fresh
+session loading belong to activation verification, not a partial TOML parser in
+the file installer. The evaluation clients ignore user configuration, so both
 evaluation scripts compose the manifest's reviewed base into their run output
 and pass that snapshot explicitly. That artifact is the complete base, not the
 Codex runtime fragment alone. Pass a complete replacement with

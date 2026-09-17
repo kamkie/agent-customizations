@@ -77,6 +77,9 @@ foreach ($targetName in $selectedTargets) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
     $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
     $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
+    if ($targetConfig.PSObject.Properties['modelInstructions']) {
+        Write-Warning 'Codex shared policy requires model_instructions_file to select the installed model-instructions file. Verify that setting before replacing AGENTS.md and verify a fresh session afterward. This installer manages file contents; it does not verify or activate that unmanaged setting.'
+    }
     $status = @(Get-CustomizationStatus -TargetName $targetName -HomePath $resolvedHome)
     $drift = @($status | Where-Object State -ne 'InSync')
     if ($drift.Count -eq 0) {

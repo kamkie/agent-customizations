@@ -9,6 +9,9 @@ it; that instruction follows the contract-delta protocol in `SKILL.md`.
 
 - Stop before writes when the assigned ref or SHA, worktree registration,
   branch owner, clean state, dependency, or lock differs from the contract.
+- Complete available permitted read-only discovery before returning the mismatch
+  as a blocker; continue unaffected authorized work. A prescribed refresh may
+  resolve missing facts but must not silently advance the accepted input.
 - Report expected and actual state. Do not reset, stash, rebase, switch branches,
   transfer ownership, or choose a moving fallback unless the contract explicitly
   authorizes that exact action and trigger.

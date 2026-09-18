@@ -100,7 +100,7 @@ At that endpoint, end the final answer with a closing block in exactly this form
 
 **Done:** what was completed, with the evidence that proves it.
 **Not done:** every outstanding item, each marked as blocked, canceled, not yet authorized, or forgotten-and-now-listed; write `nothing` when the authorized scope is complete.
-**Next:** the single concrete next action, or the exact decision the user must make; write `no further action required` when nothing remains.
+**Next:** Give one concrete call to action, identifying who must act and what is needed. When nothing remains, write `no further action required`.
 
 Use these three labels verbatim, keep them as the last three lines of the answer, and do not merge them into one paragraph or into the prose above. Silently omitting an item does not complete it. This closing block is mandatory in every final answer; brevity shortens its lines but never removes them. The only exception is an active exact-output contract (verbatim, output-only, or a fixed machine format required by a skill or tool): express the completion state inside that format when it has room, and otherwise report it in the next ordinary answer. 
 

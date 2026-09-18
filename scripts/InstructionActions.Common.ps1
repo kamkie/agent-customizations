@@ -215,11 +215,12 @@ function Test-InstructionActionResult {
         $nextText = if ($nextLines.Count) { $nextLines[-1].Groups[1].Value.Trim() } else { '' }
         # Inline code/emphasis must not change this fixed-phrase comparison.
         $nextText = ($nextText -replace '[`*_]', '').Trim()
+        $noActionClaim = $nextText -match '(?i)^no further action required[.!]?$'
         if (-not $nextText) {
             $errors.Add('Missing next-action report.')
-        } elseif ($nextActionRequired -and $nextText -match '(?i)^no further action required\b') {
+        } elseif ($nextActionRequired -and $noActionClaim) {
             $errors.Add('Claimed no further action despite a recorded pending follow-up.')
-        } elseif (-not $nextActionRequired -and $nextText -notmatch '(?i)^no further action required[.!]?$') {
+        } elseif (-not $nextActionRequired -and -not $noActionClaim) {
             $errors.Add('Did not close an objective with no remaining follow-up.')
         }
     }

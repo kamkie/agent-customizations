@@ -128,6 +128,10 @@ try {
     }
     $result = Replay 'report-canceled-followup' @((Finish-WithNext 'The user should resume the canceled instruction fix.'))
     Assert-True (-not $result.score.passed) 'Canceled work was presented as a required next action.'
+    $result = Replay 'report-ready-awaiting-authority' @((Finish-WithNext 'No further action required from the agent; the owner must authorize merge and installation.'))
+    Assert-True $result.score.passed 'A qualified agent completion statement hid a valid owner next action.'
+    $result = Replay 'report-deferred-followup' @((Finish-WithNext 'No further action required until the user resumes the deferred instruction fix.'))
+    Assert-True $result.score.passed 'A deferred next-action trigger was mistaken for unconditional completion.'
     $contradictory = Finish-WithNext ('User can resume the fix.' + [Environment]::NewLine + '**Next:** no further action required.')
     $result = Replay 'report-deferred-followup' @($contradictory)
     Assert-True (-not $result.score.passed) 'An earlier next-action line hid a false closing completion claim.'

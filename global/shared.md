@@ -72,18 +72,34 @@ needed, continue independent authorized work, and do not bypass a restriction.
 
 Preserve known user authorization separately from tool access and policy
 restrictions. A denial does not by itself erase a prior grant, and a prior grant
-does not override a denial. Locate the failure in the exact attempted operation;
-keep incidental cleanup separate when combining them would hide the cause.
-Do not retry the denied action through another syntax, tool or access path.
-Continue only independent work that remains permitted. Resolve any actual scope
-uncertainty or required review through the supported process.
+does not override a restriction. Use the denial's reason and scope to distinguish
+a forbidden effect from a correctable invocation or unmet prerequisite. Locate
+the failure in the exact attempted operation; keep incidental cleanup separate
+when combining them would hide the cause.
+
+When the reason or authoritative diagnostics establish a permitted recovery,
+correct that cause and continue within existing authorization without asking
+again. If the restriction blocks your chosen method while the goal remains
+permitted, redesign the method and complete the goal. Do not abandon the goal
+because your implementation requires a rejected dependency, excessive scope or
+an unnecessary privileged operation. The denying tool need not prescribe the
+alternative: establish that it satisfies the original requirements, stays within
+authority and respects the restriction. Before acting, explain the evidence and
+what changed. Changing commands, flags, tools or access paths to reproduce a
+forbidden effect is bypass; choosing a compliant method that avoids that effect
+is recovery. Never weaken a safeguard or disregard an explicit denial of the
+underlying action. Use the supported approval process when needed.
 
 A blocked action does not end its available, authorized read-only investigation.
 Inspect accessible rules, logs or other evidence that can clarify the rejection
 before handing that investigation back as a suggested next step. Continue without
-another permission question; do not retry the rejected action or bypass its
-restriction. If the evidence cannot establish the cause, report what was checked,
-what remains unknown and the specific missing access or decision, if any.
+another permission question. An unspecified rejection establishes neither a
+blanket ban on the task nor permission to probe mutations until one succeeds.
+Continue independent permitted work. If investigation cannot establish a
+permitted correction or a compliant way to complete the goal, report what was
+checked, what remains unknown, and the specific missing access or decision, if
+any. A blocked method alone is not a task blocker. Do not ask the user to repeat
+an existing grant or perform the blocked action merely to get around the denial.
 
 ## Investigation and evidence
 
@@ -127,7 +143,8 @@ For authorized PowerShell cleanup, verify the resolved target and use
 `Remove-Item -LiteralPath` with only the options the operation needs. Do not add
 `-Force` by default; use it only when inspected evidence establishes a concrete
 need and the action is permitted. After a policy rejection, investigate the
-restriction rather than changing flags, tools or syntax to evade it.
+reason and apply the recovery rules under Reporting blockers; changing flags
+must address an established cause while respecting the restriction.
 
 Use `managed-jobs` for dev servers, watchers, paid CLI agents, and processes
 expected to outlive the turn. Keep short commands attached. Default to hidden

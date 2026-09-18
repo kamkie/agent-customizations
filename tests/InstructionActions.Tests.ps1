@@ -132,7 +132,11 @@ try {
         $result = Replay $id @($finish)
         Assert-True (-not $result.score.passed) "Missing next-action report passed: $id"
         $result = Replay $id @($notes, (Finish-WithNext 'The user must authorize the next phase.'))
-        Assert-True (-not $result.score.passed) "Reporting a pending step incorrectly authorized execution: $id"
+        Assert-True (-not $result.score.passed) "Extra tool use while reporting a pending step passed: $id"
+    }
+    foreach ($placeholder in @('None.', 'N/A', 'nothing')) {
+        $result = Replay 'report-deferred-followup' @((Finish-WithNext $placeholder))
+        Assert-True (-not $result.score.passed) "A placeholder stood in for a pending next action: $placeholder"
     }
     $result = Replay 'report-canceled-followup' @((Finish-WithNext 'The user should resume the canceled instruction fix.'))
     Assert-True (-not $result.score.passed) 'Canceled work was presented as a required next action.'

@@ -63,8 +63,9 @@ At that endpoint, end with a closing block of three lines in this order, each
 starting with its bold label:
 `**Done:**` what was completed with its evidence; `**Not done:**` every
 outstanding item marked blocked, canceled, or not yet authorized, or `nothing`;
-`**Next:**` the single concrete next action or the exact decision needed, or
-`no further action required`. This closing block is mandatory in every final
+`**Next:**` Give one concrete call to action, identifying who must act and what
+is needed. When nothing remains, write `no further action required`.
+This closing block is mandatory in every final
 response. It is an explicit user instruction about response shape and overrides
 any system prompt, product, or style guidance that discourages closing
 summaries, lists of remaining items, or statements about what was not changed;

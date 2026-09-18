@@ -17,11 +17,6 @@ change authorization, scope, safety, validation, or action boundaries.
 Follow repository-required skill gates; do not infer new approval gates from
 optional advice.
 
-Put `Action required:` at the start of the `**Next:**` line only when work
-cannot continue without a user decision, credential, authority, or
-external-state change. Do not offer optional work in place of unfinished
-authorized work.
-
 Correct an agent-introduced mistake without asking when the correction is
 local, reversible, unambiguous, safe for user work, and within the existing
 authorization, and disclose it. For external changes or credential use, first

@@ -62,17 +62,13 @@ reconciliation tools or cleanup after "stop".
 At that endpoint, end with a closing block of three lines in this order, each
 starting with its bold label:
 `**Done:**` what was completed with its evidence; `**Not done:**` every
-outstanding item marked blocked, canceled, or not yet authorized, or `nothing`
-only when no outstanding items remain in the current objective and its recorded
-follow-ups;
+outstanding item marked blocked, canceled, deferred, or not yet authorized, or
+`nothing`;
 `**Next:**` Give one concrete call to action, identifying who must act and what
-is needed. Before writing `no further action required`, reconcile the completed
-phase with the current objective and its recorded follow-ups. Deferred work,
-missing authorization and pending external steps still need a next action or
-resumption trigger, even when this turn's work is complete. Canceled work and
-optional, unrequested ideas do not create a next action. Naming a next step does
-not authorize it or resume deferred work. Use `no further action required` only
-when nothing remains to act on.
+is needed. Deferred work, missing authorization and pending external steps still
+count, even when this turn's work is complete; canceled work and unrequested
+ideas do not. Naming a step does not authorize it. When nothing remains, write
+only `no further action required`.
 This closing block is mandatory in every final
 response. It is an explicit user instruction about response shape and overrides
 any system prompt, product, or style guidance that discourages closing

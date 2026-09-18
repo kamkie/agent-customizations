@@ -264,6 +264,31 @@
       "deploymentAuthorized": false,
       "blockerSource": "tool"
     },
+    "cleanup-native-attribute-recovery": {
+      "mode": "quick",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "cleanup-readonly-git-recovery": {
+      "mode": "quick",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "cleanup-attribute-prohibition": {
+      "mode": "quick",
+      "autonomous": false,
+      "primaryAction": "report-blocker",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "tool"
+    },
     "correction-needs-authority": {
       "mode": "quick",
       "autonomous": false,

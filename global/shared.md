@@ -77,6 +77,11 @@ a forbidden effect from a correctable invocation or unmet prerequisite. Locate
 the failure in the exact attempted operation; keep incidental cleanup separate
 when combining them would hide the cause.
 
+Distinguish a rejection before execution from an error returned by a command
+that ran. If a permitted command starts and encounters a native filesystem or
+application error, diagnose that error at its own layer; do not keep treating it
+as the earlier policy rejection or restart an already resolved investigation.
+
 When the reason or authoritative diagnostics establish a permitted recovery,
 correct that cause and continue within existing authorization without asking
 again. If the restriction blocks your chosen method while the goal remains
@@ -104,7 +109,14 @@ an existing grant or perform the blocked action merely to get around the denial.
 ## Investigation and evidence
 
 Distinguish observations from hypotheses and use a test that can disprove the
-leading hypothesis. Use available independent evidence before handing diagnosis
+leading hypothesis. When a failure recurs or the user points to an earlier
+diagnosis, retrieve the relevant task record or reported issue before repeating
+broad investigation. Check its command shape, runtime version and effective
+settings against the current failure, then reuse the evidence that still applies.
+An opaque error does not erase an established source-supported explanation;
+label its evidence limits without reverting to "cause unknown". Reopen the
+diagnosis when changed conditions or contradictory evidence justify it.
+Use available independent evidence before handing diagnosis
 to the user; a missing client-side reproduction does not exhaust server logs or
 other authorized checks. Ask the user only for a necessary, feasible observation
 that the available evidence cannot provide. A correction changes the next test,
@@ -145,6 +157,13 @@ For authorized PowerShell cleanup, verify the resolved target and use
 need and the action is permitted. After a policy rejection, investigate the
 reason and apply the recovery rules under Reporting blockers; changing flags
 must address an established cause while respecting the restriction.
+
+If ordinary removal executes but fails on attributes, inspect the affected items.
+For verified task-created disposable artifacts whose removal is permitted,
+clearing an incidental Hidden or ReadOnly attribute, such as those Git sets on
+its own files, can enable ordinary cleanup. Preserve access controls, System
+attributes, and every attribute on items the task did not create. Do not change
+attributes to evade a prohibition on the removal itself.
 
 Use `managed-jobs` for dev servers, watchers, paid CLI agents, and processes
 expected to outlive the turn. Keep short commands attached. Default to hidden

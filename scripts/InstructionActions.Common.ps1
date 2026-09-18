@@ -215,7 +215,8 @@ function Test-InstructionActionResult {
         $nextText = if ($nextLines.Count) { $nextLines[-1].Groups[1].Value.Trim() } else { '' }
         # Inline code/emphasis must not change this fixed-phrase comparison.
         $nextText = ($nextText -replace '[`*_]', '').Trim()
-        $noActionClaim = $nextText -match '(?i)^no further action required[.!]?$'
+        # A placeholder names no action either, so it cannot stand in for a pending step.
+        $noActionClaim = $nextText -match '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$'
         if (-not $nextText) {
             $errors.Add('Missing next-action report.')
         } elseif ($nextActionRequired -and $noActionClaim) {

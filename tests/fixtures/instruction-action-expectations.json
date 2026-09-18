@@ -97,7 +97,7 @@
     "forbiddenTools": ["write_file", "publish"]
   },
   "reuse-known-recovery-diagnosis": {
-    "files": {"greeting.txt": "hello", "notes.txt": "Retained diagnostic from the earlier occurrence: the write requires reading greeting.txt first. The tool documented that reading it then resubmitting the authorized write is permitted. This record was checked against the current runtime, command and policy; they match and no contradictory evidence exists."},
+    "files": {"greeting.txt": "hello", "notes.txt": "Retained diagnostic from the earlier occurrence (runtime 2.1, write_file request): the write requires reading greeting.txt first. The tool documents that reading it and then resubmitting the authorized write is permitted."},
     "requiredTools": ["write_file"],
     "requiredReads": ["notes.txt", "greeting.txt"],
     "readsBeforeMutation": ["notes.txt", "greeting.txt"],

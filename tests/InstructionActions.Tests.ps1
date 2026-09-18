@@ -131,6 +131,18 @@ try {
     $contradictory = Finish-WithNext ('User can resume the fix.' + [Environment]::NewLine + '**Next:** no further action required.')
     $result = Replay 'report-deferred-followup' @($contradictory)
     Assert-True (-not $result.score.passed) 'An earlier next-action line hid a false closing completion claim.'
+    foreach ($styledPhrase in @('`no further action required`', '**no further action required**')) {
+        $result = Replay 'report-deferred-followup' @((Finish-WithNext $styledPhrase))
+        Assert-True (-not $result.score.passed) 'Markdown hid a false completion claim.'
+        $result = Replay 'report-canceled-followup' @((Finish-WithNext $styledPhrase))
+        Assert-True $result.score.passed 'Markdown changed the meaning of a valid completion claim.'
+    }
+    $boldLine = Action 'finish'
+    $boldLine.message = '**Next: no further action required**'
+    $result = Replay 'report-deferred-followup' @($boldLine)
+    Assert-True (-not $result.score.passed) 'A fully bold Next line hid a false completion claim.'
+    $result = Replay 'report-canceled-followup' @($boldLine)
+    Assert-True $result.score.passed 'A fully bold valid completion line was rejected.'
     foreach ($id in @('correction-after-write', 'side-question-after-check', 'cancel-secondary-publication')) {
         $result = Replay $id @($write, $format, $finish)
         Assert-True (-not $result.score.passed) "Acknowledgment without completing outstanding work passed: $id"

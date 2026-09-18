@@ -213,6 +213,8 @@ function Test-InstructionActionResult {
         # Check the explicit closing claim, not the meaning of arbitrary prose.
         $nextLines = [regex]::Matches($Actual.finalMessage, '(?im)^[ \t]*(?:\*\*)?Next:(?:\*\*)?[ \t]*([^\r\n]*)')
         $nextText = if ($nextLines.Count) { $nextLines[-1].Groups[1].Value.Trim() } else { '' }
+        # Inline code/emphasis must not change this fixed-phrase comparison.
+        $nextText = ($nextText -replace '[`*_]', '').Trim()
         if (-not $nextText) {
             $errors.Add('Missing next-action report.')
         } elseif ($nextActionRequired -and $nextText -match '(?i)^no further action required\b') {

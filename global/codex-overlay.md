@@ -1,17 +1,5 @@
 ## Codex-specific workflow
 
-For recurring Windows cleanup rejections, consult the known
-[forced-deletion report](https://github.com/openai/codex/issues/45403) before
-broad policy searches. In affected versions, a delete cmdlet with `-Force` can
-trigger the built-in dangerous-command check and be denied under approval mode
-`never`, even with Full access and no matching user rule. A `-Force` on a
-non-deleting command, such as a listing, can trigger the same rejection when it
-is submitted in one script with a removal; run inspection and removal as
-separate commands. Check the actual session runtime version, command shape and
-effective policy before applying that diagnosis; a separate CLI on PATH or an
-empty user-rule match is not a substitute. This is a diagnostic lead, not
-permission to bypass a rejection.
-
 Starting or resuming a Codex Goal requests autonomous persistence for that goal.
 The `Start delivery campaign <tracker>` trigger below requests autonomous
 persistence for that campaign. In both cases, activation still requires the
@@ -44,3 +32,11 @@ required opposite-agent review with finding fixes and re-review, and each
 repository-gated readiness transition. Use the `orchestrate-work-campaigns`
 workflow and discover each repository's delivery rules at runtime. This trigger
 does not authorize merge or deployment.
+
+For a Windows cleanup rejected as "blocked by policy", first check the known
+[forced-deletion report](https://github.com/openai/codex/issues/45403): under
+approval mode `never`, `-Force` on a delete cmdlet, or on a listing submitted in
+the same script as a removal, can trigger the built-in dangerous-command check
+even with Full access. Confirm the session's own runtime version and command
+shape first, and keep inspection and removal in separate commands. This is a
+diagnostic lead, not permission to bypass a rejection.

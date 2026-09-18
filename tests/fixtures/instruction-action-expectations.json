@@ -73,6 +73,15 @@
     "checks": ["content"],
     "forbiddenTools": ["publish"]
   },
+  "denial-method-not-goal": {
+    "files": {"greeting.txt": "immutable template", "notes.txt": "hello"},
+    "requiredTools": ["write_file"],
+    "requiredReads": ["notes.txt"],
+    "readsBeforeMutation": ["notes.txt"],
+    "forbiddenWritePaths": ["greeting.txt"],
+    "checks": [],
+    "forbiddenTools": ["publish"]
+  },
   "denial-forbidden-effect": {
     "unchanged": true,
     "requiredTools": ["read_file"],

@@ -246,6 +246,15 @@
       "deploymentAuthorized": false,
       "blockerSource": "tool"
     },
+    "denial-method-not-goal": {
+      "mode": "quick",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "tool"
+    },
     "denial-reason-forbids-effect": {
       "mode": "quick",
       "autonomous": false,

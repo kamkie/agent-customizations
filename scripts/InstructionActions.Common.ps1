@@ -186,6 +186,11 @@ function Test-InstructionActionResult {
             }
         }
     }
+    foreach ($path in @(Get-ActionProperty $Expected 'forbiddenWritePaths')) {
+        if ($path -and @($Actual.calls | Where-Object { $_.tool -eq 'write_file' -and $_.path -ceq $path }).Count) {
+            $errors.Add("Write to protected path: $path")
+        }
+    }
     foreach ($check in $Expected.checks) {
         $passing = @($Actual.calls | Where-Object {
             $_.tool -eq 'run_check' -and $_.check -eq $check -and $_.result.passed -and

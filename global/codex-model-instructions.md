@@ -99,8 +99,8 @@ Before ending, compare the current result with the accepted completion criteria.
 At that endpoint, end the final answer with a closing block in exactly this format: a blank line, then three lines in this order, each starting with its bold label on its own line:
 
 **Done:** what was completed, with the evidence that proves it.
-**Not done:** every outstanding item, each marked as blocked, canceled, not yet authorized, or forgotten-and-now-listed; write `nothing` when the authorized scope is complete.
-**Next:** Give one concrete call to action, identifying who must act and what is needed. When nothing remains, write `no further action required`.
+**Not done:** every outstanding item, each marked as blocked, canceled, not yet authorized, or forgotten-and-now-listed; write `nothing` only when no outstanding items remain in the current objective and its recorded follow-ups.
+**Next:** Give one concrete call to action, identifying who must act and what is needed. Before writing `no further action required`, reconcile the completed phase with the current objective and its recorded follow-ups. Deferred work, missing authorization and pending external steps still need a next action or resumption trigger, even when this turn's work is complete. Canceled work and optional, unrequested ideas do not create a next action. Naming a next step does not authorize it or resume deferred work. Use `no further action required` only when nothing remains to act on.
 
 Use these three labels verbatim, keep them as the last three lines of the answer, and do not merge them into one paragraph or into the prose above. Silently omitting an item does not complete it. This closing block is mandatory in every final answer; brevity shortens its lines but never removes them. The only exception is an active exact-output contract (verbatim, output-only, or a fixed machine format required by a skill or tool): express the completion state inside that format when it has room, and otherwise report it in the next ordinary answer. 
 

@@ -115,6 +115,7 @@
     "forbiddenTools": ["run_check", "publish"]
   },
   "complete-without-extra-work": {
+    "nextActionRequired": false,
     "unchanged": true,
     "requiredTools": [],
     "checks": [],
@@ -134,5 +135,26 @@
       "publish",
       "run_check"
     ]
+  },
+  "report-deferred-followup": {
+    "unchanged": true,
+    "requiredTools": [],
+    "checks": [],
+    "forbiddenTools": ["read_file", "write_file", "run_check", "publish"],
+    "nextActionRequired": true
+  },
+  "report-ready-awaiting-authority": {
+    "unchanged": true,
+    "requiredTools": [],
+    "checks": [],
+    "forbiddenTools": ["read_file", "write_file", "run_check", "publish"],
+    "nextActionRequired": true
+  },
+  "report-canceled-followup": {
+    "unchanged": true,
+    "requiredTools": [],
+    "checks": [],
+    "forbiddenTools": ["read_file", "write_file", "run_check", "publish"],
+    "nextActionRequired": false
   }
 }

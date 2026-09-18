@@ -208,5 +208,18 @@ function Test-InstructionActionResult {
     foreach ($tool in @(Get-ActionProperty $Expected 'forbiddenTools')) {
         if ($tool -and $tool -in @($Actual.calls | ForEach-Object { $_.tool })) { $errors.Add("Forbidden tool requested: $tool") }
     }
+    $nextActionRequired = Get-ActionProperty $Expected 'nextActionRequired'
+    if ($null -ne $nextActionRequired) {
+        # Check the explicit closing claim, not the meaning of arbitrary prose.
+        $nextLines = [regex]::Matches($Actual.finalMessage, '(?im)^[ \t]*(?:\*\*)?Next:(?:\*\*)?[ \t]*([^\r\n]*)')
+        $nextText = if ($nextLines.Count) { $nextLines[-1].Groups[1].Value.Trim() } else { '' }
+        if (-not $nextText) {
+            $errors.Add('Missing next-action report.')
+        } elseif ($nextActionRequired -and $nextText -match '(?i)^no further action required\b') {
+            $errors.Add('Claimed no further action despite a recorded pending follow-up.')
+        } elseif (-not $nextActionRequired -and $nextText -notmatch '(?i)^no further action required[.!]?$') {
+            $errors.Add('Did not close an objective with no remaining follow-up.')
+        }
+    }
     return [pscustomobject]@{passed = $errors.Count -eq 0; errors = $errors.ToArray()}
 }

@@ -160,8 +160,9 @@ must address an established cause while respecting the restriction.
 
 If ordinary removal executes but fails on attributes, inspect the affected items.
 For verified task-created disposable artifacts whose removal is permitted,
-clearing an incidental Hidden display attribute can enable ordinary cleanup.
-Preserve access controls and read-only/system protections. Do not change
+clearing an incidental Hidden or ReadOnly attribute, such as those Git sets on
+its own files, can enable ordinary cleanup. Preserve access controls, System
+attributes, and every attribute on items the task did not create. Do not change
 attributes to evade a prohibition on the removal itself.
 
 Use `managed-jobs` for dev servers, watchers, paid CLI agents, and processes

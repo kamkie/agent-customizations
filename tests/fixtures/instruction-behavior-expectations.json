@@ -272,6 +272,14 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false
     },
+    "cleanup-readonly-git-recovery": {
+      "mode": "quick",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
     "cleanup-attribute-prohibition": {
       "mode": "quick",
       "autonomous": false,

@@ -4,10 +4,13 @@ For recurring Windows cleanup rejections, consult the known
 [forced-deletion report](https://github.com/openai/codex/issues/45403) before
 broad policy searches. In affected versions, a delete cmdlet with `-Force` can
 trigger the built-in dangerous-command check and be denied under approval mode
-`never`, even with Full access and no matching user rule. Check the actual
-session runtime version, command shape and effective policy before applying that
-diagnosis; a separate CLI on PATH or an empty user-rule match is not a substitute.
-This is a diagnostic lead, not permission to bypass a rejection.
+`never`, even with Full access and no matching user rule. A `-Force` on a
+non-deleting command, such as a listing, can trigger the same rejection when it
+is submitted in one script with a removal; run inspection and removal as
+separate commands. Check the actual session runtime version, command shape and
+effective policy before applying that diagnosis; a separate CLI on PATH or an
+empty user-rule match is not a substitute. This is a diagnostic lead, not
+permission to bypass a rejection.
 
 Starting or resuming a Codex Goal requests autonomous persistence for that goal.
 The `Start delivery campaign <tracker>` trigger below requests autonomous

@@ -170,6 +170,11 @@ function Test-InstructionActionResult {
     foreach ($tool in $Expected.requiredTools) {
         if ($tool -notin @($Actual.calls | ForEach-Object { $_.tool })) { $errors.Add("Missing tool request: $tool") }
     }
+    foreach ($path in @(Get-ActionProperty $Expected 'requiredReads')) {
+        if ($path -and -not @($Actual.calls | Where-Object { $_.tool -eq 'read_file' -and $_.path -ceq $path }).Count) {
+            $errors.Add("Missing diagnostic read: $path")
+        }
+    }
     foreach ($check in $Expected.checks) {
         $passing = @($Actual.calls | Where-Object {
             $_.tool -eq 'run_check' -and $_.check -eq $check -and $_.result.passed -and

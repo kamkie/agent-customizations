@@ -80,8 +80,16 @@ delivery unit. Apply the pilot, visible matrix, and denominator per unit.
     requires `omitted = 0`. Count a delivery unit
     as delivered only when its team-visible artifact reaches the contract's CI,
     review, and final-head state; classify local-only commits as blocked at
-    publication. Report the outcome and denominator first, then concise links,
+    publication. Keep explicitly excluded or deferred units visible without
+   treating their presence as execution authority. Report the outcome and
+   denominator first, then concise links,
     blockers, limitations, remaining merge/deploy authority, and next action.
+
+Use one current matrix and evidence record across steering and handoffs. Resolve
+stable policy once from its authoritative source, then refresh it on changes or
+required repository checkpoints. Audit reads existing validation/review evidence;
+it does not rerun valid work merely because the owner is another agent. Keep
+actual head-dependent gates fresh and return a concrete evidence gap to its owner.
 
 ## Create the Controller Prompt
 
@@ -151,7 +159,9 @@ Before relying on an audit, check for later direct user steering in the worker.
 Invalidate stale audit decisions and recover through the same owner task.
 
 Read [handoff-audit-checklist.md](references/handoff-audit-checklist.md) when a
-handoff has discrepancies, moving remote state, a terminal delivery action, or
-ownership recovery. Do not create a replacement task, worktree, branch, job, or
+handoff has discrepancies, a head moves during the audit, or exceptional
+integration/ownership recovery needs more detail. The common-path audit and
+completion steps above suffice for an unchanged, complete handoff. Do not
+create a replacement task, worktree, branch, job, or
 PR without authority; mark the original superseded before transferring
 ownership.

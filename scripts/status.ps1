@@ -49,6 +49,9 @@ foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
         instructionHashError = $instructionHashError
         modelInstructionHash = $modelInstructionHash
         modelInstructionHashError = $modelInstructionHashError
+        # File equality does not prove the unmanaged client setting or a fresh
+        # session selected this base. Never report activation as InSync.
+        modelInstructionActivation = $(if ($targetConfig.PSObject.Properties['modelInstructions']) { 'NotVerified' } else { $null })
     })
 }
 

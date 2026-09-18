@@ -10,22 +10,19 @@ remain authoritative; this skill supplies no additional permission.
 
 ## Validate the Contract Before Writes
 
-Proceed only when the task states all of the following:
+Resolve one compact worker contract: objective/acceptance and non-goals;
+accepted exact input, dependencies and owned/forbidden paths; current branch,
+worktree and locks; authorized actions and actors; applicable repository policy,
+validation, artifacts and terminal handoff. `none`/`not applicable` with a reason
+is sufficient for irrelevant fields. Discover mutable repository policy through
+its recorded sources instead of copying a second policy manual into the task.
 
-- policy sources, their consequences, precedence, and refresh points;
-- one objective, acceptance criteria, non-goals, and owned and forbidden paths;
-- exact accepted base ref and SHA or artifact version, refresh steps,
-  dependencies, exact-ref read-only inputs, worktree and branch owner, and
-  shared locks;
-- authorized writes and external actions, required actor identities, gates, and
-  explicitly forbidden actions;
-- required work, collateral documentation, validation and evidence, artifact
-  placement, delivery behavior, stop conditions, and terminal handoff fields.
-
-Treat unlisted external actions and scope as unauthorized. If the base,
-ownership, scope, lock, authority, or required evidence is missing or ambiguous,
-return `BLOCKED` before editing and identify the exact controller decision
-needed.
+Missing descriptive metadata is not automatically a whole-task blocker. Complete
+permitted read-only discovery or a prescribed refresh first, and continue
+independent authorized work. Before writes, resolve any material uncertainty in
+accepted input, ownership, lock, authority or scope with the controller/user.
+Return `BLOCKED` only when their decision or unavailable external state is
+necessary. Unlisted external effects remain unauthorized.
 
 ## Apply Direct User Steering
 
@@ -52,9 +49,11 @@ state and report the exact additional write scope or authority required.
    scope inspected. Newly discovered policy may narrow work or strengthen
    validation; it may not broaden authority or owned paths.
 2. Refresh the assigned base and prove the current worktree, branch, HEAD,
-   upstream, clean state, dependencies, and locks match the contract exactly.
-   Stop on a dirty, stale, detached, multiply owned, or mismatched state instead
-   of repairing or replacing it silently.
+   upstream, clean state, dependencies, and locks match the accepted contract.
+   A mismatch pauses affected writes. Investigate read-only, apply an explicitly
+   prescribed recovery or obtain the owner decision, and continue unaffected
+   work. Never silently replace the accepted base, absorb unrelated changes or
+   take another worker's ownership.
 3. Perform only the assigned work using the smallest coherent diff. Preserve
    unrelated work. Limit writes to the owned repository and paths. You may read
    a verified exact ref or artifact from another repository as an authoritative
@@ -73,7 +72,9 @@ state and report the exact additional write scope or authority required.
    through local preflight, commit, remote branch, draft PR/MR, tracker link,
    CI, required opposite-agent review, finding fixes, re-review, and final-head
    validation, followed by the repository-gated draft-to-ready transition when
-   authorized. Do not hand these ordinary delivery stages to replacement
+   authorized. Read and reuse valid prior evidence before launching another
+   check or review; refresh only what changed inputs or live gates invalidate.
+   Do not hand these ordinary delivery stages to replacement
    owners. Recheck live policy, actor, exact head, gates, and unresolved
    feedback before each terminal action. Treat any post-review commit as
    invalidating affected CI and review evidence.

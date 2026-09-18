@@ -12,8 +12,10 @@ which remains authoritative for deciding where a rule belongs.
 2. Read the complete canonical instruction or `SKILL.md`, every reference
    required by the changed behavior, and the relevant target mapping in
    `config/manifest.json` before editing.
-   For global guidance, read `global/shared.md` and the applicable target
-   overlay; the installed instruction is their ordered composition.
+   For global guidance, read `global/shared.md` and the affected target fragments.
+   The manifest composes shared policy into Codex's base and Claude's global file;
+   Codex AGENTS.md contains only its overlay. Validate the generated composition,
+   not an individual fragment.
 3. Classify each new or changed rule by ownership. Keep stable personal defaults
    in global guidance, repeated portable workflows in skills, and repository
    contracts in the repository that owns them.
@@ -25,6 +27,11 @@ which remains authoritative for deciding where a rule belongs.
    configuration as durable instructions.
 
 ## Maintain agent instructions
+
+Keep a short preservation map in the PR when consolidating rules: old owner,
+new canonical owner, retained boundaries and affected checks. Do not keep two
+editable copies or import private incident histories as policy. Use the ordered
+manifest sources to share text; each agent must load the common policy once.
 
 Before editing a repository instruction file, check whether it briefly defines,
 where applicable:
@@ -129,8 +136,9 @@ Record the exact targets, cases, observed results, and retained trace location.
 For continuation changes, preserve the question-only and stop cases and inject
 corrections, side questions, and cancellation of secondary work between actions.
 Score actual effects and remaining checks, not promises to continue. Inspect the
-retained final messages for completed work, outstanding items and next action;
-the action scorer does not establish semantic completeness of free-text reports.
+retained final messages for completed work, outstanding items and next action.
+The scorer checks the closing format and selected completion boundaries; it
+does not establish the full semantic accuracy of free-text reports.
 Compare a failed unchanged boundary case against the unchanged source before
 attributing it to the new instructions; retain both results without weakening
 the expectation or calling the failing boundary verified.

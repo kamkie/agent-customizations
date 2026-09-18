@@ -12,7 +12,7 @@ param(
 
     # Replacement for Codex's built-in model instructions. The Codex client runs
     # with --ignore-user-config, so the file is passed explicitly. Defaults to
-    # the manifest's reviewed Codex modelInstructions source, which is the
+    # the manifest's composed Codex modelInstructions sources, which are the
     # configuration the shared rules are written against.
     [string]$CodexModelInstructionsFile,
 
@@ -31,10 +31,7 @@ if ($CodexModelInstructionsFile) {
 . (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $manifest = Get-CustomizationManifest
-if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $null -ne $manifest.targets.codex.PSObject.Properties['modelInstructions']) {
-    $CodexModelInstructionsFile = Join-Path $repositoryRoot ([string]$manifest.targets.codex.modelInstructions.source)
-    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Reviewed Codex model instructions file not found: $CodexModelInstructionsFile" }
-}
+$useReviewedCodexInstructions = -not $CodexModelInstructionsFile -and -not $StockCodexInstructions
 $fixtureRoot = Join-Path $repositoryRoot 'tests\fixtures'
 $casesPath = Join-Path $fixtureRoot 'instruction-behavior-cases.json'
 $expectationsPath = Join-Path $fixtureRoot 'instruction-behavior-expectations.json'
@@ -72,6 +69,12 @@ if ($ownsOutputDirectory -and
     throw "Refusing to use an automatic evaluation path outside the system temporary directory: $resolvedOutputDirectory"
 }
 $null = New-Item -ItemType Directory -Path $resolvedOutputDirectory -Force
+if ($useReviewedCodexInstructions -and 'codex' -in $requestedTargets) {
+    $CodexModelInstructionsFile = Join-Path $resolvedOutputDirectory 'codex-model-instructions.md'
+    [IO.File]::WriteAllText($CodexModelInstructionsFile,
+        (Get-CustomizationInstructionContent -Target $manifest.targets.codex -Kind modelInstructions),
+        [Text.UTF8Encoding]::new($false))
+}
 
 function Write-CompiledInstructions {
     param(
@@ -83,6 +86,11 @@ function Write-CompiledInstructions {
     $targetProperty = $manifest.targets.PSObject.Properties[$AgentTarget]
     if (-not $targetProperty) { throw "Unsupported instruction target: $AgentTarget" }
     $content = Get-CustomizationInstructionContent -Target $targetProperty.Value
+    if ($AgentTarget -eq 'codex' -and $StockCodexInstructions) {
+        # Keep the same personal policy when comparing the stock base. In this
+        # explicit comparison it is loaded through AGENTS.md, not the base.
+        $content = Get-CustomizationInstructionContent -Sources (@('global/shared.md') + @($targetProperty.Value.instructions.sources))
+    }
 
     switch ($InstructionSet) {
         'global' { }

@@ -11,7 +11,7 @@ function Get-CustomizationManifest {
     }
 
     $manifest = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-    if ($manifest.schemaVersion -ne 4) {
+    if ($manifest.schemaVersion -ne 5) {
         throw "Unsupported customization manifest schema: $($manifest.schemaVersion)"
     }
     return $manifest
@@ -87,15 +87,24 @@ function Test-FilesEqual {
 }
 
 function Get-CustomizationInstructionContent {
-    param([Parameter(Mandatory)]$Target)
+    param(
+        [Parameter(Mandatory, ParameterSetName = 'Target')]$Target,
+        [Parameter(ParameterSetName = 'Target')]
+        [ValidateSet('instructions', 'modelInstructions')][string]$Kind = 'instructions',
+        [Parameter(Mandatory, ParameterSetName = 'Sources')][string[]]$Sources
+    )
 
     $repositoryRoot = Get-CustomizationRepositoryRoot
-    $sourcesProperty = $Target.instructions.PSObject.Properties['sources']
-    if (-not $sourcesProperty) { throw 'Instruction source list is missing.' }
-    $sources = @($sourcesProperty.Value)
-    if ($sources.Count -eq 0) { throw 'Instruction source list is empty.' }
+    if ($PSCmdlet.ParameterSetName -eq 'Target') {
+        $surface = $Target.PSObject.Properties[$Kind]
+        if (-not $surface) { throw "Instruction surface is missing: $Kind" }
+        $sourcesProperty = $surface.Value.PSObject.Properties['sources']
+        if (-not $sourcesProperty) { throw 'Instruction source list is missing.' }
+        $Sources = @($sourcesProperty.Value)
+    }
+    if ($Sources.Count -eq 0) { throw 'Instruction source list is empty.' }
     $parts = [Collections.Generic.List[string]]::new()
-    foreach ($source in $sources) {
+    foreach ($source in $Sources) {
         $sourcePath = Join-Path $repositoryRoot ([string]$source)
         if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
             throw "Instruction source not found: $source"
@@ -382,14 +391,13 @@ function Get-CustomizationStatus {
         State = $instructionState
     })
 
-    # A replacement for the agent's built-in model instructions, deployed as one
-    # file. The agent's config must point at it (see docs/deployment.md).
+    # Both instruction surfaces use the same ordered-source composition.
     if ($null -ne $target.PSObject.Properties['modelInstructions']) {
-        $modelSource = Join-Path $repositoryRoot ([string]$target.modelInstructions.source)
+        $modelContent = Get-CustomizationInstructionContent -Target $target -Kind modelInstructions
         $modelTarget = Join-Path $HomePath ([string]$target.modelInstructions.destination)
         $modelState = if (-not (Test-Path -LiteralPath $modelTarget -PathType Leaf)) {
             'Missing'
-        } elseif (Test-FilesEqual -Source $modelSource -Target $modelTarget) {
+        } elseif (Test-TextContentEqual -Expected $modelContent -Target $modelTarget) {
             'InSync'
         } else {
             'Different'

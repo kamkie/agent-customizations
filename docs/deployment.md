@@ -74,30 +74,26 @@ $reviewedModelHashes = @{}
 foreach ($targetName in Get-CustomizationTargetNames -Target All) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
     $liveRoot = Resolve-CustomizationHome -TargetName $targetName
-    $liveFile = Join-Path $liveRoot $targetConfig.instructions.destination
-    # Capture before reading the diff; do not refresh it after a concurrent edit.
-    $reviewedHashes[$targetName] = Get-CustomizationInstructionHash -Path $liveFile
-    if (Test-Path -LiteralPath $liveFile -PathType Leaf) {
+    foreach ($kind in @('instructions', 'modelInstructions')) {
+        $surface = $targetConfig.PSObject.Properties[$kind]
+        if (-not $surface) { continue }
+        $liveFile = Join-Path $liveRoot $surface.Value.destination
+        # Capture before the diff; do not refresh after a concurrent edit.
+        $snapshot = Get-CustomizationInstructionHash -Path $liveFile
+        if ($kind -eq 'instructions') { $reviewedHashes[$targetName] = $snapshot }
+        else { $reviewedModelHashes[$targetName] = $snapshot }
+        if ($snapshot -eq 'missing') {
+            Write-Host "$targetName $kind are missing; no live content to compare."
+            continue
+        }
         $compiledFile = [IO.Path]::GetTempFileName()
         try {
             [IO.File]::WriteAllText($compiledFile,
-                (Get-CustomizationInstructionContent -Target $targetConfig))
+                (Get-CustomizationInstructionContent -Target $targetConfig -Kind $kind))
             git diff --no-index -- $compiledFile $liveFile
-            if ($LASTEXITCODE -gt 1) { throw "Cannot compare $targetName instructions." }
+            if ($LASTEXITCODE -gt 1) { throw "Cannot compare $targetName $kind." }
         } finally {
             Remove-Item -LiteralPath $compiledFile
-        }
-    } else {
-        Write-Host "$targetName instructions are missing; no live content to compare."
-    }
-    if ($null -ne $targetConfig.PSObject.Properties['modelInstructions']) {
-        $liveModel = Join-Path $liveRoot $targetConfig.modelInstructions.destination
-        $reviewedModelHashes[$targetName] = Get-CustomizationInstructionHash -Path $liveModel
-        if (Test-Path -LiteralPath $liveModel -PathType Leaf) {
-            git diff --no-index -- $targetConfig.modelInstructions.source $liveModel
-            if ($LASTEXITCODE -gt 1) { throw "Cannot compare $targetName model instructions." }
-        } else {
-            Write-Host "$targetName model instructions are missing; no live content to compare."
         }
     }
 }
@@ -155,8 +151,8 @@ detached, or non-`main` checkouts by default. `-AllowDirty` and
 `-AllowNonMain` are explicit safeguards for exceptional use; they do not grant
 deployment authorization.
 
-Only drifted managed files are replaced. The installer composes each target's
-ordered shared and overlay instruction sources into its destination file.
+Only drifted managed files are replaced. The installer composes each instruction surface's ordered sources into its
+destination file; it uses the same composition for installation and drift checks.
 Existing files are backed up under a timestamped `customization-backups`
 directory in the selected target home, and the installer checks for remaining
 drift before it succeeds.
@@ -202,14 +198,25 @@ Sessions already running keep the hook snapshot captured at startup.
 
 ## Point Codex at the reviewed model instructions
 
-The Codex target deploys `global/codex-model-instructions.md` to
-`~/.codex/model-instructions-astra.md`. That file replaces Codex's built-in
-model instructions; it is the captured stock prompt for the current model with
-the reviewed authorization, continuation, and closing-block rules applied, so
-it must be re-based when OpenAI changes the stock prompt (compare the
-`base_instructions` recorded in a fresh session's `session_meta`).
+The Codex target composes `global/shared.md` followed by
+`global/codex-model-instructions.md` into `~/.codex/model-instructions-astra.md`.
+The shared execution contract appears only in that base; Codex's `AGENTS.md`
+contains only `global/codex-overlay.md`. Claude's `CLAUDE.md` composes
+`global/shared.md` and `global/claude-overlay.md` instead. Both agents therefore
+receive one copy of the common policy from one reviewed source.
 
-Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not
+The manifest's schema 5 uses ordered `sources` for both instruction surfaces;
+the old single model `source` is replaced, not retained as a second path.
+The model file replaces the built-in base. Its Codex-specific fragment owns
+runtime/tool/rendering behavior, while shared policy has one owner. Review
+changes to the stock base when updating Codex, without copying its conflicting
+permission and completion defaults back over the shared contract.
+
+Before replacing Codex's global AGENTS.md, verify that the effective client
+configuration selects the generated base at its actual installed path. If the
+selection is absent or wrong, resolve that activation within deployment
+authority first: the small overlay cannot supply the missing shared contract.
+Codex only loads the base when its configuration names it. `config.toml` is not
 managed by this repository; add the key once, at the top level, before any
 `[table]` section:
 
@@ -217,24 +224,65 @@ managed by this repository; add the key once, at the top level, before any
 model_instructions_file = "C:/Users/<you>/.codex/model-instructions-astra.md"
 ```
 
-Status reports the file as `ModelInstructions`; it does not verify the
-`config.toml` key. The evaluation clients ignore user configuration, so both
-evaluation scripts pass the manifest's reviewed file explicitly by default; the
-shared rules are written against that configuration. Pass another file with
-`-CodexModelInstructionsFile`, or `-StockCodexInstructions` to measure the stock
-prompt:
+Status reports file equality as `ModelInstructions` and separately reports
+`modelInstructionActivation: "NotVerified"`; zero file drift is not an activated
+or correctly selected client. The installer warns about this boundary even when
+files are already synchronized. Effective profiles, client overrides and fresh
+session loading belong to activation verification, not a partial TOML parser in
+the file installer. The evaluation clients ignore user configuration, so both
+evaluation scripts compose the manifest's reviewed base into their run output
+and pass that snapshot explicitly. That artifact is the complete base, not the
+Codex runtime fragment alone. Pass a complete replacement with
+`-CodexModelInstructionsFile`, or `-StockCodexInstructions` for a stock-base
+comparison. The stock comparison loads the same shared personal policy through
+AGENTS.md, so it measures that different instruction placement without silently
+omitting the policy:
 
 ```powershell
 pwsh ./scripts/evaluate-instructions.ps1 -Target codex
 pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -StockCodexInstructions
 ```
 
+`--ignore-user-config` does not suppress Codex's home-level AGENTS.md. Before
+claiming an isolated candidate result, inspect the native session's loaded
+instruction sources. Record any live global contribution and its hash; a
+pre-install run with old global guidance is a mixed-layer check, not proof of the
+final deployed composition. Do not edit live instructions or copy credentials
+to isolate a test. After authorized activation, verify the fresh Desktop/CLI
+session loads the generated base and small global overlay. Controlled action
+checks prove their observed tool effects; they are not a general reliability
+guarantee.
+
+## Select the reviewed OpenAI Docs skill
+
+The manifest installs this repository's `skills/openai-docs` as a personal skill.
+It does not edit the bundled `.system` skill. Codex does not merge same-name
+skills, so installation alone does not replace the bundled route. During an
+explicitly authorized activation, inspect the discovered paths and add or update
+only the bundled skill's entry in the user's existing `config.toml`:
+
+```toml
+[[skills.config]]
+path = "C:/Users/<you>/.codex/skills/.system/openai-docs/SKILL.md"
+enabled = false
+```
+
+Use the actual absolute bundled path reported by that installation. Preserve
+other settings and do not create duplicate entries. Leave the reviewed personal
+`skills/openai-docs/SKILL.md` enabled. Restart Codex and verify that its skill
+catalog selects the personal copy for this workflow. This is the documented
+[skill disable mechanism](https://learn.chatgpt.com/docs/build-skills#enable-or-disable-local-codex-skills);
+`config.toml` remains outside the installer's managed files, as with the model
+prompt selection. Without this activation step, both names may appear and the
+new route is not proven active. Never delete or patch the bundled cache to force
+selection. No configuration change is part of repository validation.
+
 ## Scope boundary
 
 For each selected target, the manifest owns:
 
 - the ordered sources composing the target's global instruction file;
-- the optional replacement model-instructions file for that target;
+- the ordered sources composing its optional replacement model-instructions file;
 - the compatible skills listed for that target;
 - the reviewed hook scripts; and
 - the reviewed hook registrations in `hooks.json` for Codex or `settings.json`

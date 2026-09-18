@@ -8,7 +8,7 @@ $claudeRoot = Join-Path $root 'claude'
 $codexFile = Join-Path $codexRoot 'AGENTS.md'
 $claudeFile = Join-Path $claudeRoot 'CLAUDE.md'
 $codexTarget = Get-CustomizationTarget -Name 'codex'
-$modelSource = Join-Path $PSScriptRoot ('../' + [string]$codexTarget.modelInstructions.source)
+$expectedModel = Get-CustomizationInstructionContent -Target $codexTarget -Kind modelInstructions
 $modelInstalled = Join-Path $codexRoot ([string]$codexTarget.modelInstructions.destination)
 $installer = Join-Path $PSScriptRoot '../scripts/install.ps1'
 $assertions = 0
@@ -122,7 +122,7 @@ try {
     }
     # The Codex model-instructions replacement installs as one managed file and
     # reports as its own status kind.
-    Assert-True ([IO.File]::ReadAllBytes($modelInstalled).Length -gt 0 -and ([IO.File]::ReadAllText($modelInstalled) -ceq [IO.File]::ReadAllText($modelSource))) 'Model instructions were not installed from the reviewed source.'
+    Assert-True ([IO.File]::ReadAllBytes($modelInstalled).Length -gt 0 -and ([IO.File]::ReadAllText($modelInstalled) -ceq $expectedModel)) 'Model instructions were not composed from the reviewed sources.'
     $modelStatus = Get-CustomizationStatus -TargetName 'codex' -HomePath $codexRoot | Where-Object Kind -eq 'ModelInstructions'
     Assert-True ($modelStatus.State -eq 'InSync') 'Installed model instructions should report InSync.'
     Add-Content -LiteralPath $modelInstalled -Value '# local drift' -Encoding utf8
@@ -130,7 +130,7 @@ try {
     Assert-True ($modelStatus.State -eq 'Different') 'Edited model instructions should report Different.'
     $acceptedModelHash = Get-CustomizationInstructionHash $modelInstalled
     Install-Expected @{ codex = Get-CustomizationInstructionHash $codexFile } -target Codex -ModelHashes @{ codex = $acceptedModelHash }
-    Assert-True ([IO.File]::ReadAllText($modelInstalled) -ceq [IO.File]::ReadAllText($modelSource)) 'Reinstall did not restore the reviewed model instructions.'
+    Assert-True ([IO.File]::ReadAllText($modelInstalled) -ceq $expectedModel) 'Reinstall did not restore the reviewed model instructions.'
     $modelBackups = @(Get-ChildItem (Join-Path $codexRoot 'customization-backups') -Recurse -File | Where-Object Name -eq $codexTarget.modelInstructions.destination)
     Assert-True ($modelBackups.Count -eq 1 -and (Get-CustomizationInstructionHash $modelBackups[0].FullName) -eq $acceptedModelHash) 'Model backup differs from the accepted live snapshot.'
     $statusOutput = @(& pwsh -NoProfile -File (Join-Path $PSScriptRoot '../scripts/status.ps1') -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot -SummaryOnly)
@@ -138,6 +138,8 @@ try {
     $report = ($statusOutput -join "`n") | ConvertFrom-Json
     $codexSummary = $report.targets | Where-Object target -eq 'codex'
     $claudeSummary = $report.targets | Where-Object target -eq 'claude'
+    Assert-True ($codexSummary.modelInstructionActivation -eq 'NotVerified') 'Synchronized files must not imply verified client activation.'
+    Assert-True ($null -eq $claudeSummary.modelInstructionActivation) 'Model selection is not applicable to Claude.'
     Assert-True ($codexSummary.modelInstructionHash -eq (Get-CustomizationInstructionHash $modelInstalled)) 'Status model hash does not identify the installed content.'
     Assert-True ($null -eq $claudeSummary.modelInstructionHash -and $null -eq $claudeSummary.modelInstructionHashError) 'Target without a model prompt must report the model hash as not applicable.'
     # A single target requires only its own key; another target stays untouched.
@@ -153,6 +155,8 @@ try {
         return @($warnings | ForEach-Object { [string]$_ })
     }
     $currentHashes = @{ codex = Get-CustomizationInstructionHash $codexFile; claude = Get-CustomizationInstructionHash $claudeFile }
+    $synchronizedWarnings = Install-CapturingWarnings $currentHashes
+    Assert-True ($synchronizedWarnings -match 'does not verify or activate') 'Already-synchronized Codex files must still disclose unverified activation.'
     $codexHookEntry = @((Get-CustomizationTarget -Name 'codex').hooks.entries)[0]
     $installedHookScript = Join-Path $codexRoot ([string]$codexHookEntry.script)
     Add-Content -LiteralPath $installedHookScript -Value '# script-only drift' -Encoding utf8

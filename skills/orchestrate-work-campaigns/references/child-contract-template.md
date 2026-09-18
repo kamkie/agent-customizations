@@ -93,7 +93,9 @@ Direct user steering:
   acquire the campaign lock when the delta touches a serialized surface;
   controller sequencing cannot veto the user's decision.
 
-Stop and return control when:
+Investigate material gaps read-only and continue unaffected authorized work.
+Pause affected writes and return for a controller/user decision when available
+records or an explicitly prescribed recovery cannot resolve one of these:
 - policy, authority, base provenance, ownership, or a required lock is ambiguous;
 - required scope expands beyond owned paths or the approved objective;
 - validation is contaminated, contradictory, or cannot support the requested claim;

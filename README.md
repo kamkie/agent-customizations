@@ -19,10 +19,14 @@ tools' live configuration directories are deployment targets.
   reading without changing its content.
 - `skills/execute-campaign-work-item` — scoped execution and evidence-backed
   handoff for one controller-assigned campaign work item.
+- `skills/extract-teams-transcript` — complete browser extraction with contiguous
+  entry and saved-file integrity checks; discovers destination repository rules.
 - `skills/lavish` — pinned, loopback-only HTML artifact review with annotations
   and guarded publishing, setup, and update operations for Codex.
 - `skills/managed-jobs` — durable supervision for long-running local processes,
   shared by Codex and Claude Code.
+- `skills/openai-docs` — local evidence for local state and current official
+  sources for external OpenAI product/API claims.
 - `skills/orchestrate-work-campaigns` — Codex-specific, visible,
   coordinator-only control of multi-task delivery campaigns.
 - `skills/shape-product-decisions` — evidence-labeled product shaping from an
@@ -65,14 +69,20 @@ tools' live configuration directories are deployment targets.
   evaluation prompts, expectations, and response contracts; none are installed
   into agent homes.
 
-Claude Code loads personal instructions from `~/.claude/CLAUDE.md` and
-personal skills from `~/.claude/skills`. Codex uses `~/.codex/AGENTS.md` and
-`~/.codex/skills`. The manifest composes `global/shared.md` with the applicable
-target overlay during installation, reuses portable skills where possible, and
-keeps tool-specific skills on their compatible target. For Codex it also deploys
-`global/codex-model-instructions.md`, a reviewed replacement for the built-in
-model instructions that `config.toml` must reference (see
-[deployment](docs/deployment.md#point-codex-at-the-reviewed-model-instructions)).
+`global/shared.md` is the single source for the execution contract and personal
+policies. Installation renders it once per agent:
+
+| Target file | Ordered sources |
+| --- | --- |
+| Codex `model-instructions-astra.md` | `global/shared.md`, `global/codex-model-instructions.md` |
+| Codex `AGENTS.md` | `global/codex-overlay.md` |
+| Claude `CLAUDE.md` | `global/shared.md`, `global/claude-overlay.md` |
+
+The Codex runtime fragment is not a complete standalone prompt; its generated
+base must be selected by `model_instructions_file`. See
+[deployment](docs/deployment.md#point-codex-at-the-reviewed-model-instructions).
+Personal skills remain under each agent's `skills` directory. The manifest
+selects compatible skills and instruction sources for each target.
 
 ## Why deployment is explicit
 

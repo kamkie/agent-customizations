@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "targets": {
     "codex": {
       "displayName": "Codex",
@@ -7,14 +7,16 @@
       "defaultHomeDirectory": ".codex",
       "instructions": {
         "sources": [
-          "global/shared.md",
           "global/codex-overlay.md"
         ],
         "destination": "AGENTS.md"
       },
       "modelInstructions": {
-        "source": "global/codex-model-instructions.md",
-        "destination": "model-instructions-astra.md"
+        "destination": "model-instructions-astra.md",
+        "sources": [
+          "global/shared.md",
+          "global/codex-model-instructions.md"
+        ]
       },
       "hooks": {
         "destination": "hooks.json",
@@ -60,8 +62,10 @@
         "deep-research",
         "dyslexia-friendly-formatter",
         "execute-campaign-work-item",
+        "extract-teams-transcript",
         "lavish",
         "managed-jobs",
+        "openai-docs",
         "orchestrate-work-campaigns",
         "shape-product-decisions",
         "shared-term",

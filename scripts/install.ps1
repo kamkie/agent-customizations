@@ -77,6 +77,9 @@ foreach ($targetName in $selectedTargets) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
     $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
     $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
+    if ($targetConfig.PSObject.Properties['modelInstructions']) {
+        Write-Warning 'Codex shared policy requires model_instructions_file to select the installed model-instructions file. Verify that setting before replacing AGENTS.md and verify a fresh session afterward. This installer manages file contents; it does not verify or activate that unmanaged setting.'
+    }
     $status = @(Get-CustomizationStatus -TargetName $targetName -HomePath $resolvedHome)
     $drift = @($status | Where-Object State -ne 'InSync')
     if ($drift.Count -eq 0) {
@@ -111,13 +114,13 @@ foreach ($targetName in $selectedTargets) {
 
         $modelState = $status | Where-Object Kind -eq 'ModelInstructions' | Select-Object -First 1
         if ($modelState -and $modelState.State -ne 'InSync') {
-            $modelSource = Join-Path $repositoryRoot ([string]$targetConfig.modelInstructions.source)
+            $modelContent = Get-CustomizationInstructionContent -Target $targetConfig -Kind modelInstructions
             $modelTarget = Join-Path $resolvedHome ([string]$targetConfig.modelInstructions.destination)
             if (Test-Path -LiteralPath $modelTarget -PathType Leaf) {
                 Copy-Item -LiteralPath $modelTarget -Destination (Join-Path $backupRoot ([string]$targetConfig.modelInstructions.destination)) -Force
             }
             $temporaryModel = Join-Path $resolvedHome ('.model-instructions.install-' + [guid]::NewGuid().ToString('N'))
-            Copy-Item -LiteralPath $modelSource -Destination $temporaryModel -Force
+            [IO.File]::WriteAllText($temporaryModel, $modelContent, [Text.UTF8Encoding]::new($false))
             Move-Item -LiteralPath $temporaryModel -Destination $modelTarget -Force
         }
 

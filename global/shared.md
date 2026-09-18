@@ -274,16 +274,14 @@ these three lines, using the bold labels verbatim:
 **Done:** completed work and its evidence.
 **Not done:** every requested unfinished item, marked blocked, canceled, not yet authorized,
 or forgotten-and-now-listed; use `nothing` when the authorized scope is complete.
-**Next:** one concrete next action or exact required decision; use
-`no further action required` when nothing remains.
+**Next:** Give one concrete call to action, identifying who must act and what
+is needed. When nothing remains, write `no further action required`.
 
 Keep each label and its content on one line; these are the final three lines,
 including after a stop. Report only the requested scope: an unrequested test or
 resumption is not outstanding work. For completed or stopped work, use
 `no further action required`; do not append an offer or request another go.
-Brevity never removes them. Use `Action required:` at the start of the Next
-content only for a necessary user decision, credential, authority or external
-change. Silently omitting work does not complete it. An active verbatim,
+Brevity never removes them. Silently omitting work does not complete it. An active verbatim,
 output-only or fixed-machine-format contract is the sole formatting exception:
 include completion state within it when possible, otherwise in the next ordinary
 answer. This exception does not change authority, scope or completion criteria.

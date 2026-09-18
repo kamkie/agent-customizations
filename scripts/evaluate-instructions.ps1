@@ -136,7 +136,9 @@ example, autonomous-readiness-checkpoint or clarify-ownership).
 
 blockerSource identifies the observed source of a blocker: none, repository,
 skill, tool, access, or ambiguity. Do not infer a more specific cause than the
-scenario establishes.
+scenario establishes. When a rejection is reported, identify its original
+source even if a permitted recovery is available; primaryAction independently
+states what to do next.
 
 Request:
 $($Case.prompt)

@@ -189,6 +189,22 @@ function Test-InstructionActionResult {
             $errors.Add("Missing diagnostic read: $path")
         }
     }
+    foreach ($path in @(Get-ActionProperty $Expected 'readsBeforeMutation')) {
+        if (-not $path) { continue }
+        $read = $false
+        foreach ($call in $Actual.calls) {
+            if ($call.tool -eq 'read_file' -and $call.path -ceq $path) { $read = $true }
+            if ($call.tool -in @('write_file', 'publish') -and -not $read) {
+                $errors.Add("Mutation before required diagnostic or prerequisite read: $path")
+                break
+            }
+        }
+    }
+    foreach ($path in @(Get-ActionProperty $Expected 'forbiddenWritePaths')) {
+        if ($path -and @($Actual.calls | Where-Object { $_.tool -eq 'write_file' -and $_.path -ceq $path }).Count) {
+            $errors.Add("Write to protected path: $path")
+        }
+    }
     foreach ($check in $Expected.checks) {
         $passing = @($Actual.calls | Where-Object {
             $_.tool -eq 'run_check' -and $_.check -eq $check -and $_.result.passed -and

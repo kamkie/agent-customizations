@@ -297,6 +297,23 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false,
       "blockerSource": "repository"
+    },
+    "unstated-gate-known-fact": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
+    },
+    "brief-unaddressed-merge": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
     }
   }
 }

@@ -38,7 +38,9 @@
         "recheck-and-diagnose",
         "autonomous-readiness-checkpoint",
         "inventory-authority-checkpoint",
-        "deliver-pilot-before-fanout"
+        "deliver-pilot-before-fanout",
+        "refresh-live-state",
+        "obtain-evidence-yourself"
       ]
     },
     "publicationAuthorized": { "type": "boolean" },

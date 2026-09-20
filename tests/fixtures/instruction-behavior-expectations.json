@@ -314,6 +314,22 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false,
       "blockerSource": "none"
+    },
+    "pending-ask-user-may-have-acted": {
+      "mode": "standard",
+      "autonomous": false,
+      "primaryAction": "refresh-live-state",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
+    },
+    "user-relay-available-check": {
+      "mode": "investigation",
+      "autonomous": false,
+      "primaryAction": "obtain-evidence-yourself",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
     }
   }
 }

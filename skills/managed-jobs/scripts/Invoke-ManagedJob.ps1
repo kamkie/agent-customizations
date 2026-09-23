@@ -26,7 +26,6 @@ param(
     [int]$ReadinessTimeoutSeconds = 30,
     [int]$Tail = 100,
     [switch]$Follow,
-    [switch]$Async,
     [ValidateRange(1, 86400)]
     [Nullable[int]]$TimeoutSeconds,
     [AllowEmptyString()]
@@ -62,9 +61,6 @@ if ($Action -ne 'send-key' -and $PSBoundParameters.ContainsKey('Key')) {
 }
 if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
     throw '-MaxLines is valid only for capture.'
-}
-if ($Action -ne 'wait' -and $PSBoundParameters.ContainsKey('Async')) {
-    throw '-Async is valid only for wait.'
 }
 if ($Action -ne 'wait' -and $PSBoundParameters.ContainsKey('TimeoutSeconds')) {
     throw '-TimeoutSeconds is valid only for wait.'
@@ -1086,47 +1082,7 @@ switch ($Action) {
     }
     'wait' {
         if (-not $Id) { throw '-Id is required for wait.' }
-        if ($Async) {
-            $target = Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id)
-            $root = Get-ManagedJobRoot
-            $targetProperties = $target.PSObject.Properties.Name
-            $ownerAgent = if ($targetProperties -contains 'ownerAgent') { [string]$target.ownerAgent } else { '' }
-            $ownerSessionId = if ($targetProperties -contains 'ownerSessionId') { [string]$target.ownerSessionId } else { '' }
-            $targetLifetime = if ($targetProperties -contains 'lifetime' -and
-                $target.lifetime -in @('turn', 'session', 'persistent')) {
-                [string]$target.lifetime
-            } else {
-                'Persistent'
-            }
-            if ($targetLifetime -in @('turn', 'session') -and (-not $ownerAgent -or -not $ownerSessionId)) {
-                $targetLifetime = 'Persistent'
-            }
-            $waiterParameters = @{
-                StateRoot = $root
-                Name = "wait-$Id"
-                Kind = 'completion-wait'
-                Executable = (Get-Command pwsh -ErrorAction Stop).Source
-                Arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath,
-                    'wait', '-Id', $Id, '-StateRoot', $root)
-                WorkingDirectory = $PSScriptRoot
-                Lifetime = $targetLifetime
-            }
-            if ($ownerAgent -and $ownerSessionId) {
-                $waiterParameters.OwnerAgent = $ownerAgent
-                $waiterParameters.OwnerSessionId = $ownerSessionId
-            }
-            if ($null -ne $TimeoutSeconds) {
-                $waiterParameters.Arguments += @('-TimeoutSeconds', [string]$TimeoutSeconds)
-            }
-            $waiter = (& $PSCommandPath start @waiterParameters | Out-String) | ConvertFrom-Json
-            [pscustomobject]@{
-                targetId = $Id
-                waiter = $waiter
-                resultPath = Get-ManagedJobFile -Id $Id
-            } | ConvertTo-Json -Depth 12
-        } else {
-            Wait-ManagedJobCompletion -JobId $Id -TimeoutSeconds $TimeoutSeconds | ConvertTo-Json -Depth 12
-        }
+        Wait-ManagedJobCompletion -JobId $Id -TimeoutSeconds $TimeoutSeconds | ConvertTo-Json -Depth 12
     }
     'wait-ready' {
         if (-not $Id) { throw '-Id is required for wait-ready.' }

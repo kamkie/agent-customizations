@@ -32,6 +32,11 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
   until the job is completed, failed, stopped, or orphaned and returns the final
   record, including `exitCode` when the host recorded one. Check that status and
   exit code before treating the work as successful; an orphan may have no exit code.
+- Keep that tool call pending until it returns. If its transport yields a
+  session ID, wait on that session and, where supported, combine transport waits
+  inside one tool invocation so the model stays idle. Do not make repeated
+  agent-side `status` calls. A background job does not wake an idle agent by
+  itself.
 - For finite work, use `-TimeoutSeconds` to bound the wait:
 
   ```powershell
@@ -43,22 +48,6 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
   A timeout leaves the target job running. Stop it separately if it is no longer needed.
 - `wait` follows the job record, so it also finishes when a completed
   `-KeepTerminalOpen` job leaves its visible terminal open.
-- To start a supervised wait without blocking this call, use:
-
-  ```powershell
-  $test = (& $jobs start -Name tests -Executable dotnet -Arguments @('test') `
-      -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
-  $pending = (& $jobs wait -Id $test.id -Async -TimeoutSeconds 600 | Out-String) | ConvertFrom-Json
-  # $pending.waiter.id identifies the companion managed job.
-  # After it finishes, read the target's final record:
-  & $jobs status -Id $pending.targetId
-  ```
-
-  The companion inherits the target's lifetime when the target has owner
-  metadata. Its own successful exit means the target reached a terminal record;
-  inspect the target's status and exit code to determine the work result. A
-  timeout fails the companion and leaves the target running. Stop an unneeded
-  companion with its waiter ID if the target is intentionally left running.
 - Treat arguments, environment values, records, and logs as non-secret.
 - Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen`
   leaves a completed terminal for the user to close manually.

@@ -352,28 +352,6 @@ try {
     $failedWait = (& $controller wait -StateRoot $stateRoot -Id $failedWaitJob.id -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
     Assert-True ($failedWait.status -eq 'failed' -and $failedWait.exitCode -eq 19 -and $failedWait.finishedAtUtc) `
         'Completion wait should block through a failing child and return its real exit code.'
-    $asyncTarget = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-async-target' -Executable $pwsh `
-        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 2; exit 23') | Out-String) | ConvertFrom-Json
-    $asyncWait = (& $controller wait -StateRoot $stateRoot -Id $asyncTarget.id -Async -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
-    Assert-True ($asyncWait.targetId -eq $asyncTarget.id -and $asyncWait.waiter.id -and
-        $asyncWait.waiter.kind -eq 'completion-wait' -and $asyncWait.waiter.lifetime -eq $asyncTarget.lifetime) `
-        'Async wait should return a supervised companion with the target lifetime.'
-    $asyncWaiterResult = (& $controller wait -StateRoot $stateRoot -Id $asyncWait.waiter.id -TimeoutSeconds 20 | Out-String) | ConvertFrom-Json
-    $asyncTargetResult = Get-JobStatus -Id $asyncTarget.id
-    Assert-True ($asyncWaiterResult.status -eq 'completed' -and $asyncTargetResult.status -eq 'failed' -and
-        $asyncTargetResult.exitCode -eq 23 -and $asyncWait.resultPath -eq (Get-ManagedJobFile -Id $asyncTarget.id)) `
-        'The async companion should finish after the target and leave its final result in the target record.'
-    $legacyId = '20000101-000000-lifecycle-legacy-wait-000001'
-    Write-ManagedJob -Path (Get-ManagedJobFile -Id $legacyId) -Job ([pscustomobject]@{
-        id = $legacyId; name = 'lifecycle-legacy-wait'; status = 'completed'; exitCode = 0
-        createdAtUtc = '2000-01-01T00:00:00Z'; finishedAtUtc = '2000-01-01T00:00:01Z'
-    })
-    $legacyWait = (& $controller wait -StateRoot $stateRoot -Id $legacyId -Async -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
-    Assert-True ($legacyWait.waiter.lifetime -eq 'persistent') `
-        'Async wait should use a persistent companion for a legacy record without ownership metadata.'
-    $legacyWaiterResult = (& $controller wait -StateRoot $stateRoot -Id $legacyWait.waiter.id -TimeoutSeconds 20 | Out-String) | ConvertFrom-Json
-    Assert-True ($legacyWaiterResult.status -eq 'completed') `
-        'A legacy terminal record should complete its async companion.'
     $timeoutTarget = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-wait-timeout' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
     $activeIds.Add($timeoutTarget.id)
@@ -384,11 +362,6 @@ try {
     Assert-True ($waitTimeoutError -match 'did not complete within 1 seconds' -and
         (Get-JobStatus -Id $timeoutTarget.id).status -in @('starting', 'running')) `
         'A wait timeout should report its bound and leave the target running.'
-    $asyncTimeout = (& $controller wait -StateRoot $stateRoot -Id $timeoutTarget.id -Async -TimeoutSeconds 1 | Out-String) | ConvertFrom-Json
-    $asyncTimeoutResult = (& $controller wait -StateRoot $stateRoot -Id $asyncTimeout.waiter.id -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
-    Assert-True ($asyncTimeoutResult.status -eq 'failed' -and
-        (Get-JobStatus -Id $timeoutTarget.id).status -in @('starting', 'running')) `
-        'An async wait timeout should fail only its companion and leave the target running.'
     $null = & $controller stop -StateRoot $stateRoot -Id $timeoutTarget.id
     $activeIds.Remove($timeoutTarget.id) | Out-Null
     for ($raceAttempt = 0; $raceAttempt -lt 3; $raceAttempt++) {

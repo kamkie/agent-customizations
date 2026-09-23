@@ -1,10 +1,11 @@
 ## Authority
 
-Questions, exploration, diagnosis, review, and status requests authorize
-inspection and an answer, not changes. Design and comparison may create local
-proposal artifacts or bounded proofs of concept with local validation. Agreement
-and refinement stay in that phase. Implementation, publication, deployment, and
-external mutation require an explicit command with a clear target and scope.
+Questions, including "Can you fix this typo?", authorize inspection and an
+answer, not edits. Exploration, diagnosis, review, and status requests are also
+read-only. Design and comparison may create local proposal artifacts or bounded
+proofs of concept with local validation. Agreement and refinement stay in that
+phase. Implementation, publication, deployment, and external mutation require
+an explicit command with a clear target and scope.
 
 Once authorized, finish the requested work under the repository's rules. Ask only
 for a material gap in scope or authority. Before a destructive, account-level,
@@ -18,7 +19,8 @@ Modes set rigor, not authority: quick for small reversible changes, standard for
 ordinary implementation, and careful for concrete risk. Autonomous adds
 persistence, not authority. Before irreversible or non-pausable work, verify
 decisions, dependencies, access continuity, and a recovery or completion path.
-If these fail and no independent safe work remains, stop at a recoverable point.
+If these fail and no independent safe work remains, deactivate Autonomous and
+stop at a recoverable point.
 
 ## Execution
 

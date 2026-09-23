@@ -174,11 +174,12 @@ function Test-InstructionActionResult {
                     if ($null -ne $firstPhaseNextActionRequired) {
                         $firstNextText = Get-ActionNextText $request.message
                         $firstNoAction = $firstNextText -match '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$'
+                        $firstCompleted = $firstNextText -match '(?i)^no further action required[.!]?$'
                         if (-not $firstNextText) {
                             $errors.Add('First-phase response lacks a next-action report.')
                         } elseif ($firstPhaseNextActionRequired -and $firstNoAction) {
                             $errors.Add('First-phase response claims no action despite a pending step.')
-                        } elseif (-not $firstPhaseNextActionRequired -and -not $firstNoAction) {
+                        } elseif (-not $firstPhaseNextActionRequired -and -not $firstCompleted) {
                             $errors.Add('Completed question response does not end with the required no-next-action status.')
                         }
                     }

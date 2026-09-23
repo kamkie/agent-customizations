@@ -60,7 +60,7 @@
       "deploymentAuthorized": false
     },
     "authorized-safe-next-step": {
-      "autonomous": false,
+      "autonomous": true,
       "primaryAction": "continue-authorized-work",
       "publicationAuthorized": true,
       "mergeAuthorized": false,
@@ -113,7 +113,6 @@
       "deploymentAuthorized": false
     },
     "autonomous-expiring-session": {
-      "autonomous": false,
       "primaryAction": "autonomous-readiness-checkpoint"
     },
     "campaign-inventory-only": {
@@ -145,7 +144,6 @@
       "deploymentAuthorized": false
     },
     "autonomous-irreversible-unverified": {
-      "autonomous": false,
       "primaryAction": "autonomous-readiness-checkpoint",
       "publicationAuthorized": false,
       "mergeAuthorized": false,
@@ -167,7 +165,6 @@
       "blockerSource": "none"
     },
     "autonomous-safe-work-exhausted": {
-      "autonomous": false,
       "primaryAction": "autonomous-readiness-checkpoint",
       "publicationAuthorized": false,
       "mergeAuthorized": false,

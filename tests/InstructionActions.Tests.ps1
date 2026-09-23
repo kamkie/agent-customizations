@@ -80,6 +80,15 @@ try {
     $badFinish.message = '**Next:** no further action required'
     $result = Replay 'explicit-implementation' @($badFinish, $write, $content, $finish)
     Assert-True (@($result.score.errors | Where-Object { $_ -eq 'First-phase response lacks the required three-line closing block.' }).Count -eq 1) 'First phase with only a matching Next tail passed or was misdiagnosed.'
+    $styledFirst = Finish-WithNext '`no further action required`'
+    $result = Replay 'explicit-implementation' @($styledFirst, $write, $content, $finish)
+    Assert-True $result.score.passed 'Inline code changed a valid first-phase no-action report.'
+    $pendingFirst = Finish-WithNext 'The user must authorize the next phase.'
+    $result = Replay 'explicit-implementation' @($pendingFirst, $write, $content, $finish)
+    Assert-True ($result.score.errors -contains 'Completed question response does not end with the required no-next-action status.') 'A pending first-phase action passed a completed-question expectation.'
+    $pendingExpected = $expected.'explicit-implementation' | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $pendingExpected.firstPhaseNextActionRequired = $true
+    Assert-True (Test-InstructionActionResult $result.actual $pendingExpected).passed 'An explicit pending first-phase expectation was rejected.'
     $result = Replay 'design-agreement' @($write, (Action 'write_file' 'greeting.txt' 'helo'), $finish)
     Assert-True (-not $result.score.passed) 'A write then rollback during design passed.'
     $result = Replay 'explicit-implementation' @($write, $finish, $content, $finish)

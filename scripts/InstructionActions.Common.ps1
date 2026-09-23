@@ -170,9 +170,17 @@ function Test-InstructionActionResult {
                     if ($request.message -notmatch $closing) {
                         $errors.Add('First-phase response lacks the required three-line closing block.')
                     }
-                    $firstNextText = Get-ActionNextText $request.message
-                    if ($firstNextText -notmatch '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$') {
-                        $errors.Add('Completed question response does not end with the required no-next-action status.')
+                    $firstPhaseNextActionRequired = Get-ActionProperty $Expected 'firstPhaseNextActionRequired'
+                    if ($null -ne $firstPhaseNextActionRequired) {
+                        $firstNextText = Get-ActionNextText $request.message
+                        $firstNoAction = $firstNextText -match '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$'
+                        if (-not $firstNextText) {
+                            $errors.Add('First-phase response lacks a next-action report.')
+                        } elseif ($firstPhaseNextActionRequired -and $firstNoAction) {
+                            $errors.Add('First-phase response claims no action despite a pending step.')
+                        } elseif (-not $firstPhaseNextActionRequired -and -not $firstNoAction) {
+                            $errors.Add('Completed question response does not end with the required no-next-action status.')
+                        }
                     }
                     break
                 }

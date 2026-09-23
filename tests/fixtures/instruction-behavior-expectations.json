@@ -59,7 +59,7 @@
     },
     "design-to-explicit-implementation": {
       "mode": "standard",
-      "autonomous": false,
+      "autonomous": true,
       "primaryAction": "implement-and-deliver",
       "publicationAuthorized": true,
       "mergeAuthorized": false,

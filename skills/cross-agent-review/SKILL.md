@@ -26,20 +26,28 @@ Write the focus file, then run one round. Resolve `$skill` to this file's
 directory.
 
 ```powershell
+$focusPath = Join-Path ([IO.Path]::GetTempPath()) ('review-focus-' + [guid]::NewGuid().ToString('N') + '.md')
 @(
-    '<what this change is meant to do, in one sentence>',
-    '<each unresolved finding carried forward, with the reason you did not fix it>',
-    'Finish with one line: ANOTHER ROUND: yes or no, plus one sentence of justification.'
-) -join [Environment]::NewLine | Set-Content -LiteralPath "$env:TEMP/cross-agent-focus.md" -Encoding utf8
+    '<describe the requested behavior and changed scope>',
+    'Finish with ANOTHER ROUND: yes or no and one sentence explaining why.'
+) -join [Environment]::NewLine | Set-Content -LiteralPath $focusPath -Encoding utf8
 
 pwsh -NoProfile -File "$skill/scripts/Invoke-CrossAgentReview.ps1" `
-    -Direction to-codex -FocusFile "$env:TEMP/cross-agent-focus.md"
+    -Direction to-codex -FocusFile $focusPath
 ```
 
 ```bash
+focus_file=$(mktemp "${TMPDIR:-/tmp}/review-focus.XXXXXXXX.md")
+printf '%s\n' '<describe the requested behavior and changed scope>' \
+    'Finish with ANOTHER ROUND: yes or no and one sentence explaining why.' > "$focus_file"
 bash "$skill/scripts/invoke-cross-agent-review.sh" \
-    --direction to-codex --focus-file "${TMPDIR:-/tmp}/cross-agent-focus.md"
+    --direction to-codex --focus-file "$focus_file"
 ```
+
+Replace the explicit description placeholder before invoking. Later rounds append
+only unresolved findings and their current disposition to this same task-owned
+focus file. Remove that exact file after the review ends; never use a cleanup
+glob that can match another task's review input.
 
 - `-Direction`/`--direction`: `to-codex` when Claude implements, `to-claude` when
   Codex implements.
@@ -47,8 +55,6 @@ bash "$skill/scripts/invoke-cross-agent-review.sh" \
   with `-Lifetime Session`; the default turn lifetime kills the reviewer when the
   turn ends while waiting. Read the verdict and result JSON from the job log as
   soon as they appear rather than waiting only for the job to exit.
-- **Drop the second line in round 1** — nothing is carried forward yet. Sending
-  the placeholder as literal text produces a bogus prompt.
 - Omit the base in round 1. In every later round pass `-Base`/`--base` with the
   exact head the previous round reviewed.
 - `to-claude` requires an open pull request. Round 1 uses Claude's built-in PR
@@ -87,7 +93,12 @@ clean review or a routine finding resolved in the same round.
 - Commit one fix per finding, crediting the reviewing engine with the trailer the
   repository defines, or `Co-Authored-By: Codex <noreply@openai.com>` /
   `Co-Authored-By: Claude <noreply@anthropic.com>`.
-- Run the repository's own validation commands before the round ends.
+- Account for the repository's required validation before closing the round.
+  Reuse recorded results whose inputs and validity conditions still match. Read
+  an existing review/test record before reporting it missing or launching a
+  duplicate. A read-only reviewer need not rerun the author's successful tests.
+- For an ownership/portability objection, cite the owning contract. Passing
+  behavior tests does not prove the rule belongs in a global or public source.
 - **Decide by the repair's effect.** Require another scoped review when changes
   since the last reviewed head alter behavior or introduce meaningful risk.
   Instruction changes that alter agent decisions count as behavior changes.
@@ -103,7 +114,8 @@ clean review or a routine finding resolved in the same round.
   runs consume nothing. Only the user can increase the budget. A user-requested
   round adds one and runs. Otherwise use remaining rounds only for behavior or
   material risk changes; collect a reviewer vote when available and record the
-  implementer's decision.
+  implementer's decision. Exhausting the budget does not waive repository
+  gates; do not offer "ready as is" as a substitute for required review.
 - Before handoff, account for every commit after the last reviewed head: reviewed
   in a later range, or inspected as behavior-neutral with targeted validation.
   Never describe an unreviewed commit as reviewed. Unclassified or materially

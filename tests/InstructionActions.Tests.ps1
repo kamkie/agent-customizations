@@ -39,9 +39,17 @@ try {
     $content = Action 'run_check' '' '' 'content'
     $publish = Action 'publish'
     $notes = Action 'write_file' 'notes.txt' 'checked'
+    $editFirst = Finish-WithNext 'say `edit`'
+    $editFirst.message = @'
+greeting.txt contains `helo`; the correction is `hello`.
+
+**Done:** identified the typo.
+**Not done:** file edit.
+**Next:** say `edit`
+'@
     $plans = @{
         'design-agreement' = @($finish)
-        'explicit-implementation' = @((Action 'read_file' 'greeting.txt'), $finish, $write, $content, $finish)
+        'explicit-implementation' = @((Action 'read_file' 'greeting.txt'), $editFirst, $write, $content, $finish)
         'continue-after-check' = @($write, $format, $content, $finish)
         'stop-after-write' = @($write, $finish)
         'publication-blocked' = @($publish, $notes, $format, $content, $finish)
@@ -76,24 +84,25 @@ try {
     $result = Replay 'complete-without-extra-work' @($badFinish)
     Assert-True (-not $result.score.passed) 'Invented action after completion passed.'
     $result = Replay 'explicit-implementation' @($badFinish, $write, $content, $finish)
-    Assert-True (-not $result.score.passed) 'Unrequested implementation invitation after a completed question passed.'
+    Assert-True ($result.score.errors -contains 'First-phase next action does not include required word: edit') 'The first-phase action ignored the user-selected word.'
     $badFinish.message = '**Next:** no further action required'
     $result = Replay 'explicit-implementation' @($badFinish, $write, $content, $finish)
     Assert-True (@($result.score.errors | Where-Object { $_ -eq 'First-phase response lacks the required three-line closing block.' }).Count -eq 1) 'First phase with only a matching Next tail passed or was misdiagnosed.'
-    $styledFirst = Finish-WithNext '`no further action required`'
-    $result = Replay 'explicit-implementation' @($styledFirst, $write, $content, $finish)
-    Assert-True $result.score.passed 'Inline code changed a valid first-phase no-action report.'
+    $result = Replay 'explicit-implementation' @($editFirst, $write, $content, $finish)
+    Assert-True $result.score.passed 'Inline code changed a valid first-phase edit call to action.'
+    $missingDetailFirst = Finish-WithNext 'say `edit`'
+    $result = Replay 'explicit-implementation' @($missingDetailFirst, $write, $content, $finish)
+    Assert-True ($result.score.errors -contains 'First-phase response lacks an answer before the closing block.') 'A status block alone passed as a full answer.'
+    Assert-True ($result.score.errors -contains 'First-phase response omits required detail: helo') 'A closing block without the observed typo passed as a full answer.'
     $placeholderFirst = Finish-WithNext 'N/A'
     $result = Replay 'explicit-implementation' @($placeholderFirst, $write, $content, $finish)
-    Assert-True ($result.score.errors -contains 'Completed question response does not end with the required no-next-action status.') 'A placeholder passed the explicit first-phase completion phrase.'
+    Assert-True ($result.score.errors -contains 'First-phase response claims no action despite a pending step.') 'A placeholder passed the pending edit expectation.'
     $pendingFirst = Finish-WithNext 'The user must authorize the next phase.'
     $result = Replay 'explicit-implementation' @($pendingFirst, $write, $content, $finish)
-    Assert-True ($result.score.errors -contains 'Completed question response does not end with the required no-next-action status.') 'A pending first-phase action passed a completed-question expectation.'
-    $pendingExpected = $expected.'explicit-implementation' | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-    $pendingExpected.firstPhaseNextActionRequired = $true
-    Assert-True (Test-InstructionActionResult $result.actual $pendingExpected).passed 'An explicit pending first-phase expectation was rejected.'
-    $result = Replay 'explicit-implementation' @($styledFirst, $write, $content, $finish)
-    Assert-True ((Test-InstructionActionResult $result.actual $pendingExpected).errors -contains 'First-phase response claims no action despite a pending step.') 'A no-action first phase passed an explicit pending expectation.'
+    Assert-True ($result.score.errors -contains 'First-phase next action does not include required word: edit') 'A generic first-phase action passed without the user-selected word.'
+    $noActionFirst = Finish-WithNext '`no further action required`'
+    $result = Replay 'explicit-implementation' @($noActionFirst, $write, $content, $finish)
+    Assert-True ($result.score.errors -contains 'First-phase response claims no action despite a pending step.') 'A no-action first phase passed the pending edit expectation.'
     $result = Replay 'design-agreement' @($write, (Action 'write_file' 'greeting.txt' 'helo'), $finish)
     Assert-True (-not $result.score.passed) 'A write then rollback during design passed.'
     $result = Replay 'explicit-implementation' @($write, $finish, $content, $finish)

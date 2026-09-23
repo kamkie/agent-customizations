@@ -8,7 +8,7 @@
     {
       "id": "explicit-implementation",
       "files": {"greeting.txt": "helo", "notes.txt": "pending"},
-      "prompt": "Can you fix the typo in greeting.txt?",
+      "prompt": "Can you fix the typo in greeting.txt? If I need to ask for the edit separately, tell me to say `edit`.",
       "followUp": "Now fix greeting.txt to contain exactly hello and run the content check. Keep the change local."
     },
     {

@@ -14,7 +14,7 @@
       },
       "modelInstructions": {
         "source": "global/codex-model-instructions.md",
-        "destination": "model-instructions-astra.md"
+        "destination": "model-instructions.md"
       },
       "hooks": {
         "destination": "hooks.json",

@@ -8,6 +8,9 @@ param(
     # the manifest's reviewed Codex modelInstructions source, which is the
     # configuration the shared rules are written against.
     [string]$CodexModelInstructionsFile,
+    [string]$CodexModel,
+    [ValidateSet('none', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
+    [string]$CodexReasoningEffort,
     # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
     [switch]$StockCodexInstructions
 )
@@ -102,6 +105,8 @@ $currentRequest
                     $arguments += @('--disable', $feature)
                 }
                 if ($IsWindows) { $arguments += @('-c', 'windows.sandbox="elevated"') }
+                if ($CodexModel) { $arguments += @('--model', $CodexModel) }
+                if ($CodexReasoningEffort) { $arguments += @('-c', ('model_reasoning_effort="' + $CodexReasoningEffort + '"')) }
                 if ($CodexModelInstructionsFile) { $arguments += @('-c', ('model_instructions_file="' + ($CodexModelInstructionsFile -replace '\\', '/') + '"')) }
                 $raw = @($prompt | & codex @arguments '-' 2> $stderrPath)
                 $clientExit = $LASTEXITCODE
@@ -145,7 +150,7 @@ $currentRequest
         Write-Host "$agentTarget/$($case.id): $($results[$results.Count - 1] | ConvertTo-Json -Compress)"
     }
 }
-$summary = @{results = $results.ToArray(); passed = @($results | Where-Object passed).Count; failed = @($results | Where-Object { -not $_.passed }).Count; artifacts = $runRoot}
+$summary = @{codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort; results = $results.ToArray(); passed = @($results | Where-Object passed).Count; failed = @($results | Where-Object { -not $_.passed }).Count; artifacts = $runRoot}
 $summary | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $runRoot 'summary.json')
 $summary | ConvertTo-Json -Depth 8
 if ($summary.failed) { exit 1 }

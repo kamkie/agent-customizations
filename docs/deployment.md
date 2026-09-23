@@ -203,18 +203,20 @@ Sessions already running keep the hook snapshot captured at startup.
 ## Point Codex at the reviewed model instructions
 
 The Codex target deploys `global/codex-model-instructions.md` to
-`~/.codex/model-instructions-astra.md`. That file replaces Codex's built-in
-model instructions; it is the captured stock prompt for the current model with
-the reviewed authorization, continuation, and closing-block rules applied, so
-it must be re-based when OpenAI changes the stock prompt (compare the
-`base_instructions` recorded in a fresh session's `session_meta`).
+`~/.codex/model-instructions.md`. It is a shorter, shared replacement for
+Codex's built-in model instructions, based on GPT-6 Sol with reviewed personal
+rules. The same file is used when another model is selected; compare its
+behavior against each model's stock `base_instructions` when models change.
 
-Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not
-managed by this repository; add the key once, at the top level, before any
+Codex only loads it when `~/.codex/config.toml` names it. If an earlier
+installation still points to `model-instructions-astra.md`, update that key
+when separately authorizing deployment; the old file is not removed by this
+repository. `config.toml` is not managed by this repository; add the key once,
+at the top level, before any
 `[table]` section:
 
 ```toml
-model_instructions_file = "C:/Users/<you>/.codex/model-instructions-astra.md"
+model_instructions_file = "C:/Users/<you>/.codex/model-instructions.md"
 ```
 
 Status reports the file as `ModelInstructions`; it does not verify the
@@ -225,8 +227,8 @@ shared rules are written against that configuration. Pass another file with
 prompt:
 
 ```powershell
-pwsh ./scripts/evaluate-instructions.ps1 -Target codex
-pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -StockCodexInstructions
+pwsh ./scripts/evaluate-instructions.ps1 -Target codex -CodexModel gpt-6-sol -CodexReasoningEffort medium
+pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -CodexModel gpt-6-astra -CodexReasoningEffort medium -StockCodexInstructions
 ```
 
 ## Scope boundary

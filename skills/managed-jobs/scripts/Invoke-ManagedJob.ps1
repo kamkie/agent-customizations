@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory)]
-    [ValidateSet('start', 'list', 'status', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'prune')]
+    [ValidateSet('start', 'list', 'status', 'wait', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'prune')]
     [string]$Action,
 
     [string]$Id,
@@ -26,6 +26,7 @@ param(
     [int]$ReadinessTimeoutSeconds = 30,
     [int]$Tail = 100,
     [switch]$Follow,
+    [switch]$Async,
     [AllowEmptyString()]
     [string]$InputText,
     [ValidateSet('Enter', 'Tab', 'Escape', 'Backspace', 'Ctrl+C')]
@@ -59,6 +60,9 @@ if ($Action -ne 'send-key' -and $PSBoundParameters.ContainsKey('Key')) {
 }
 if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
     throw '-MaxLines is valid only for capture.'
+}
+if ($Action -ne 'wait' -and $PSBoundParameters.ContainsKey('Async')) {
+    throw '-Async is valid only for wait.'
 }
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
@@ -219,6 +223,28 @@ function Add-ManagedJobIdentity {
         $copy.processIdentity = Get-ManagedProcessIdentity -Job $Job
     }
     return [pscustomobject]$copy
+}
+
+function Wait-ManagedJobCompletion {
+    param([Parameter(Mandatory)][string]$JobId)
+
+    $path = Get-ManagedJobFile -Id $JobId
+    $watcher = [IO.FileSystemWatcher]::new((Split-Path -Parent $path), (Split-Path -Leaf $path))
+    $watcher.NotifyFilter = [IO.NotifyFilters]::FileName -bor [IO.NotifyFilters]::LastWrite
+    try {
+        $watcher.EnableRaisingEvents = $true
+        while ($true) {
+            # Subscribe before reading. A write between the read and the blocking
+            # wait is still covered by the bounded reconciliation wakeup.
+            $job = Update-ReconciledJob -Job (Read-ManagedJob -Path $path)
+            if ($job.status -notin @('starting', 'running')) {
+                return Add-ManagedJobIdentity -Job $job
+            }
+            $null = $watcher.WaitForChanged([IO.WatcherChangeTypes]::All, 1000)
+        }
+    } finally {
+        $watcher.Dispose()
+    }
 }
 
 function Resolve-ManagedJobReadinessUri {
@@ -1038,6 +1064,35 @@ switch ($Action) {
         } else {
             $jobs = @(Get-ManagedJobsWithActiveReconciliation | Sort-Object createdAtUtc -Descending)
             Write-JobCollection -Jobs (Select-ManagedJobs -Jobs $jobs)
+        }
+    }
+    'wait' {
+        if (-not $Id) { throw '-Id is required for wait.' }
+        if ($Async) {
+            $target = Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id)
+            $root = Get-ManagedJobRoot
+            $waiterParameters = @{
+                StateRoot = $root
+                Name = "wait-$Id"
+                Kind = 'completion-wait'
+                Executable = (Get-Command pwsh -ErrorAction Stop).Source
+                Arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath,
+                    'wait', '-Id', $Id, '-StateRoot', $root)
+                WorkingDirectory = $PSScriptRoot
+                Lifetime = if ($target.lifetime -in @('turn', 'session', 'persistent')) { [string]$target.lifetime } else { 'Persistent' }
+            }
+            if ($target.ownerAgent -and $target.ownerSessionId) {
+                $waiterParameters.OwnerAgent = [string]$target.ownerAgent
+                $waiterParameters.OwnerSessionId = [string]$target.ownerSessionId
+            }
+            $waiter = (& $PSCommandPath start @waiterParameters | Out-String) | ConvertFrom-Json
+            [pscustomobject]@{
+                targetId = $Id
+                waiter = $waiter
+                resultPath = Get-ManagedJobFile -Id $Id
+            } | ConvertTo-Json -Depth 12
+        } else {
+            Wait-ManagedJobCompletion -JobId $Id | ConvertTo-Json -Depth 12
         }
     }
     'wait-ready' {

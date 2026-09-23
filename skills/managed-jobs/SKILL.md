@@ -1,6 +1,6 @@
 ---
 name: managed-jobs
-description: Contain, run, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes, optional visible output, and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
+description: Contain, run, wait for completion, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes, optional visible output, and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
 ---
 
 # Managed Jobs
@@ -20,6 +20,7 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
     -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
 & $jobs status -Id $job.id
 & $jobs logs -Id $job.id -Tail 100
+$final = (& $jobs wait -Id $job.id | Out-String) | ConvertFrom-Json
 ```
 
 - Keep short commands attached to the active tool call.
@@ -28,6 +29,25 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - `Auto` uses the current agent turn when ownership is available. Use
   `-Lifetime Session` only across turns and `Persistent` only across sessions.
 - Use the returned job instead of a global `list`; target `status` when needed.
+- Use `wait -Id <job-id>` when the next step needs process completion. It blocks
+  until the job is completed, failed, stopped, or orphaned and returns the final
+  record, including `exitCode` when the host recorded one. Check that status and
+  exit code before treating the work as successful; an orphan may have no exit code.
+- `wait` follows the job record, so it also finishes when a completed
+  `-KeepTerminalOpen` job leaves its visible terminal open.
+- To start a supervised wait without blocking this call, use:
+
+  ```powershell
+  $pending = (& $jobs wait -Id $job.id -Async | Out-String) | ConvertFrom-Json
+  # $pending.waiter.id identifies the companion managed job.
+  # After it finishes, read the target's final record:
+  & $jobs status -Id $pending.targetId
+  ```
+
+  The companion inherits the target's lifetime. Its own successful exit means
+  the target reached a terminal record; inspect the target's status and exit
+  code to determine the work result. Stop an unneeded companion with its waiter
+  ID if the target is intentionally left running.
 - Treat arguments, environment values, records, and logs as non-secret.
 - Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen`
   leaves a completed terminal for the user to close manually.

@@ -175,7 +175,7 @@ function Test-InstructionActionResult {
                     }
                     $firstPhaseMessageContains = Get-ActionProperty $Expected 'firstPhaseMessageContains'
                     foreach ($detail in @($firstPhaseMessageContains)) {
-                        if ($detail -and $request.message -cnotmatch ('(?<!\w)' + [regex]::Escape([string]$detail) + '(?!\w)')) {
+                        if ($detail -and $request.message -notmatch ('(?<!\w)' + [regex]::Escape([string]$detail) + '(?!\w)')) {
                             $errors.Add("First-phase response omits required detail: $detail")
                         }
                     }

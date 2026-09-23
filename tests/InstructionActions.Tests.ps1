@@ -107,6 +107,10 @@ greeting.txt contains `helo`; the correction is `hello`.
     $lookalikeFirst.message = "Hello; the correction is hello.`n`n" + $lookalikeFirst.message
     $result = Replay 'explicit-implementation' @($lookalikeFirst, $write, $content, $finish)
     Assert-True ($result.score.errors -contains 'First-phase response omits required detail: helo') 'A lookalike greeting passed as the exact observed typo.'
+    $capitalizedFirst = Finish-WithNext 'say `edit`'
+    $capitalizedFirst.message = $editFirst.message.Replace('`helo`', '`Helo`')
+    $result = Replay 'explicit-implementation' @($capitalizedFirst, $write, $content, $finish)
+    Assert-True $result.score.passed 'Capitalized typo wording was rejected.'
     $placeholderFirst = Finish-WithNext 'N/A'
     $result = Replay 'explicit-implementation' @($placeholderFirst, $write, $content, $finish)
     Assert-True ($result.score.errors -contains 'First-phase next action must ask the user to say: edit') 'A placeholder passed the pending edit expectation.'

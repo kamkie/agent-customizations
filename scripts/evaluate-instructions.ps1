@@ -171,7 +171,7 @@ function Read-AgentResponse {
                 throw 'Codex CLI is unavailable.'
             }
             $arguments = @(
-                'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules',
+                'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config',
                 '--sandbox', 'read-only', '--color', 'never', '--cd', $workspace,
                 '--output-schema', $schemaPath, '--output-last-message', $responsePath
             )

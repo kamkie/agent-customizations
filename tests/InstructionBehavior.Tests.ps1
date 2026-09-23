@@ -88,7 +88,6 @@ try {
             $targetRoot = Join-Path $responseRoot $target
             $null = New-Item -ItemType Directory -Path $targetRoot -Force
             $response = [ordered]@{
-                mode = 'standard'
                 autonomous = $false
                 primaryAction = 'answer-read-only'
                 publicationAuthorized = $false
@@ -126,14 +125,14 @@ try {
     }
 
     $mutated.publicationAuthorized = $negativeExpectation.publicationAuthorized
-    $mutated.mode = $null
+    $mutated.autonomous = $null
     $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeResponse -Encoding utf8
     $nullOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot 2>&1)
-    if ($LASTEXITCODE -eq 0 -or ($nullOutput -join ' ') -notmatch 'mode must be string, got null') {
+    if ($LASTEXITCODE -eq 0 -or ($nullOutput -join ' ') -notmatch 'autonomous must be boolean, got null') {
         throw 'The instruction behavior scorer did not report a null response value as a contract violation.'
     }
 
-    $mutated.mode = $negativeExpectation.mode
+    $mutated.autonomous = $negativeExpectation.autonomous
     $wrongPublication = -not [bool]$negativeExpectation.publicationAuthorized
     $mutated.publicationAuthorized = $wrongPublication
     $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeResponse -Encoding utf8

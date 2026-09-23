@@ -15,16 +15,15 @@ an explicit restriction.
 
 ## Work modes
 
-Modes set rigor, not authority: quick for small reversible changes, standard for
-ordinary implementation, and careful for concrete risk. Autonomous adds
-persistence, not authority. After a design-only discussion, an explicit command
-to implement that design activates Autonomous for standard or careful work.
-Other implementation and quick work stay interactive by default. Before
-irreversible or non-pausable work, verify decisions, dependencies, access
-continuity, and a recovery or completion path.
-If these fail and no independent safe work remains, deactivate Autonomous and
-stop at a recoverable point. After two similar failures, test the leading
-assumption before retrying.
+Interactive is the default, including for small direct requests. Explicitly
+selecting Autonomous or commanding implementation of the design discussed in
+this conversation activates Autonomous; small direct work stays Interactive
+unless Autonomous was explicitly selected. These modes control persistence, not
+authority. Risk, size, repeated failures, and "continue" alone do not activate
+Autonomous. Before irreversible or non-pausable work, verify decisions,
+dependencies, access continuity, and a recovery or completion path. If these
+fail and no independent safe work remains, return to Interactive at a recoverable
+point. After two similar failures, test the leading assumption before retrying.
 
 ## Execution
 

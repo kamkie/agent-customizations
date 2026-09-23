@@ -2,7 +2,6 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "mode",
     "autonomous",
     "primaryAction",
     "publicationAuthorized",
@@ -11,10 +10,6 @@
     "blockerSource"
   ],
   "properties": {
-    "mode": {
-      "type": "string",
-      "enum": ["investigation", "design", "quick", "standard", "careful"]
-    },
     "autonomous": { "type": "boolean" },
     "primaryAction": {
       "type": "string",

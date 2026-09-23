@@ -203,10 +203,11 @@ Sessions already running keep the hook snapshot captured at startup.
 ## Point Codex at the reviewed model instructions
 
 The Codex target deploys `global/codex-model-instructions.md` to
-`~/.codex/model-instructions.md`. It is a shorter, shared replacement for
-Codex's built-in model instructions, based on GPT-6 Sol with reviewed personal
-rules. The same file is used when another model is selected; compare its
-behavior against each model's stock `base_instructions` when models change.
+`~/.codex/model-instructions.md`. It is the GPT-6 Sol base prompt from the
+Codex model catalog with narrow changes where it conflicts with the effective
+`AGENTS.md`, plus the closing format that was not reliable from `AGENTS.md`
+alone. The same file is used when another model is selected, so compare
+behavior on Sol, Astra, and Luna when the prompt or model changes.
 
 Codex only loads it when `~/.codex/config.toml` names it. If an earlier
 installation still points to `model-instructions-astra.md`, update that key

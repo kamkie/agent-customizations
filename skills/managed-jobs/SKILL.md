@@ -1,6 +1,6 @@
 ---
 name: managed-jobs
-description: Contain, run, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes, optional visible output, and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
+description: Contain, run, wait for completion, verify readiness, inspect, recover, and stop long-running local Windows processes with explicit lifetimes, optional visible output, and durable logs. Use for dev servers, watchers, paid CLI agents, and lengthy builds or tests that may outlive a tool call. Do not use for ordinary short commands, non-Windows hosts, remote monitoring, or shared-terminal interaction.
 ---
 
 # Managed Jobs
@@ -28,6 +28,26 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - `Auto` uses the current agent turn when ownership is available. Use
   `-Lifetime Session` only across turns and `Persistent` only across sessions.
 - Use the returned job instead of a global `list`; target `status` when needed.
+- Use `wait -Id <job-id>` when the next step needs process completion. It blocks
+  until the job is completed, failed, stopped, or orphaned and returns the final
+  record, including `exitCode` when the host recorded one. Check that status and
+  exit code before treating the work as successful; an orphan may have no exit code.
+- Keep that tool call pending until it returns. If its transport yields a
+  session ID, wait on that session and, where supported, combine transport waits
+  inside one tool invocation so the model stays idle. Do not make repeated
+  agent-side `status` calls. A background job does not wake an idle agent by
+  itself.
+- For finite work, use `-TimeoutSeconds` to bound the wait:
+
+  ```powershell
+  $build = (& $jobs start -Name build -Executable dotnet -Arguments @('build') `
+      -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
+  $final = (& $jobs wait -Id $build.id -TimeoutSeconds 600 | Out-String) | ConvertFrom-Json
+  ```
+
+  A timeout leaves the target job running. Stop it separately if it is no longer needed.
+- `wait` follows the job record, so it also finishes when a completed
+  `-KeepTerminalOpen` job leaves its visible terminal open.
 - Treat arguments, environment values, records, and logs as non-secret.
 - Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen`
   leaves a completed terminal for the user to close manually.

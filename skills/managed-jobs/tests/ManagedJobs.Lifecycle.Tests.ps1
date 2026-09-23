@@ -225,6 +225,17 @@ try {
     Assert-True ($LASTEXITCODE -eq 0) 'Keep-open host path should return without propagating the child exit code.'
     $keepOpenResult = Get-JobStatus -Id $keepOpenId
     Assert-True ($keepOpenResult.status -eq 'failed' -and $keepOpenResult.exitCode -eq 17) 'Keep-open record should preserve the real child failure.'
+    # Model a shared terminal that remains alive after its child result was
+    # recorded. Completion is determined by the record, not host process exit.
+    $keepOpenRecord = Read-ManagedJob -Path $keepOpenJobPath
+    $keepOpenRecord | Add-Member -NotePropertyName sharedTerminal -NotePropertyValue $true
+    $keepOpenRecord.hostPid = $PID
+    $keepOpenRecord.hostStartedAtUtc = (Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')
+    Write-ManagedJob -Path $keepOpenJobPath -Job $keepOpenRecord
+    $keepOpenWait = (& $controller wait -StateRoot $stateRoot -Id $keepOpenId -TimeoutSeconds 5 | Out-String) | ConvertFrom-Json
+    Assert-True ($keepOpenWait.status -eq 'failed' -and $keepOpenWait.exitCode -eq 17 -and
+        $keepOpenWait.hostPid -eq $PID) `
+        'Completion wait should return a keep-open shared-terminal result while its host remains alive.'
 
     # The exact encoded command used for a shared-terminal tab must start the
     # shared host, consume the launch file, register terminal metadata, and exit.
@@ -333,7 +344,33 @@ try {
     # Start, record redaction, structured list/status, logs, and reconcile.
     $completed = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-complete' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Write-Output lifecycle-ok') -Environment @{ LIFECYCLE_MARKER = 'not-recorded'; GIT_AUTHOR_NAME = 'Lifecycle Test' } | Out-String) | ConvertFrom-Json
-    $completed = Wait-JobStatus -Id $completed.id -Expected @('completed')
+    $completed = (& $controller wait -StateRoot $stateRoot -Id $completed.id -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
+    Assert-True ($completed.status -eq 'completed' -and $completed.exitCode -eq 0 -and $completed.finishedAtUtc) `
+        'Completion wait should return the final successful record, including exit result and finish time.'
+    $failedWaitJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-wait-failed' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Milliseconds 300; exit 19') | Out-String) | ConvertFrom-Json
+    $failedWait = (& $controller wait -StateRoot $stateRoot -Id $failedWaitJob.id -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
+    Assert-True ($failedWait.status -eq 'failed' -and $failedWait.exitCode -eq 19 -and $failedWait.finishedAtUtc) `
+        'Completion wait should block through a failing child and return its real exit code.'
+    $timeoutTarget = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-wait-timeout' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
+    $activeIds.Add($timeoutTarget.id)
+    $waitTimeoutError = $null
+    try {
+        & $controller wait -StateRoot $stateRoot -Id $timeoutTarget.id -TimeoutSeconds 1 | Out-Null
+    } catch { $waitTimeoutError = $_.Exception.Message }
+    Assert-True ($waitTimeoutError -match 'did not complete within 1 seconds' -and
+        (Get-JobStatus -Id $timeoutTarget.id).status -in @('starting', 'running')) `
+        'A wait timeout should report its bound and leave the target running.'
+    $null = & $controller stop -StateRoot $stateRoot -Id $timeoutTarget.id
+    $activeIds.Remove($timeoutTarget.id) | Out-Null
+    for ($raceAttempt = 0; $raceAttempt -lt 3; $raceAttempt++) {
+        $raceJob = (& $controller start -StateRoot $stateRoot -Name "lifecycle-wait-race-$raceAttempt" `
+            -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'exit 0') | Out-String) | ConvertFrom-Json
+        $raceResult = (& $controller wait -StateRoot $stateRoot -Id $raceJob.id -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
+        Assert-True ($raceResult.status -eq 'completed' -and $raceResult.exitCode -eq 0) `
+            'Completion wait should survive a fast completion during watcher setup.'
+    }
     Assert-True (Test-Path -LiteralPath $historicalControlPath) `
         'Normal startup must not reconcile inactive historical control records.'
     Assert-True (@(Get-ManagedJobOwnerReferenceIds -OwnerAgent codex -OwnerSessionId $testSessionId -Lifetime turn) -contains $historicalId) `
@@ -361,7 +398,8 @@ try {
     Assert-True ($logText -match 'lifecycle-ok') 'Logs should capture child output.'
     Assert-True ($logText -notmatch 'Write-Output lifecycle-ok|LIFECYCLE_MARKER|not-recorded') 'Controller log metadata must omit arguments and environment.'
     $completedList = @((& $controller list -StateRoot $stateRoot -Status completed -Json | Out-String) | ConvertFrom-Json)
-    Assert-True ($completedList.id -contains $completed.id) 'Structured list filter should return the completed job.'
+    Assert-True ($completedList.id -contains $completed.id) `
+        "Structured list filter should return the completed job ($($completed.id)); got $(@($completedList.id) -join ',')."
     $completedStatus = @((& $controller status -StateRoot $stateRoot -Status completed -Json | Out-String) | ConvertFrom-Json)
     Assert-True ($completedStatus.id -contains $completed.id) 'Structured status filter should return the completed job.'
 
@@ -799,7 +837,9 @@ exit 5
     Stop-Process -Id $contained.hostPid -Force
     $activeIds.Remove($contained.id) | Out-Null
     Assert-True (Wait-ProcessExit -TargetProcessId $childPid) 'Windows containment should terminate descendants when the managed host crashes.'
-    Assert-True ((Get-JobStatus -Id $contained.id).status -eq 'orphaned') 'A crashed contained host should reconcile to an orphaned record without a live child.'
+    $crashedWait = (& $controller wait -StateRoot $stateRoot -Id $contained.id -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
+    Assert-True ($crashedWait.status -eq 'orphaned' -and $null -eq $crashedWait.exitCode -and $crashedWait.finishedAtUtc) `
+        'Completion wait should reconcile a crashed host without inventing an exit code.'
 
     # A missing PID plus recorded start identity reconciles to orphaned without killing anything.
     $orphanId = '20000101-000000-lifecycle-orphan-000001'

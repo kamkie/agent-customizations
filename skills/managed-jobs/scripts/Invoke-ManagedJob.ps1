@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory)]
-    [ValidateSet('start', 'list', 'status', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'prune')]
+    [ValidateSet('start', 'list', 'status', 'wait', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'prune')]
     [string]$Action,
 
     [string]$Id,
@@ -26,6 +26,8 @@ param(
     [int]$ReadinessTimeoutSeconds = 30,
     [int]$Tail = 100,
     [switch]$Follow,
+    [ValidateRange(1, 86400)]
+    [Nullable[int]]$TimeoutSeconds,
     [AllowEmptyString()]
     [string]$InputText,
     [ValidateSet('Enter', 'Tab', 'Escape', 'Backspace', 'Ctrl+C')]
@@ -59,6 +61,9 @@ if ($Action -ne 'send-key' -and $PSBoundParameters.ContainsKey('Key')) {
 }
 if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
     throw '-MaxLines is valid only for capture.'
+}
+if ($Action -ne 'wait' -and $PSBoundParameters.ContainsKey('TimeoutSeconds')) {
+    throw '-TimeoutSeconds is valid only for wait.'
 }
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
@@ -219,6 +224,41 @@ function Add-ManagedJobIdentity {
         $copy.processIdentity = Get-ManagedProcessIdentity -Job $Job
     }
     return [pscustomobject]$copy
+}
+
+function Wait-ManagedJobCompletion {
+    param(
+        [Parameter(Mandatory)][string]$JobId,
+        [Nullable[int]]$TimeoutSeconds
+    )
+
+    $path = Get-ManagedJobFile -Id $JobId
+    $watcher = [IO.FileSystemWatcher]::new((Split-Path -Parent $path), (Split-Path -Leaf $path))
+    $watcher.NotifyFilter = [IO.NotifyFilters]::FileName -bor [IO.NotifyFilters]::LastWrite
+    $elapsed = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $watcher.EnableRaisingEvents = $true
+        while ($true) {
+            # Subscribe before reading. A write between the read and the blocking
+            # wait is still covered by the bounded reconciliation wakeup.
+            $job = Update-ReconciledJob -Job (Read-ManagedJob -Path $path)
+            if ($job.status -notin @('starting', 'running')) {
+                return Add-ManagedJobIdentity -Job $job
+            }
+            $waitMilliseconds = 1000
+            if ($null -ne $TimeoutSeconds) {
+                $remainingMilliseconds = ($TimeoutSeconds * 1000) - $elapsed.Elapsed.TotalMilliseconds
+                if ($remainingMilliseconds -le 0) {
+                    throw "Managed job $JobId did not complete within $TimeoutSeconds seconds; last status was '$($job.status)'."
+                }
+                $waitMilliseconds = [Math]::Max(1, [Math]::Min(1000, [int][Math]::Ceiling($remainingMilliseconds)))
+            }
+            $null = $watcher.WaitForChanged([IO.WatcherChangeTypes]::All, $waitMilliseconds)
+        }
+    } finally {
+        $elapsed.Stop()
+        $watcher.Dispose()
+    }
 }
 
 function Resolve-ManagedJobReadinessUri {
@@ -1039,6 +1079,10 @@ switch ($Action) {
             $jobs = @(Get-ManagedJobsWithActiveReconciliation | Sort-Object createdAtUtc -Descending)
             Write-JobCollection -Jobs (Select-ManagedJobs -Jobs $jobs)
         }
+    }
+    'wait' {
+        if (-not $Id) { throw '-Id is required for wait.' }
+        Wait-ManagedJobCompletion -JobId $Id -TimeoutSeconds $TimeoutSeconds | ConvertTo-Json -Depth 12
     }
     'wait-ready' {
         if (-not $Id) { throw '-Id is required for wait-ready.' }

@@ -7,6 +7,14 @@ function Get-ActionProperty {
     return $null
 }
 
+function Get-ActionNextText {
+    param([string]$Message)
+    $nextLines = [regex]::Matches($Message, '(?im)^[ \t]*(?:\*\*)?Next:(?:\*\*)?[ \t]*([^\r\n]*)')
+    if (-not $nextLines.Count) { return '' }
+    # Inline code and emphasis do not change the meaning of the closing claim.
+    return (($nextLines[-1].Groups[1].Value.Trim() -replace '[`*_]', '').Trim())
+}
+
 function New-ActionProtocolException {
     param([string]$Message)
     $exception = [ArgumentException]::new($Message)
@@ -162,7 +170,8 @@ function Test-InstructionActionResult {
                     if ($request.message -notmatch $closing) {
                         $errors.Add('First-phase response lacks the required three-line closing block.')
                     }
-                    if ($request.message -notmatch '\*\*Next:\*\* no further action required\.?\s*$') {
+                    $firstNextText = Get-ActionNextText $request.message
+                    if ($firstNextText -notmatch '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$') {
                         $errors.Add('Completed question response does not end with the required no-next-action status.')
                     }
                     break
@@ -221,10 +230,7 @@ function Test-InstructionActionResult {
     $nextActionRequired = Get-ActionProperty $Expected 'nextActionRequired'
     if ($null -ne $nextActionRequired) {
         # Check the explicit closing claim, not the meaning of arbitrary prose.
-        $nextLines = [regex]::Matches($Actual.finalMessage, '(?im)^[ \t]*(?:\*\*)?Next:(?:\*\*)?[ \t]*([^\r\n]*)')
-        $nextText = if ($nextLines.Count) { $nextLines[-1].Groups[1].Value.Trim() } else { '' }
-        # Inline code/emphasis must not change this fixed-phrase comparison.
-        $nextText = ($nextText -replace '[`*_]', '').Trim()
+        $nextText = Get-ActionNextText $Actual.finalMessage
         # A placeholder names no action either, so it cannot stand in for a pending step.
         $noActionClaim = $nextText -match '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$'
         if (-not $nextText) {

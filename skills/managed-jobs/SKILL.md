@@ -46,7 +46,9 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - To start a supervised wait without blocking this call, use:
 
   ```powershell
-  $pending = (& $jobs wait -Id $job.id -Async -TimeoutSeconds 600 | Out-String) | ConvertFrom-Json
+  $test = (& $jobs start -Name tests -Executable dotnet -Arguments @('test') `
+      -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
+  $pending = (& $jobs wait -Id $test.id -Async -TimeoutSeconds 600 | Out-String) | ConvertFrom-Json
   # $pending.waiter.id identifies the companion managed job.
   # After it finishes, read the target's final record:
   & $jobs status -Id $pending.targetId

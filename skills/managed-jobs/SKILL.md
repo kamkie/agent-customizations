@@ -20,7 +20,6 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
     -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
 & $jobs status -Id $job.id
 & $jobs logs -Id $job.id -Tail 100
-$final = (& $jobs wait -Id $job.id | Out-String) | ConvertFrom-Json
 ```
 
 - Keep short commands attached to the active tool call.
@@ -33,21 +32,31 @@ $final = (& $jobs wait -Id $job.id | Out-String) | ConvertFrom-Json
   until the job is completed, failed, stopped, or orphaned and returns the final
   record, including `exitCode` when the host recorded one. Check that status and
   exit code before treating the work as successful; an orphan may have no exit code.
+- For finite work, use `-TimeoutSeconds` to bound the wait:
+
+  ```powershell
+  $build = (& $jobs start -Name build -Executable dotnet -Arguments @('build') `
+      -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
+  $final = (& $jobs wait -Id $build.id -TimeoutSeconds 600 | Out-String) | ConvertFrom-Json
+  ```
+
+  A timeout leaves the target job running. Stop it separately if it is no longer needed.
 - `wait` follows the job record, so it also finishes when a completed
   `-KeepTerminalOpen` job leaves its visible terminal open.
 - To start a supervised wait without blocking this call, use:
 
   ```powershell
-  $pending = (& $jobs wait -Id $job.id -Async | Out-String) | ConvertFrom-Json
+  $pending = (& $jobs wait -Id $job.id -Async -TimeoutSeconds 600 | Out-String) | ConvertFrom-Json
   # $pending.waiter.id identifies the companion managed job.
   # After it finishes, read the target's final record:
   & $jobs status -Id $pending.targetId
   ```
 
-  The companion inherits the target's lifetime. Its own successful exit means
-  the target reached a terminal record; inspect the target's status and exit
-  code to determine the work result. Stop an unneeded companion with its waiter
-  ID if the target is intentionally left running.
+  The companion inherits the target's lifetime when the target has owner
+  metadata. Its own successful exit means the target reached a terminal record;
+  inspect the target's status and exit code to determine the work result. A
+  timeout fails the companion and leaves the target running. Stop an unneeded
+  companion with its waiter ID if the target is intentionally left running.
 - Treat arguments, environment values, records, and logs as non-secret.
 - Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen`
   leaves a completed terminal for the user to close manually.

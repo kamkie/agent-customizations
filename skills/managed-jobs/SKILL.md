@@ -34,7 +34,7 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - Never replace this controller with a detached/background launch. Use
   `claude-runner` for Claude session, resume, and review behavior.
 
-Stop completed or unneeded work:
+Stop running work that is no longer needed; a terminal job needs no stop call:
 
 ```powershell
 & $jobs stop -Id <job-id>
@@ -42,6 +42,28 @@ Stop completed or unneeded work:
 
 Hand off the id, status, lifetime, log path, working directory, and exact
 status/logs/stop commands for any session or persistent job left running.
+
+## Agent progress and completion
+
+For a CLI agent or an agent-driven test, track three separate facts: the managed
+process state, the native session's latest completed tool/output event, and the
+required result artifacts. A live PID, startup log or heartbeat proves liveness,
+not useful progress. Inspect the returned job and its native session/log paths;
+use a filtered registry lookup only to recover a lost job ID, not as routine
+polling. Preserve the PID/start identity when diagnosing a vanished supervisor.
+
+A coordinator's final message does not establish that its child workers finished.
+Keep the owner waiting through the runtime's supported completion mechanism;
+check child terminal state and required artifacts before workspace teardown.
+Inspect interruption timestamps and effective child settings before assigning
+the failure to the model, wrapper or harness. Reuse a recoverable session rather
+than launching a duplicate paid attempt without the applicable retry authority.
+
+If a final usage/export record is absent, inspect native usage events before
+calling it lost. For comparisons, report cost per completed attempt separately
+from failures/retries, orchestration and grading. Missing cost stays unknown.
+Retain failure evidence; cleanup may remove only this job's owned scratch paths,
+not another task's logs or review inputs.
 
 ## HTTP readiness
 

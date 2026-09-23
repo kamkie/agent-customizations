@@ -21,7 +21,10 @@
 - Run the wrapper in the foreground. If it must outlive the current turn, run the wrapper through `managed-jobs`; do not use raw `Start-Process`, `Start-Job`, `--bg`, `--background`, hidden windows, scheduled tasks, or detached execution.
 - Keep session persistence. Do not pass `--no-session-persistence` or use `--fork-session` to continue prior work.
 - Use `--output-format stream-json --verbose --include-partial-messages` with `-p`; the wrapper supplies these controls.
-- Avoid short timeouts for paid runs. If the runner is alive, wait or read its managed terminal/log.
+- Avoid short timeouts for paid runs. Use the `managed-jobs` progress contract:
+  process liveness, native tool events and completed result artifacts are
+  separate evidence. Keep required child work awaited and inspect the native
+  interruption timeline before deciding which layer caused a failure.
 - Never pass `-MaxBudgetUsd` or `-MaxTurns`. Codex must not estimate or impose budget or turn caps on Claude runs.
 - Use `-PromptFile` for multiline, XML, or shell-hostile prompts. Keep temporary prompt files outside the repository.
 - Do not use `-Bare` for cross-reviews or runs that need `CLAUDE.md`, skills, plugins, hooks, or project settings.
@@ -110,7 +113,8 @@ Claude Code CLI and Claude Desktop keep separate histories. Use Claude Code's `/
 After an interruption:
 
 1. Check whether `claude` is still running.
-2. If it is running, wait or read the attached/managed output; do not kill it.
+2. If it is running, inspect native progress and the attached/managed output;
+   preserve the active run rather than killing it or starting a duplicate.
 3. If it exited without the result, use `-Resume`, `-FromPr`, or `-ContinueLatest`.
 4. Start fresh only when no session exists or the user explicitly asks.
 

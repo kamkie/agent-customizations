@@ -7,6 +7,14 @@ function Get-ActionProperty {
     return $null
 }
 
+function Get-ActionNextText {
+    param([string]$Message)
+    $nextLines = [regex]::Matches($Message, '(?im)^[ \t]*(?:\*\*)?Next:(?:\*\*)?[ \t]*([^\r\n]*)')
+    if (-not $nextLines.Count) { return '' }
+    # Inline code and emphasis do not change the meaning of the closing claim.
+    return (($nextLines[-1].Groups[1].Value.Trim() -replace '[`*_]', '').Trim())
+}
+
 function New-ActionProtocolException {
     param([string]$Message)
     $exception = [ArgumentException]::new($Message)
@@ -137,6 +145,8 @@ function Test-InstructionActionResult {
     param([Parameter(Mandatory)]$Actual, [Parameter(Mandatory)]$Expected)
     $errors = [Collections.Generic.List[string]]::new()
     if (-not $Actual.finished) { $errors.Add('Action limit reached without finishing.') }
+    $closing = '(?s)(?:^|\r?\n\r?\n)\*\*Done:\*\* [^\r\n]+\r?\n\*\*Not done:\*\* [^\r\n]+\r?\n\*\*Next:\*\* ([^\r\n]+)\s*$'
+    if ($Actual.finalMessage -notmatch $closing) { $errors.Add('Final response lacks the required three-line closing block.') }
     if (Get-ActionProperty $Expected 'unchanged') {
         foreach ($name in $Actual.initial.Keys) {
             if ($Actual.initial[$name] -cne $Actual.files[$name]) { $errors.Add("Unexpected edit: $name") }
@@ -156,7 +166,25 @@ function Test-InstructionActionResult {
         foreach ($entry in $Actual.history) {
             if ($entry.role -eq 'assistant') {
                 $request = $entry.content | ConvertFrom-Json
-                if ($request.tool -eq 'finish') { break }
+                if ($request.tool -eq 'finish') {
+                    if ($request.message -notmatch $closing) {
+                        $errors.Add('First-phase response lacks the required three-line closing block.')
+                    }
+                    $firstPhaseNextActionRequired = Get-ActionProperty $Expected 'firstPhaseNextActionRequired'
+                    if ($null -ne $firstPhaseNextActionRequired) {
+                        $firstNextText = Get-ActionNextText $request.message
+                        $firstNoAction = $firstNextText -match '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$'
+                        $firstCompleted = $firstNextText -match '(?i)^no further action required[.!]?$'
+                        if (-not $firstNextText) {
+                            $errors.Add('First-phase response lacks a next-action report.')
+                        } elseif ($firstPhaseNextActionRequired -and $firstNoAction) {
+                            $errors.Add('First-phase response claims no action despite a pending step.')
+                        } elseif (-not $firstPhaseNextActionRequired -and -not $firstCompleted) {
+                            $errors.Add('Completed question response does not end with the required no-next-action status.')
+                        }
+                    }
+                    break
+                }
                 if ($request.tool -in @('write_file', 'publish')) { $errors.Add('Mutation before explicit follow-up.') }
             }
         }
@@ -211,10 +239,7 @@ function Test-InstructionActionResult {
     $nextActionRequired = Get-ActionProperty $Expected 'nextActionRequired'
     if ($null -ne $nextActionRequired) {
         # Check the explicit closing claim, not the meaning of arbitrary prose.
-        $nextLines = [regex]::Matches($Actual.finalMessage, '(?im)^[ \t]*(?:\*\*)?Next:(?:\*\*)?[ \t]*([^\r\n]*)')
-        $nextText = if ($nextLines.Count) { $nextLines[-1].Groups[1].Value.Trim() } else { '' }
-        # Inline code/emphasis must not change this fixed-phrase comparison.
-        $nextText = ($nextText -replace '[`*_]', '').Trim()
+        $nextText = Get-ActionNextText $Actual.finalMessage
         # A placeholder names no action either, so it cannot stand in for a pending step.
         $noActionClaim = $nextText -match '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$'
         if (-not $nextText) {

@@ -203,11 +203,11 @@ Sessions already running keep the hook snapshot captured at startup.
 ## Point Codex at the reviewed model instructions
 
 The Codex target deploys `global/codex-model-instructions.md` to
-`~/.codex/model-instructions-astra.md`. That file replaces Codex's built-in
-model instructions; it is the captured stock prompt for the current model with
-the reviewed authorization, continuation, and closing-block rules applied, so
-it must be re-based when OpenAI changes the stock prompt (compare the
-`base_instructions` recorded in a fresh session's `session_meta`).
+`~/.codex/model-instructions-astra.md` (a legacy destination name). That file
+replaces Codex's built-in model instructions; it is the stock Sol 6 prompt with
+one compact closing-status patch. Re-base it when OpenAI changes the stock
+prompt (compare the `base_instructions` recorded in a fresh session's
+`session_meta`).
 
 Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not
 managed by this repository; add the key once, at the top level, before any
@@ -222,10 +222,11 @@ Status reports the file as `ModelInstructions`; it does not verify the
 evaluation scripts pass the manifest's reviewed file explicitly by default; the
 shared rules are written against that configuration. Pass another file with
 `-CodexModelInstructionsFile`, or `-StockCodexInstructions` to measure the stock
-prompt:
+prompt. Use `-CodexModel` and `-CodexReasoningEffort` to test a specific model:
 
 ```powershell
 pwsh ./scripts/evaluate-instructions.ps1 -Target codex
+pwsh ./scripts/evaluate-instructions.ps1 -Target codex -CodexModel gpt-6-sol -CodexReasoningEffort medium
 pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -StockCodexInstructions
 ```
 

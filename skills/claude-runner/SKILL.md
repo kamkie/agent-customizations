@@ -27,6 +27,12 @@ $pr = [int]'<requested-pr-number>'
 - Never pass `-MaxBudgetUsd` or `-MaxTurns`. Codex must not estimate or impose
   budget or turn caps on Claude runs.
 - Keep the wrapper attached; use `managed-jobs` when the process must survive a turn or restart.
+- Follow `managed-jobs` for process, native-session and artifact progress. A
+  coordinator response alone is not worker completion. Keep required child work
+  awaited through its terminal result before allowing harness/workspace cleanup.
+- On an interruption, inspect the native event timeline and effective child
+  lifetime/permission settings before attributing the cause. Recover through the
+  printed session ID; distinguish a runtime cutoff from a model-quality failure.
 - Report the exit status, verdict or findings, printed native session id,
   diagnostic-log path, and exact resume option when further work is needed.
 

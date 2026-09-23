@@ -182,7 +182,7 @@ function Test-InstructionActionResult {
                     $firstPhaseNextWord = Get-ActionProperty $Expected 'firstPhaseNextWord'
                     if ($firstPhaseNextWord) {
                         $firstNextText = Get-ActionNextText $request.message
-                        $firstNextPattern = '^(?i:(?:please\s+)?say\s+' + [regex]::Escape([string]$firstPhaseNextWord) + '(?=\W|$))'
+                        $firstNextPattern = '(?i:\b(?:say|reply|respond|type|send|write|enter)\s+(?:(?:the\s+word|with)\s+)?' + [regex]::Escape([string]$firstPhaseNextWord) + '(?!\w))'
                         if (-not $firstNextText) {
                             $errors.Add('First-phase response lacks a next-action report.')
                         } elseif ($firstNextText -notmatch $firstNextPattern) {

@@ -27,6 +27,8 @@ param(
     [int]$Tail = 100,
     [switch]$Follow,
     [switch]$Async,
+    [ValidateRange(1, 86400)]
+    [Nullable[int]]$TimeoutSeconds,
     [AllowEmptyString()]
     [string]$InputText,
     [ValidateSet('Enter', 'Tab', 'Escape', 'Backspace', 'Ctrl+C')]
@@ -63,6 +65,9 @@ if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
 }
 if ($Action -ne 'wait' -and $PSBoundParameters.ContainsKey('Async')) {
     throw '-Async is valid only for wait.'
+}
+if ($Action -ne 'wait' -and $PSBoundParameters.ContainsKey('TimeoutSeconds')) {
+    throw '-TimeoutSeconds is valid only for wait.'
 }
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
@@ -226,11 +231,15 @@ function Add-ManagedJobIdentity {
 }
 
 function Wait-ManagedJobCompletion {
-    param([Parameter(Mandatory)][string]$JobId)
+    param(
+        [Parameter(Mandatory)][string]$JobId,
+        [Nullable[int]]$TimeoutSeconds
+    )
 
     $path = Get-ManagedJobFile -Id $JobId
     $watcher = [IO.FileSystemWatcher]::new((Split-Path -Parent $path), (Split-Path -Leaf $path))
     $watcher.NotifyFilter = [IO.NotifyFilters]::FileName -bor [IO.NotifyFilters]::LastWrite
+    $elapsed = [Diagnostics.Stopwatch]::StartNew()
     try {
         $watcher.EnableRaisingEvents = $true
         while ($true) {
@@ -240,9 +249,18 @@ function Wait-ManagedJobCompletion {
             if ($job.status -notin @('starting', 'running')) {
                 return Add-ManagedJobIdentity -Job $job
             }
-            $null = $watcher.WaitForChanged([IO.WatcherChangeTypes]::All, 1000)
+            $waitMilliseconds = 1000
+            if ($null -ne $TimeoutSeconds) {
+                $remainingMilliseconds = ($TimeoutSeconds * 1000) - $elapsed.Elapsed.TotalMilliseconds
+                if ($remainingMilliseconds -le 0) {
+                    throw "Managed job $JobId did not complete within $TimeoutSeconds seconds; last status was '$($job.status)'."
+                }
+                $waitMilliseconds = [Math]::Max(1, [Math]::Min(1000, [int][Math]::Ceiling($remainingMilliseconds)))
+            }
+            $null = $watcher.WaitForChanged([IO.WatcherChangeTypes]::All, $waitMilliseconds)
         }
     } finally {
+        $elapsed.Stop()
         $watcher.Dispose()
     }
 }
@@ -1071,6 +1089,18 @@ switch ($Action) {
         if ($Async) {
             $target = Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id)
             $root = Get-ManagedJobRoot
+            $targetProperties = $target.PSObject.Properties.Name
+            $ownerAgent = if ($targetProperties -contains 'ownerAgent') { [string]$target.ownerAgent } else { '' }
+            $ownerSessionId = if ($targetProperties -contains 'ownerSessionId') { [string]$target.ownerSessionId } else { '' }
+            $targetLifetime = if ($targetProperties -contains 'lifetime' -and
+                $target.lifetime -in @('turn', 'session', 'persistent')) {
+                [string]$target.lifetime
+            } else {
+                'Persistent'
+            }
+            if ($targetLifetime -in @('turn', 'session') -and (-not $ownerAgent -or -not $ownerSessionId)) {
+                $targetLifetime = 'Persistent'
+            }
             $waiterParameters = @{
                 StateRoot = $root
                 Name = "wait-$Id"
@@ -1079,11 +1109,14 @@ switch ($Action) {
                 Arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath,
                     'wait', '-Id', $Id, '-StateRoot', $root)
                 WorkingDirectory = $PSScriptRoot
-                Lifetime = if ($target.lifetime -in @('turn', 'session', 'persistent')) { [string]$target.lifetime } else { 'Persistent' }
+                Lifetime = $targetLifetime
             }
-            if ($target.ownerAgent -and $target.ownerSessionId) {
-                $waiterParameters.OwnerAgent = [string]$target.ownerAgent
-                $waiterParameters.OwnerSessionId = [string]$target.ownerSessionId
+            if ($ownerAgent -and $ownerSessionId) {
+                $waiterParameters.OwnerAgent = $ownerAgent
+                $waiterParameters.OwnerSessionId = $ownerSessionId
+            }
+            if ($null -ne $TimeoutSeconds) {
+                $waiterParameters.Arguments += @('-TimeoutSeconds', [string]$TimeoutSeconds)
             }
             $waiter = (& $PSCommandPath start @waiterParameters | Out-String) | ConvertFrom-Json
             [pscustomobject]@{
@@ -1092,7 +1125,7 @@ switch ($Action) {
                 resultPath = Get-ManagedJobFile -Id $Id
             } | ConvertTo-Json -Depth 12
         } else {
-            Wait-ManagedJobCompletion -JobId $Id | ConvertTo-Json -Depth 12
+            Wait-ManagedJobCompletion -JobId $Id -TimeoutSeconds $TimeoutSeconds | ConvertTo-Json -Depth 12
         }
     }
     'wait-ready' {

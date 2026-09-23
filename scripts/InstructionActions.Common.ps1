@@ -170,17 +170,23 @@ function Test-InstructionActionResult {
                     if ($request.message -notmatch $closing) {
                         $errors.Add('First-phase response lacks the required three-line closing block.')
                     }
-                    $firstPhaseNextActionRequired = Get-ActionProperty $Expected 'firstPhaseNextActionRequired'
-                    if ($null -ne $firstPhaseNextActionRequired) {
+                    if ((Get-ActionProperty $Expected 'firstPhaseRequiresProse') -and $request.message -notmatch '(?s)^.+\r?\n\r?\n\*\*Done:\*\*') {
+                        $errors.Add('First-phase response lacks an answer before the closing block.')
+                    }
+                    $firstPhaseMessageContains = Get-ActionProperty $Expected 'firstPhaseMessageContains'
+                    foreach ($detail in @($firstPhaseMessageContains)) {
+                        if ($detail -and $request.message -notmatch ('(?<!\w)' + [regex]::Escape([string]$detail) + '(?!\w)')) {
+                            $errors.Add("First-phase response omits required detail: $detail")
+                        }
+                    }
+                    $firstPhaseNextWord = Get-ActionProperty $Expected 'firstPhaseNextWord'
+                    if ($firstPhaseNextWord) {
                         $firstNextText = Get-ActionNextText $request.message
-                        $firstNoAction = $firstNextText -match '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$'
-                        $firstCompleted = $firstNextText -match '(?i)^no further action required[.!]?$'
+                        $firstNextPattern = '(?i:\b(?:say|reply|respond|type|send|write|enter)\s+(?:(?:the\s+word|with)\s+)?' + [regex]::Escape([string]$firstPhaseNextWord) + '(?!\w))'
                         if (-not $firstNextText) {
                             $errors.Add('First-phase response lacks a next-action report.')
-                        } elseif ($firstPhaseNextActionRequired -and $firstNoAction) {
-                            $errors.Add('First-phase response claims no action despite a pending step.')
-                        } elseif (-not $firstPhaseNextActionRequired -and -not $firstCompleted) {
-                            $errors.Add('Completed question response does not end with the required no-next-action status.')
+                        } elseif ($firstNextText -notmatch $firstNextPattern) {
+                            $errors.Add("First-phase next action must ask the user to say: $firstPhaseNextWord")
                         }
                     }
                     break

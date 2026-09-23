@@ -15,6 +15,9 @@ param(
     # the manifest's reviewed Codex modelInstructions source, which is the
     # configuration the shared rules are written against.
     [string]$CodexModelInstructionsFile,
+    [string]$CodexModel,
+    [ValidateSet('none', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
+    [string]$CodexReasoningEffort,
 
     # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
     [switch]$StockCodexInstructions
@@ -168,10 +171,12 @@ function Read-AgentResponse {
                 throw 'Codex CLI is unavailable.'
             }
             $arguments = @(
-                'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules',
+                'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config',
                 '--sandbox', 'read-only', '--color', 'never', '--cd', $workspace,
                 '--output-schema', $schemaPath, '--output-last-message', $responsePath
             )
+            if ($CodexModel) { $arguments += @('--model', $CodexModel) }
+            if ($CodexReasoningEffort) { $arguments += @('-c', ('model_reasoning_effort="' + $CodexReasoningEffort + '"')) }
             if ($CodexModelInstructionsFile) { $arguments += @('-c', ('model_instructions_file="' + ($CodexModelInstructionsFile -replace '\\', '/') + '"')) }
             $arguments += '-'
             # --ignore-rules disables execpolicy .rules files; AGENTS.md remains
@@ -296,6 +301,8 @@ try {
     $failed = @($results | Where-Object { -not $_.passed })
     [pscustomobject]@{
         targets = $requestedTargets
+        codexModel = $CodexModel
+        codexReasoningEffort = $CodexReasoningEffort
         cases = $results.Count
         passed = $results.Count - $failed.Count
         failed = $failed.Count

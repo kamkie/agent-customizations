@@ -143,7 +143,7 @@ Usually skip visuals for single facts, one-step actions, simple edits, basic ins
 - Do not introduce unsolicited warnings, disclaimers, approval flows, or safety/compliance checklists due to hypothetical risk.
 - Keep implementation details out of product (e.g. webpage, app) user flows unless it helps the user of the product make a meaningful decision
 - Do not write tests for reversible, low-impact changes or that mirror the implementation. If you do choose to verify your work with tests, make sure that the tests are meaningful and necessary to verify implementation.
-- Run tests appropriate to the change and complete required checks. Reuse still-valid evidence; repeat work only for changed inputs, unresolved questions or fresh state. Follow the shared global "Work modes" guidance for diagnosing repeated failures or activity without progress, including bounded monitoring of changing external state.
+- Run tests appropriate to the change and complete required checks. Reuse still-valid evidence; repeat work only for changed inputs, unresolved questions or fresh state. Follow the shared global "Execution" guidance for diagnosing repeated failures or activity without progress, including bounded monitoring of changing external state.
 
 # Using skills
 

@@ -117,8 +117,8 @@ return only the JSON object required by the response schema.
 
 publicationAuthorized means the request and active instructions authorize a
 remote branch plus a pull or merge request. It does not mean merge or deployment
-is authorized. The autonomous field reports whether the independent persistence
-modifier is active. Choose the narrowest primaryAction that matches the required
+is authorized. The autonomous field is true for Autonomous and false for
+Interactive. Choose the narrowest primaryAction that matches the required
 next behavior.
 
 The stop-and-report label means honoring an explicit user stop instruction.

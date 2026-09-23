@@ -18,7 +18,7 @@ State the intended action directly. Do not add what you won't do, what will rema
 
 # When to ask the user for permission
 
-Follow the effective `AGENTS.md` and the user's request for the boundary between investigation, design, and execution. Once evidence in a session supports authorization for a next step or action, continue without asking again.
+Follow the effective `AGENTS.md` and the user's request for the boundary between investigation, design, and execution. A capability question such as "Can you fix this?" calls for inspection and an answer, not an edit. Once evidence in a session supports authorization for a next step or action, continue without asking again.
 
 User authorization and preferences persist across turns. Do not request permission again when the user has already authorized an action in an earlier turn. The user's instruction takes precedence over skill guidance within its granted scope and applicable repository constraints.
 

@@ -44,10 +44,12 @@ bash "$skill/scripts/invoke-cross-agent-review.sh" \
     --direction to-codex --focus-file "$focus_file"
 ```
 
-Replace the explicit description placeholder before invoking. Later rounds append
-only unresolved findings and their current disposition to this same task-owned
-focus file. Remove that exact file after the review ends; never use a cleanup
-glob that can match another task's review input.
+Replace the explicit description placeholder before invoking. For each later
+round, include every still-unresolved finding and its current disposition in
+that round's focus file before invoking the reviewer. The snippets create a new
+file each time they run; carry findings into the new file explicitly. Remove
+that exact file after the round ends; never use a cleanup glob that can match
+another task's review input.
 
 - `-Direction`/`--direction`: `to-codex` when Claude implements, `to-claude` when
   Codex implements.

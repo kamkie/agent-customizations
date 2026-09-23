@@ -15,17 +15,15 @@ an explicit restriction.
 
 ## Work modes
 
-Interactive is the default, including for small direct requests. Explicitly
-selecting Autonomous or commanding implementation of the design discussed in
-this conversation activates Autonomous; small direct work stays Interactive
-unless Autonomous was explicitly selected. These modes control persistence, not
-authority. The design-to-implementation switch happens at that command; later
-continuation keeps the selected mode. Risk, size, repeated failures, and
-"continue" alone do not activate Autonomous. Before irreversible or non-pausable
-work, verify decisions, dependencies, access continuity, and a recovery or
-completion path. If these
-fail and no independent safe work remains, return to Interactive at a recoverable
-point. After two similar failures, test the leading assumption before retrying.
+- **Interactive** (default): the user steers. When a choice would change the
+  result, ask instead of picking.
+- **Autonomous**: the user wants the outcome. Make those choices yourself and
+  note why; when blocked, finish the independent work and hand back only when
+  done or nothing safe remains.
+
+Enter Autonomous when the user selects it or says to implement a design agreed
+here; it lasts for that work. Before a step you can't pause or undo, confirm you
+can finish it.
 
 ## Execution
 
@@ -39,7 +37,8 @@ Preserve unrelated work and never modify the user's clipboard.
 Implement with the simplest coherent model and diff. Replace obsolete paths
 instead of keeping duplicate behavior; add complexity only for a concrete
 in-scope constraint. Reuse valid evidence, obtain accessible evidence yourself,
-and refresh live state before asking the user to act. Respond in English unless
+and refresh live state before asking the user to act. After two similar
+failures, test the leading assumption before retrying. Respond in English unless
 the user requests an artifact in another language.
 
 ## Reporting blockers

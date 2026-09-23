@@ -175,24 +175,18 @@ function Test-InstructionActionResult {
                     }
                     $firstPhaseMessageContains = Get-ActionProperty $Expected 'firstPhaseMessageContains'
                     foreach ($detail in @($firstPhaseMessageContains)) {
-                        if ($detail -and $request.message -notmatch [regex]::Escape([string]$detail)) {
+                        if ($detail -and $request.message -cnotmatch ('(?<!\w)' + [regex]::Escape([string]$detail) + '(?!\w)')) {
                             $errors.Add("First-phase response omits required detail: $detail")
                         }
                     }
-                    $firstPhaseNextActionRequired = Get-ActionProperty $Expected 'firstPhaseNextActionRequired'
-                    if ($null -ne $firstPhaseNextActionRequired) {
+                    $firstPhaseNextWord = Get-ActionProperty $Expected 'firstPhaseNextWord'
+                    if ($firstPhaseNextWord) {
                         $firstNextText = Get-ActionNextText $request.message
-                        $firstNextContains = Get-ActionProperty $Expected 'firstPhaseNextContains'
-                        $firstNoAction = $firstNextText -match '(?i)^(no further action required|none|nothing|n/?a|-+)[.!]?$'
-                        $firstCompleted = $firstNextText -match '(?i)^no further action required[.!]?$'
+                        $firstNextPattern = '^(?i:(?:please\s+)?say\s+' + [regex]::Escape([string]$firstPhaseNextWord) + '(?=\W|$))'
                         if (-not $firstNextText) {
                             $errors.Add('First-phase response lacks a next-action report.')
-                        } elseif ($firstPhaseNextActionRequired -and $firstNoAction) {
-                            $errors.Add('First-phase response claims no action despite a pending step.')
-                        } elseif (-not $firstPhaseNextActionRequired -and -not $firstCompleted) {
-                            $errors.Add('Completed question response does not end with the required no-next-action status.')
-                        } elseif ($firstNextContains -and $firstNextText -notmatch [regex]::Escape([string]$firstNextContains)) {
-                            $errors.Add("First-phase next action does not include required word: $firstNextContains")
+                        } elseif ($firstNextText -notmatch $firstNextPattern) {
+                            $errors.Add("First-phase next action must ask the user to say: $firstPhaseNextWord")
                         }
                     }
                     break

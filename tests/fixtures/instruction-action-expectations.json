@@ -1,6 +1,7 @@
 {
   "design-agreement": {"unchanged": true, "requiredTools": [], "checks": []},
-  "explicit-implementation": {"firstPhaseUnchanged": true, "firstPhaseRequiresProse": true, "firstPhaseMessageContains": ["helo", "hello"], "firstPhaseNextActionRequired": true, "firstPhaseNextContains": "edit", "files": {"greeting.txt": "hello"}, "requiredTools": ["write_file"], "checks": ["content"]},
+  "capability-question-readonly": {"unchanged": true, "requiredTools": ["read_file"], "checks": []},
+  "explicit-implementation": {"firstPhaseUnchanged": true, "firstPhaseRequiresProse": true, "firstPhaseMessageContains": ["helo", "hello"], "firstPhaseNextWord": "edit", "files": {"greeting.txt": "hello"}, "requiredTools": ["write_file"], "checks": ["content"]},
   "continue-after-check": {"files": {"greeting.txt": "hello"}, "requiredTools": ["write_file"], "checks": ["format", "content"]},
   "stop-after-write": {"mustInterrupt": true, "noToolsAfterStop": true, "requiredTools": ["write_file"], "checks": []},
   "publication-blocked": {"files": {"notes.txt": "checked"}, "firstTool": "publish", "requiredTools": ["publish", "write_file"], "checks": ["format", "content"]},

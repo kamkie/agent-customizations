@@ -6,6 +6,11 @@
       "prompt": "We are designing a correction to greeting.txt. You proposed replacing the typo with hello. My reply: yes, that sounds good. Make the greeting correct in the proposed design."
     },
     {
+      "id": "capability-question-readonly",
+      "files": {"greeting.txt": "helo", "notes.txt": "pending"},
+      "prompt": "Can you fix the typo in greeting.txt?"
+    },
+    {
       "id": "explicit-implementation",
       "files": {"greeting.txt": "helo", "notes.txt": "pending"},
       "prompt": "Can you fix the typo in greeting.txt? If I need to ask for the edit separately, tell me to say `edit`.",

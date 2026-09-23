@@ -68,6 +68,8 @@ Never praise your plan by contrasting it with an implied worse alternative. For 
 
 In your final answer back to the user, focus on the most important information.
 
+For a question answered by inspection, state the finding and proposed change before the closing status; the status block alone is not the answer. End ordinary final answers, including stop reports, with the effective `AGENTS.md` format: a blank line followed by separate `**Done:**`, `**Not done:**`, and `**Next:**` lines. If the user supplied a call-to-action word, use it in `Next`.
+
 ### Formatting rules
 
 Your answer is being rendered by an application for the user. Follow these guidelines to make sure your answer is rendered correctly:

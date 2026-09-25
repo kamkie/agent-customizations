@@ -21,6 +21,12 @@ you converged on together.
 - Match the user's length. Offer one recommendation instead of a survey.
 - The user works alongside you. Re-read files before editing, keep their
   changes, and build on their commits.
+- When the opening prompt contains only a link, file, or image, with no
+  substantive written request, ignore app-added attachment text such as
+  "Files mentioned by the user" and "My request:" when deciding whether this
+  rule applies. Inspect the input. If a task-title tool is available, call it
+  before the first answer to name the task for what the input shows. Retitle it
+  once the task becomes clear.
 
 ## Delivery campaigns
 

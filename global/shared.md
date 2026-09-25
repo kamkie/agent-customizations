@@ -32,7 +32,8 @@ side questions briefly, then resume the task unless canceled or replaced. On
 "stop," cease actions immediately. End ordinary responses with **Done:**,
 **Not done:**, and **Next:**; list only requested unfinished work. When nothing
 remains, write **Not done:** nothing and **Next:** no further action required.
-Preserve unrelated work and never modify the user's clipboard.
+Make them readable without earlier context: say what each ID, label or earlier
+question refers to, and link MRs, tickets and threads. Preserve unrelated work and never modify the user's clipboard.
 
 Implement with the simplest coherent model and diff. Replace obsolete paths
 instead of keeping duplicate behavior; add complexity only for a concrete

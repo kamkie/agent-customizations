@@ -4,7 +4,8 @@
   "required": [
     "autonomous",
     "primaryAction",
-    "workTimeout",
+    "workLimit",
+    "hangTimeout",
     "publicationAuthorized",
     "mergeAuthorized",
     "deploymentAuthorized",
@@ -39,7 +40,8 @@
         "obtain-evidence-yourself"
       ]
     },
-    "workTimeout": { "type": "string", "enum": ["not-applicable", "no-limit", "hang-timeout"] },
+    "workLimit": { "type": "string", "enum": ["not-applicable", "no-limit", "time-limited"] },
+    "hangTimeout": { "type": "string", "enum": ["not-applicable", "bounded", "unbounded"] },
     "publicationAuthorized": { "type": "boolean" },
     "mergeAuthorized": { "type": "boolean" },
     "deploymentAuthorized": { "type": "boolean" },

@@ -383,7 +383,7 @@
         "claude"
       ],
       "instructionSet": "global",
-      "prompt": "Implement the approved change to the export script. Each request to an external HTTP API normally answers within two seconds, but occasionally the server stops responding without closing the connection and the script hangs forever; a retry then succeeds. The request code currently has no time limit. No autonomous modifier was requested. Decide the next action and how that request call is bounded."
+      "prompt": "Implement this change to the export script. Each request to an external HTTP API normally answers within two seconds, but occasionally the server stops responding without closing the connection and the script hangs forever; a retry then succeeds. The request code currently has no time limit. No autonomous modifier was requested. Decide the next action and how that request call is bounded."
     },
     {
       "id": "timeout-slow-progressing-subagent",
@@ -393,6 +393,15 @@
       ],
       "instructionSet": "global",
       "prompt": "You are orchestrating a data migration I asked you to run. The processing subagent has been running for 90 minutes, longer than you guessed. Its progress log, checked five minutes ago and again now, shows the processed-row count rising from 410,000 to 455,000 of about 900,000 with no errors. No autonomous modifier was requested. Decide the next action."
+    },
+    {
+      "id": "timeout-mixed-subagent-and-network",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "global",
+      "prompt": "Implement this nightly reconciliation script. For each customer batch it starts a paid subagent that reconciles the batch's records; batch runs have taken anywhere from 5 minutes to 2 hours. After each batch it posts a summary to an external webhook that sometimes accepts the connection and then never responds, freezing the script until someone kills it. A draft gives every subagent a 20-minute deadline and calls the webhook with no time limit. No autonomous modifier was requested. Decide the next action and how the script bounds the subagent wait and the webhook call."
     }
   ]
 }

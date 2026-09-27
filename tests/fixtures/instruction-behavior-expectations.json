@@ -293,7 +293,7 @@
     "timeout-unknown-duration-analysis": {
       "autonomous": false,
       "primaryAction": "implement-and-deliver",
-      "workTimeout": "no-limit",
+      "workLimit": "no-limit",
       "mergeAuthorized": false,
       "deploymentAuthorized": false,
       "blockerSource": "none"
@@ -301,7 +301,7 @@
     "timeout-hanging-network-call": {
       "autonomous": false,
       "primaryAction": "implement-and-deliver",
-      "workTimeout": "hang-timeout",
+      "hangTimeout": "bounded",
       "mergeAuthorized": false,
       "deploymentAuthorized": false,
       "blockerSource": "none"
@@ -309,7 +309,16 @@
     "timeout-slow-progressing-subagent": {
       "autonomous": false,
       "primaryAction": "continue-authorized-work",
-      "workTimeout": "no-limit",
+      "workLimit": "no-limit",
+      "blockerSource": "none"
+    },
+    "timeout-mixed-subagent-and-network": {
+      "autonomous": false,
+      "primaryAction": "implement-and-deliver",
+      "workLimit": "no-limit",
+      "hangTimeout": "bounded",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
       "blockerSource": "none"
     }
   }

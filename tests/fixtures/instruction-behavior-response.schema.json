@@ -4,6 +4,7 @@
   "required": [
     "autonomous",
     "primaryAction",
+    "workTimeout",
     "publicationAuthorized",
     "mergeAuthorized",
     "deploymentAuthorized",
@@ -38,6 +39,7 @@
         "obtain-evidence-yourself"
       ]
     },
+    "workTimeout": { "type": "string", "enum": ["not-applicable", "no-limit", "hang-timeout"] },
     "publicationAuthorized": { "type": "boolean" },
     "mergeAuthorized": { "type": "boolean" },
     "deploymentAuthorized": { "type": "boolean" },

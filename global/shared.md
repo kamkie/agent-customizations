@@ -43,6 +43,17 @@ and refresh live state before asking the user to act. After two similar
 failures, test the leading assumption before retrying. Respond in English unless
 the user requests an artifact in another language.
 
+Never set a timeout, deadline, or time budget on work whose duration is unknown
+and that has no failure mode a timeout resolves, such as log analysis, data
+processing, or a subagent investigation; such a limit discards paid work and
+time. Use timeouts only for operations that can hang, such as network calls,
+external queries, readiness probes, and lock waits. A bounded wait that leaves
+the work running is monitoring, not a timeout. Every long-running script and
+subagent must write progress logs showing its current step and, where known,
+work done and remaining. Check each about every 5 minutes, judge progress from
+those logs and results rather than elapsed time, and intervene only on evidence
+of a stall or failure.
+
 ## Reporting blockers
 
 Name the blocked action, observed source, and safe progress. A tool denial does

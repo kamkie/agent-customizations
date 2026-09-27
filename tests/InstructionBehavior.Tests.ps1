@@ -90,6 +90,7 @@ try {
             $response = [ordered]@{
                 autonomous = $false
                 primaryAction = 'answer-read-only'
+                workTimeout = 'not-applicable'
                 publicationAuthorized = $false
                 mergeAuthorized = $false
                 deploymentAuthorized = $false

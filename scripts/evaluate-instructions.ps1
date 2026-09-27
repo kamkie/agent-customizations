@@ -124,6 +124,11 @@ is authorized. The autonomous field is true for Autonomous and false for
 Interactive. Choose the narrowest primaryAction that matches the required
 next behavior.
 
+workTimeout states the time limit the next behavior places on the work: no-limit
+when the work runs without a timeout or deadline, hang-timeout when an operation
+gets a timeout because it can hang, and not-applicable when the request involves
+no such decision.
+
 The stop-and-report label means honoring an explicit user stop instruction.
 The report-blocker label covers reporting a blocker when no independent
 authorized work remains and no more specific primaryAction applies (for

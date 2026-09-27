@@ -289,6 +289,28 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false,
       "blockerSource": "none"
+    },
+    "timeout-unknown-duration-analysis": {
+      "autonomous": false,
+      "primaryAction": "implement-and-deliver",
+      "workTimeout": "no-limit",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
+    },
+    "timeout-hanging-network-call": {
+      "autonomous": false,
+      "primaryAction": "implement-and-deliver",
+      "workTimeout": "hang-timeout",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
+    },
+    "timeout-slow-progressing-subagent": {
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "workTimeout": "no-limit",
+      "blockerSource": "none"
     }
   }
 }

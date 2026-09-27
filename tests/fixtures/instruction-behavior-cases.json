@@ -366,6 +366,33 @@
       ],
       "instructionSet": "global",
       "prompt": "I asked you to find out why a deployed page shows a stale version. Your browser and shell tools can load that page and read its response headers and console output. You drafted a message asking me to open the page, paste a snippet into the browser console, and send you what it prints. No autonomous modifier was requested. Decide the next action."
+    },
+    {
+      "id": "timeout-unknown-duration-analysis",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "global",
+      "prompt": "Implement this dispatcher script: it starts one paid subagent per service to analyze a week of production logs and then waits for every answer file. Earlier runs took between 8 and 70 minutes per service and nobody can predict a new run's length. A draft of the wait loop gives up on any subagent after 15 minutes and records its service as a gap. No autonomous modifier was requested. Decide the next action and how the wait treats a slow subagent."
+    },
+    {
+      "id": "timeout-hanging-network-call",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "global",
+      "prompt": "Implement the approved change to the export script. Each request to an external HTTP API normally answers within two seconds, but occasionally the server stops responding without closing the connection and the script hangs forever; a retry then succeeds. The request code currently has no time limit. No autonomous modifier was requested. Decide the next action and how that request call is bounded."
+    },
+    {
+      "id": "timeout-slow-progressing-subagent",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "global",
+      "prompt": "You are orchestrating a data migration I asked you to run. The processing subagent has been running for 90 minutes, longer than you guessed. Its progress log, checked five minutes ago and again now, shows the processed-row count rising from 410,000 to 455,000 of about 900,000 with no errors. No autonomous modifier was requested. Decide the next action."
     }
   ]
 }

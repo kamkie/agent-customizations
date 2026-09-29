@@ -85,9 +85,14 @@ for the individual command, verify the effective login, and remove it
 immediately:
 
 ```powershell
-$botToken = gh auth token --hostname github.com --user kamkie-codex-bot
 $previousToken = $env:GH_TOKEN
+$botToken = $null
 try {
+    Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
+    $botToken = gh auth token --hostname github.com --user kamkie-codex-bot
+    if ([string]::IsNullOrWhiteSpace($botToken)) {
+        throw 'The kamkie-codex-bot GitHub CLI credential is unavailable.'
+    }
     $env:GH_TOKEN = $botToken
     if ((gh api user --jq .login) -ne 'kamkie-codex-bot') {
         throw 'Expected the kamkie-codex-bot GitHub identity.'

@@ -86,9 +86,11 @@ immediately:
 
 ```powershell
 $previousToken = $env:GH_TOKEN
+$previousGithubToken = $env:GITHUB_TOKEN
 $botToken = $null
 try {
     Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
+    Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
     $botToken = gh auth token --hostname github.com --user kamkie-codex-bot
     if ([string]::IsNullOrWhiteSpace($botToken)) {
         throw 'The kamkie-codex-bot GitHub CLI credential is unavailable.'
@@ -103,6 +105,11 @@ try {
         Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
     } else {
         $env:GH_TOKEN = $previousToken
+    }
+    if ($null -eq $previousGithubToken) {
+        Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
+    } else {
+        $env:GITHUB_TOKEN = $previousGithubToken
     }
     $botToken = $null
 }

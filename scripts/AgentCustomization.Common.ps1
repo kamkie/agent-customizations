@@ -37,7 +37,7 @@ function Get-MissingMarkdownFileLink {
         $target = [Uri]::UnescapeDataString(($link -split '[?#]', 2)[0])
         if ([string]::IsNullOrWhiteSpace($target) -or [IO.Path]::IsPathRooted($target)) { continue }
         $destination = Join-Path (Split-Path -Parent $Path) $target
-        if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) {
+        if (-not (Test-Path -LiteralPath $destination)) {
             [pscustomobject]@{ Source = $Path; Target = $target }
         }
     }

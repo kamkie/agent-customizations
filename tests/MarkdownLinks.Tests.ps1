@@ -16,6 +16,7 @@ try {
     Write-Host 'Markdown links: testing link resolution and code examples'
     $document = Join-Path $sandbox 'nested/source.md'
     $null = New-Item -ItemType Directory -Path (Split-Path -Parent $document)
+    $null = New-Item -ItemType Directory -Path (Join-Path (Split-Path -Parent $document) 'references')
     foreach ($name in @('existing.md', 'reference notes.md', 'hash#name.md', 'amp&name.md')) {
         [IO.File]::WriteAllText((Join-Path (Split-Path -Parent $document) $name), '# Fixture')
     }
@@ -23,6 +24,7 @@ try {
     $content = @'
 [valid](existing.md)
 [parent](../parent.md)
+[directory](references/)
 [spaces](<reference notes.md>)
 [encoded](reference%20notes.md)
 [fragment](existing.md#not-a-real-heading)

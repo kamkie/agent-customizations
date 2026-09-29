@@ -124,6 +124,12 @@ is authorized. The autonomous field is true for Autonomous and false for
 Interactive. Choose the narrowest primaryAction that matches the required
 next behavior.
 
+publicationActor identifies the account that must perform an authorized
+pull-request mutation: kamkie-codex-bot, repository-defined when a
+verified repository contract names another actor, current-session when the
+active credential is the applicable default, or not-applicable when no remote
+publication is authorized or pending.
+
 workLimit states whether the next behavior puts a timeout, deadline, or time
 budget on the request's long-running or unknown-duration work: no-limit,
 time-limited, or not-applicable when there is no such work. hangTimeout states

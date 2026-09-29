@@ -68,6 +68,21 @@ repository gates. Wait for required CI on the current head and triage review
 before calling a PR ready; never skip or cancel automatic jobs. Merge and
 deployment require separate authority.
 
+For a repository whose verified remote is `github.com/kamkie/<repository>`, use
+`kamkie-codex-bot` to create and mutate agent-authored pull requests when the
+repository does not define another actor. Keep `kamkie` as the active GitHub CLI
+account. Commits and branch pushes may use the configured Git or SSH identity;
+pull-request authorship comes from the credential that creates it. For each bot
+command, save and clear `GH_TOKEN` and `GITHUB_TOKEN`,
+obtain the stored `kamkie-codex-bot` token for that command, set it as
+`GH_TOKEN`, and verify `gh api user --jq .login` before the mutation. Restore
+both environment variables in `finally`; never print or persist the token. If
+the credential or repository access is unavailable, finish independent local
+work and stop before the remote mutation with the exact blocker. The current
+head requires `kamkie` approval when repository rules require owner approval.
+When merge or auto-merge is separately authorized and every repository gate
+passes, perform it as `kamkie-codex-bot` with a head-match guard.
+
 For authorized integration, default to a merge commit (`git merge --no-ff`) when
 repository policy is silent. Do not rebase, squash, or cherry-pick without an
 instruction for that operation. After merge, fetch the target and verify the

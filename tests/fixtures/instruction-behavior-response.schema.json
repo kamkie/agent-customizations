@@ -7,6 +7,7 @@
     "workLimit",
     "hangTimeout",
     "publicationAuthorized",
+    "publicationActor",
     "mergeAuthorized",
     "deploymentAuthorized",
     "blockerSource"
@@ -43,6 +44,10 @@
     "workLimit": { "type": "string", "enum": ["not-applicable", "no-limit", "time-limited"] },
     "hangTimeout": { "type": "string", "enum": ["not-applicable", "bounded", "unbounded"] },
     "publicationAuthorized": { "type": "boolean" },
+    "publicationActor": {
+      "type": "string",
+      "enum": ["not-applicable", "current-session", "kamkie-codex-bot", "repository-defined"]
+    },
     "mergeAuthorized": { "type": "boolean" },
     "deploymentAuthorized": { "type": "boolean" },
     "blockerSource": { "type": "string", "enum": ["none", "repository", "skill", "tool", "access", "ambiguity"] }

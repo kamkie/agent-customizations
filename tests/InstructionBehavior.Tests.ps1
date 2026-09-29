@@ -93,6 +93,7 @@ try {
                 workLimit = 'not-applicable'
                 hangTimeout = 'not-applicable'
                 publicationAuthorized = $false
+                publicationActor = 'not-applicable'
                 mergeAuthorized = $false
                 deploymentAuthorized = $false
                 blockerSource = 'none'

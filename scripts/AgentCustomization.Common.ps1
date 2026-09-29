@@ -24,6 +24,25 @@ function Get-CustomizationTargetNames {
     return @($Target.ToLowerInvariant())
 }
 
+function Get-MissingMarkdownFileLink {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # Rendering keeps fenced and inline code examples out of the anchor list.
+    $html = (ConvertFrom-Markdown -LiteralPath $Path).Html
+    foreach ($anchor in [regex]::Matches($html, '<a\b[^>]*\bhref="([^"]*)"')) {
+        $link = [Net.WebUtility]::HtmlDecode($anchor.Groups[1].Value)
+        if ($link -match '^(?:[a-z][a-z0-9+.-]*:|[/\\]|#)') { continue }
+
+        # Split before decoding so an encoded # remains part of the filename.
+        $target = [Uri]::UnescapeDataString(($link -split '[?#]', 2)[0])
+        if ([string]::IsNullOrWhiteSpace($target) -or [IO.Path]::IsPathRooted($target)) { continue }
+        $destination = Join-Path (Split-Path -Parent $Path) $target
+        if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) {
+            [pscustomobject]@{ Source = $Path; Target = $target }
+        }
+    }
+}
+
 function Get-CustomizationTarget {
     param([Parameter(Mandatory)][string]$Name)
 

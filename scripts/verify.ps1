@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = Get-CustomizationRepositoryRoot
 $manifest = Get-CustomizationManifest
 $errors = [Collections.Generic.List[string]]::new()
+$markdownFiles = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 
 $requiredRepositoryFiles = @(
     'AGENTS.md',
@@ -76,6 +77,8 @@ foreach ($targetName in $targetNames) {
             $instructionSource = Join-Path $repositoryRoot ([string]$source)
             if (-not (Test-Path -LiteralPath $instructionSource -PathType Leaf)) {
                 $errors.Add("Target '$targetName' instruction source does not exist: $source")
+            } elseif ([IO.Path]::GetExtension($instructionSource) -eq '.md') {
+                [void]$markdownFiles.Add($instructionSource)
             }
         }
     }
@@ -90,6 +93,8 @@ foreach ($targetName in $targetNames) {
             $errors.Add("Target '$targetName' model instructions have no source")
         } elseif (-not (Test-Path -LiteralPath (Join-Path $repositoryRoot ([string]$modelInstructions.source)) -PathType Leaf)) {
             $errors.Add("Target '$targetName' model instruction source does not exist: $($modelInstructions.source)")
+        } elseif ([IO.Path]::GetExtension([string]$modelInstructions.source) -eq '.md') {
+            [void]$markdownFiles.Add((Join-Path $repositoryRoot ([string]$modelInstructions.source)))
         }
     }
 
@@ -145,6 +150,10 @@ foreach ($skillName in $declaredSkills) {
         continue
     }
 
+    foreach ($file in Get-ChildItem -LiteralPath $skillRoot -Recurse -File -Filter '*.md') {
+        [void]$markdownFiles.Add($file.FullName)
+    }
+
     $nameLine = Get-Content -LiteralPath $skillFile -TotalCount 20 |
         Select-String -Pattern '^name:\s*["'']?([^"'']+)["'']?\s*$' |
         Select-Object -First 1
@@ -157,6 +166,13 @@ foreach ($skillName in $declaredSkills) {
 foreach ($skillName in $actualSkills) {
     if (-not $declaredSkills.Contains($skillName)) {
         $errors.Add("Undeclared skill directory: $skillName")
+    }
+}
+
+foreach ($file in $markdownFiles | Sort-Object) {
+    foreach ($missing in Get-MissingMarkdownFileLink -Path $file) {
+        $relativeSource = [IO.Path]::GetRelativePath($repositoryRoot, $missing.Source).Replace('\', '/')
+        $errors.Add("Missing local Markdown link: $relativeSource -> $($missing.Target)")
     }
 }
 

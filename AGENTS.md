@@ -75,7 +75,7 @@ supplies defaults and skills own reusable execution.
 ### Use the bot for author-side pull-request mutations
 
 `kamkie` is the repository owner, reviewer, approver, and administrator.
-`kamkie-codex-bot` opens Codex-authored pull requests and performs author-side
+`kamkie-codex-bot` opens agent-authored pull requests and performs author-side
 mutations for them. Commits and pushes may use the configured Git or SSH
 credentials because pull-request authorship is determined by the credential
 that creates the pull request.
@@ -104,7 +104,7 @@ try {
 ```
 
 Do not globally switch the active GitHub account, print or persist the token, or
-open a Codex-authored pull request as `kamkie`. If the bot credential is
+open an agent-authored pull request as `kamkie`. If the bot credential is
 unavailable or lacks access, stop before the mutation and report the exact
 blocker.
 

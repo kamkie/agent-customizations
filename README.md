@@ -46,8 +46,6 @@ tools' live configuration directories are deployment targets.
 - `docs/maintaining-customizations.md` — maintenance rules for agent
   instructions, skill entrypoints, references, and progressive-disclosure
   validation.
-- `docs/temporary-bot-unavailable.md` — conditionally loaded GitHub actor and
-  exact-head authorization policy used during the current bot outage.
 - `scripts/verify.ps1` — validates structure and scans managed sources for
   common publication hazards.
 - `scripts/evaluate-instructions.ps1` — runs input-only scenarios in fresh,
@@ -91,10 +89,9 @@ activating it.
 
 An explicit request to implement a repository change defaults to the complete
 branch-to-PR delivery workflow in [`AGENTS.md`](AGENTS.md): validate, commit,
-push, open a draft PR under the current author rule, obtain opposite-agent
-cross-review, triage findings, and mark the PR ready. The applicable owner
-authorization rule then governs guarded merge or auto-merge after required
-checks pass.
+push, open a bot-authored draft PR, obtain opposite-agent cross-review, triage
+findings, and mark the PR ready. Current-head owner approval then governs a
+guarded merge or auto-merge after required checks pass.
 
 Validate the repository:
 

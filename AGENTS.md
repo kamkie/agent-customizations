@@ -32,11 +32,6 @@ including commit, push, PR, cross-review, and readiness, unless the user limits
 the terminal state. Questions, investigation, review, and design remain read-only
 or proposal-only until implementation is explicitly authorized.
 
-While the [temporary policy](docs/temporary-bot-unavailable.md) is active,
-owner-authored PRs require a new `merge PR <number> at <sha>` instruction after
-Ready: GitHub cannot record owner self-approval. Implementation authority stops
-at the ready PR.
-
 Installation, live deployment, release, repository administration,
 protection bypass, and fabricated approval are never part of delivery authority.
 These actions require their own explicit authority.
@@ -77,14 +72,53 @@ supplies defaults and skills own reusable execution.
   causes, and remaining risk. Commit intentionally and push; a local commit is
   intermediate. Validate is complete when applicable checks pass and are recorded.
 
-### Apply the temporary pull-request policy when active
+### Use the bot for author-side pull-request mutations
 
-The [temporary bot-unavailable policy](docs/temporary-bot-unavailable.md) is
-active until this notice is removed.
+`kamkie` is the repository owner, reviewer, approver, and administrator.
+`kamkie-codex-bot` opens agent-authored pull requests and performs author-side
+mutations for them. Commits and pushes may use the configured Git or SSH
+credentials because pull-request authorship is determined by the credential
+that creates the pull request.
 
-Read that policy and this notice immediately before PR creation or any author-side
-mutation, never earlier. The policy owns the actor, credential boundary, draft
-creation, and owner-authored exact-head authorization rule.
+For pull-request creation and later author-side mutations, obtain the bot token
+for the individual command, verify the effective login, and remove it
+immediately:
+
+```powershell
+$previousToken = $env:GH_TOKEN
+$previousGithubToken = $env:GITHUB_TOKEN
+$botToken = $null
+try {
+    Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
+    Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
+    $botToken = gh auth token --hostname github.com --user kamkie-codex-bot
+    if ([string]::IsNullOrWhiteSpace($botToken)) {
+        throw 'The kamkie-codex-bot GitHub CLI credential is unavailable.'
+    }
+    $env:GH_TOKEN = $botToken
+    if ((gh api user --jq .login) -ne 'kamkie-codex-bot') {
+        throw 'Expected the kamkie-codex-bot GitHub identity.'
+    }
+    gh pr create --draft # supply the task-specific base, head, title, and body
+} finally {
+    if ($null -eq $previousToken) {
+        Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
+    } else {
+        $env:GH_TOKEN = $previousToken
+    }
+    if ($null -eq $previousGithubToken) {
+        Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
+    } else {
+        $env:GITHUB_TOKEN = $previousGithubToken
+    }
+    $botToken = $null
+}
+```
+
+Do not globally switch the active GitHub account, print or persist the token, or
+open an agent-authored pull request as `kamkie`. If the bot credential is
+unavailable or lacks access, stop before the mutation and report the exact
+blocker.
 
 ### Review: opposite-agent review and triage
 
@@ -122,21 +156,19 @@ clean mergeability. Reassess changes and affected evidence if the head moves;
 return to draft if a gate fails after Ready. Resolved feedback stays triaged,
 but an outstanding formal blocking review must be cleared.
 
-CODEOWNERS requests `kamkie` for non-owner-authored PRs. Owner-authored PRs use the
-temporary exact-head rule. Owner authorization is a merge gate, never approval
-invented by the author.
+CODEOWNERS requests `kamkie` for bot-authored pull requests. Owner authorization
+is a merge gate, never approval invented by the author.
 
 ### Owner approval, checks, and merge
 
-Use the refreshed record and the temporary owner-authorization rule when active;
-otherwise require the latest owner approval at the current head. Never fabricate
-approval or reuse stale authority.
+Require the latest `kamkie` approval to apply to the current head. Never
+fabricate approval or reuse stale authority.
 
 When current-head owner authorization, review disposition, triage, passing required
-checks, non-draft state, and clean mergeability all pass, merge as `kamkie` with
-`--merge --match-head-commit <sha>`. If only required checks remain pending, enable
-guarded auto-merge with those flags. Otherwise leave unmerged and report the
-exact unmet gate.
+checks, non-draft state, and clean mergeability all pass, merge as
+`kamkie-codex-bot` with `--merge --match-head-commit <sha>`. If only required
+checks remain pending, enable guarded auto-merge with those flags. Otherwise
+leave unmerged and report the exact unmet gate.
 
 After merge, fetch `origin/main`, prove the landed result is reachable, and report
 that commit before global cleanup. Live deployment remains separately authorized.

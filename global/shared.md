@@ -68,10 +68,12 @@ repository gates. Wait for required CI on the current head and triage review
 before calling a PR ready; never skip or cancel automatic jobs. Merge and
 deployment require separate authority.
 
-For a repository whose verified remote is `github.com/kamkie/<repository>`, use
-`kamkie-codex-bot` to create and mutate agent-authored pull requests when the
-repository does not define another actor. Keep `kamkie` as the active GitHub CLI
-account. Commits and branch pushes may use the configured Git or SSH identity;
+For a pull request whose verified target repository is
+`github.com/kamkie/<repository>`, use `kamkie-codex-bot` to create and mutate it
+when the repository does not define another actor. Keep `kamkie` as the active
+GitHub CLI account. A fork under `kamkie` does not select the bot when its pull
+request targets a repository owned by someone else. Commits and branch pushes
+may use the configured Git or SSH identity;
 pull-request authorship comes from the credential that creates it. For each bot
 command, save and clear `GH_TOKEN` and `GITHUB_TOKEN`,
 obtain the stored `kamkie-codex-bot` token for that command, set it as

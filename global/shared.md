@@ -64,9 +64,12 @@ Never invent gates.
 
 An explicit repository implementation command includes validation, commit,
 branch push, and PR delivery unless the user or repository limits it. Follow
-repository gates. Wait for required CI on the current head and triage review
-before calling a PR ready; never skip or cancel automatic jobs. Merge and
-deployment require separate authority.
+repository gates. Monitor required CI on the current head yourself until it
+passes or a required check fails, then triage review and complete the
+authorized gates; pending CI is never a handoff point. Act on the first failed
+required check without waiting for the rest of the pipeline. Every watcher must
+end when checks finish or fail; stop any that is no longer needed. Never skip
+or cancel automatic jobs. Merge and deployment require separate authority.
 
 For a pull request whose verified target repository is
 `github.com/kamkie/<repository>`, use `kamkie-codex-bot` to create and mutate it

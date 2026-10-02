@@ -31,7 +31,12 @@ IDs. Resolve ambiguous matches before reading or writing a destination.
 1. Resolve the supplied link, chat ID, participants, or topic using the bindings
    above, then read the recent conversation in one call.
 2. Inspect timestamps, ordering, truncation, and any continuation metadata.
-   A recent read or search hit is not proof of full history. Fetch individual
+   A recent read or search hit is not proof of full history. In Claude, the
+   chat resource returns the 50 most recently updated messages, so a reaction
+   or edit can push newer sent messages out. When its `truncated` note
+   appears, treat as complete only messages created strictly after the oldest
+   `lastModifiedDateTime` returned, and only if every returned message has one;
+   never use the oldest `createdDateTime` as that boundary. Fetch individual
    full bodies only when previews omit text, tables, lists, or attachments
    needed for the request; use returned paths or per-message resource URIs.
 3. When the discussion points to a meeting or workshop, check its linked

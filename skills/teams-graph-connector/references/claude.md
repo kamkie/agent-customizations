@@ -1,8 +1,7 @@
 # Claude Microsoft 365 MCP customization
 
-Applies to Claude Code's Microsoft 365 (Graph) MCP connector. Limits and
-failure modes below were observed in 2026-10.
-Recheck exposed schemas and returned metadata when the connector changes.
+Use these bindings with Claude Code's Microsoft 365 (Graph) MCP connector.
+Check current tool schemas and returned metadata for limits and paging.
 Do not apply Codex Teams app parameters to these tools. The
 [shared entrypoint](../SKILL.md) owns authorization and reporting boundaries.
 

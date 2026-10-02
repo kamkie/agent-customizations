@@ -1,8 +1,7 @@
 # Codex Teams app customization
 
-Applies to the connected Teams app in Codex. Tool names below are action
-suffixes; discover their full names and current schemas. These bindings reflect
-the exposed tool schemas inspected in 2026-10, not live tenant measurements.
+Use these bindings with the connected Teams app in Codex. Tool names below
+are action suffixes; discover their full names and current schemas.
 Do not apply the Claude connector's 50-message resource cap or search offsets.
 The [shared entrypoint](../SKILL.md) owns authorization and reporting boundaries.
 

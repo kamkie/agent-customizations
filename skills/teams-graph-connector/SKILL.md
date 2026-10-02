@@ -35,7 +35,12 @@ messages exist.
    link, page `teams_list_chats` and match on member names or topic.
 2. **Read the latest 50** with `read_resource` on
    `teams:///chats/<id>/messages`, encoding `:` as `%3A` and `@` as `%40`.
-   Note the oldest `createdDateTime` returned; that is where history ends.
+   When the result is truncated, it is complete only for messages created
+   after the oldest `lastModifiedDateTime` returned: an unreturned message was
+   last updated, and so created, before that time. The oldest
+   `createdDateTime` is not a boundary, because a reacted or edited old message
+   can appear while newer ones are pushed out. If `lastModifiedDateTime` is
+   absent, treat no period as complete.
 3. **Open full bodies** only for messages whose preview is cut off or that
    carry tables, lists, or attachments. Previews stop at about 300 characters
    and search summaries are shorter. Inline images (`hostedContents`) cannot be
@@ -70,8 +75,10 @@ keep only results whose `chatUri` equals the target chat's
   fallback ran because `ChannelMessage.Read.All` is missing. Coverage is then
   partial and 429s are likely, so stop and report.
 
-Work backwards from the oldest message step 2 returned, window by window,
-until a window holds no messages from the chat or you reach its first message.
+Work backwards window by window from the completeness boundary step 2
+established, or from now when it established none, and deduplicate by message
+ID against what you already read. Stop when a window holds no messages from
+the chat or you reach its first message.
 
 ## Channels
 

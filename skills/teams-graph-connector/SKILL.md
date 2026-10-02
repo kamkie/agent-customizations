@@ -36,9 +36,12 @@ IDs. Resolve ambiguous matches before reading or writing a destination.
    needed for the request; use returned paths or per-message resource URIs.
 3. When the discussion points to a meeting or workshop, check its linked
    meeting chat if it is relevant to the requested summary.
-4. Attribute statements to people with dates and times; mark edits and system
-   events. State the period read in full, periods reached only through search,
-   and gaps. If completeness cannot be established, label the coverage partial.
+4. Attribute statements to people with dates and times. Mark edits using
+   returned edit metadata (such as `lastEditedDateTime`), and identify system
+   events using `messageType` other than `message` and `eventDetail` when
+   available. State the period read in full, periods reached only through
+   search, and gaps. If completeness cannot be established, label coverage
+   partial.
 
 For channels, older history, search, sending tool selection, or a throttled
 call, read only the matching customization:

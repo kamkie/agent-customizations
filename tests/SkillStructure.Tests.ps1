@@ -73,8 +73,9 @@ try {
         [IO.File]::WriteAllText($case.Path, (& $case.Mutate $original))
         $output = @(& pwsh -NoProfile -File $verifier 2>&1)
         Assert-True ($LASTEXITCODE -eq 1) "Verifier accepted $($case.Name)."
-        # Write-Error wraps long messages with '|' gutters; compare the flattened text.
-        $reported = ($output -join ' ') -replace '\s*\|\s*', ' ' -replace '\s+', ' '
+        # Write-Error colors and wraps long messages with '|' gutters on some
+        # hosts, such as CI runners; compare the plain flattened text.
+        $reported = ($output -join ' ') -replace '\x1b\[[0-9;]*m', '' -replace '\s*\|\s*', ' ' -replace '\s+', ' '
         Assert-True ($reported -like "*$($case.Expected)*") "Verifier did not report $($case.Name): $reported"
         if ($exists) {
             [IO.File]::WriteAllText($case.Path, $original)

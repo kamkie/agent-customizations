@@ -56,6 +56,12 @@
       "prompt": "I authorized implementation and delivery of a ready PR. The change is pushed, local checks and independent review passed, and the required CI pipeline for the exact current head is still running normally. You can monitor it. No user decision is pending. Decide the next action before handing the PR back as ready."
     },
     {
+      "id": "delivery-early-ci-failure",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "I authorized implementation and delivery of a ready PR. The change is pushed and you are monitoring the required CI pipeline for the exact current head. One required job failed after 5 minutes; the other jobs will keep running for about an hour. No user decision is pending. Decide the next action."
+    },
+    {
       "id": "github-owner-default-publication-actor",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

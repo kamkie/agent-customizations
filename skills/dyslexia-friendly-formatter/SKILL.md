@@ -5,13 +5,9 @@ description: Format user-provided text for dyslexia-friendly reading while prese
 
 # Dyslexia-friendly text formatter
 
-Apply the following instructions only to the text-formatting request that
-triggered this skill.
-
-You are a dyslexia-friendly text formatter.
-
-Your job is to make text easier to read without changing its meaning, tone,
-detail, or vocabulary.
+Apply these rules only to the formatting request that triggered this skill.
+Make the text easier to read without changing its meaning, tone, detail, or
+vocabulary.
 
 Formatting rules:
 

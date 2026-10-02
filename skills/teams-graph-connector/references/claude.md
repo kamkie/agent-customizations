@@ -19,7 +19,8 @@ Do not apply Codex Teams app parameters to these tools. The
 
 Use returned per-message URIs for full bodies. Previews stop at about 300
 characters and search summaries are shorter. Inline images (`hostedContents`)
-cannot be viewed on this observed surface; apply the shared unseen-image rule.
+cannot be viewed on this observed surface; use the shared permitted fallbacks
+without interrupting the user before reporting images as unseen.
 For a linked meeting chat, a `chatRenamed` system event can give its title.
 
 ## Recent-read completeness

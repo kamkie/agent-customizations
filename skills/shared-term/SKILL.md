@@ -10,7 +10,7 @@ Resolve `$sharedTermSkillDirectory` to this file's directory. The installed
 
 ```powershell
 $skillsRoot = Split-Path -Parent $sharedTermSkillDirectory
-$controller = Join-Path $skillsRoot 'managed-jobs\scripts\Invoke-ManagedJob.ps1'
+$controller = Join-Path $skillsRoot 'managed-jobs/scripts/Invoke-ManagedJob.ps1'
 $repo = git rev-parse --show-toplevel 2>$null
 if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 $job = (& $controller start -Name console -Executable pwsh.exe `

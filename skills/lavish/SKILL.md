@@ -9,7 +9,7 @@ Use the bundled wrapper for every Lavish command. It pins the reviewed CLI
 version, disables telemetry, binds only to loopback, and guards publishing,
 setup, and updates.
 
-    $lavish = Join-Path $PSScriptRoot 'scripts\Invoke-Lavish.ps1'
+    $lavish = Join-Path $PSScriptRoot 'scripts/Invoke-Lavish.ps1'
 
 When $PSScriptRoot does not resolve to this skill directory, discover the
 active skill directory first and construct the same script path from it.
@@ -45,11 +45,11 @@ active skill directory first and construct the same script path from it.
 
 Open the artifact:
 
-    & $lavish .\.lavish\artifact.html
+    & $lavish ./.lavish/artifact.html
 
 Then keep the poll attached to the active turn:
 
-    & $lavish poll .\.lavish\artifact.html --agent-reply 'What to review first'
+    & $lavish poll ./.lavish/artifact.html --agent-reply 'What to review first'
 
 - Do not detach, background, or impose a normal-use timeout on the poll.
 - Apply submitted annotations and decisions, save the same HTML file, reply

@@ -8,7 +8,7 @@ description: Contain, run, wait for completion, verify readiness, inspect, recov
 Resolve `$managedJobsSkillDirectory` to this file's directory, then use:
 
 ```powershell
-$jobs = Join-Path $managedJobsSkillDirectory 'scripts\Invoke-ManagedJob.ps1'
+$jobs = Join-Path $managedJobsSkillDirectory 'scripts/Invoke-ManagedJob.ps1'
 $repo = git rev-parse --show-toplevel 2>$null
 if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 ```

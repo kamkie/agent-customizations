@@ -43,6 +43,23 @@ function Get-MissingMarkdownFileLink {
     }
 }
 
+function Get-SkillFrontmatter {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # Skills keep single-line scalar frontmatter values; block scalars are unsupported.
+    $text = [IO.File]::ReadAllText($Path).Replace("`r`n", "`n")
+    $match = [regex]::Match($text, '\A---\n(.*?)\n---(?:\n|\z)', [Text.RegularExpressions.RegexOptions]::Singleline)
+    if (-not $match.Success) { return $null }
+    $fields = [ordered]@{}
+    foreach ($line in $match.Groups[1].Value -split "`n") {
+        $field = [regex]::Match($line, '^([A-Za-z][\w-]*):\s*(.*)$')
+        if ($field.Success) {
+            $fields[$field.Groups[1].Value] = $field.Groups[2].Value.Trim().Trim('"', "'")
+        }
+    }
+    return [pscustomobject]$fields
+}
+
 function Get-CustomizationTarget {
     param([Parameter(Mandatory)][string]$Name)
 

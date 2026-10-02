@@ -7,6 +7,15 @@ Audit child reports with [handoff-audit-checklist.md](handoff-audit-checklist.md
 A delivery unit is one repository in a multi-repository campaign or one
 independently reviewable outcome in a single-repository campaign.
 
+## Contents
+
+- [Controller Prompt](#controller-prompt): campaign registration, user and
+  repository authority, and operating requirements
+- [Primary Campaign Matrix](#primary-campaign-matrix)
+- [Ledger Skeleton](#ledger-skeleton)
+
+## Controller Prompt
+
 ```text
 Use $orchestrate-work-campaigns as the persistent controller for [campaign objective] in [repository/project], tracked by [parent item] and [child items]. You are the active controller; do not create another controller.
 

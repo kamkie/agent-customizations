@@ -18,6 +18,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Repository verification test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\MarkdownLinks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Markdown file-link tests failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\SkillStructure.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Skill structure verification tests failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionInstallation.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Instruction installation precondition tests failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionBehavior.Tests.ps1')

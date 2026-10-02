@@ -1,5 +1,7 @@
 # Claude Runner Runtime Reference
 
+## Contents
+
 - [Select a mode](#select-a-mode)
 - [Runtime rules](#runtime-rules)
 - [Permissions](#permissions)
@@ -45,7 +47,7 @@
 Resolve the requested repository rather than hard-coding paths, PR numbers, or session IDs:
 
 ```powershell
-$runner = Join-Path $claudeRunnerSkillDirectory 'scripts\Invoke-ClaudeRunner.ps1'
+$runner = Join-Path $claudeRunnerSkillDirectory 'scripts/Invoke-ClaudeRunner.ps1'
 $repo = git rev-parse --show-toplevel 2>$null
 if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 $pr = <pr-number>
@@ -89,7 +91,7 @@ Use an exact model:
 Custom task:
 
 ```powershell
-& $runner -WorkingDirectory $repo -PromptFile "$env:TEMP\claude-task.md" -ModelAlias opus -Effort high
+& $runner -WorkingDirectory $repo -PromptFile "$env:TEMP/claude-task.md" -ModelAlias opus -Effort high
 ```
 
 Exceptional explicit bypass for a non-review task:
@@ -106,7 +108,7 @@ For a resumed follow-up, send only the delta instruction unless the task changed
 
 ## Sessions, recovery, and logs
 
-Claude Code owns the canonical transcript under `CLAUDE_CONFIG_DIR\projects`, or `~/.claude/projects` when the variable is unset. The wrapper keeps persistence enabled and prints the native session id and directory. Resume with this wrapper or `claude --resume <session-id>`.
+Claude Code owns the canonical transcript under `$CLAUDE_CONFIG_DIR/projects`, or `~/.claude/projects` when the variable is unset. The wrapper keeps persistence enabled and prints the native session id and directory. Resume with this wrapper or `claude --resume <session-id>`.
 
 Claude Code CLI and Claude Desktop keep separate histories. Use Claude Code's `/desktop` command when an interactive CLI session must move into Desktop. Codex imports and continuity must use supported native artifacts, not the wrapper's raw diagnostic stream.
 
@@ -118,7 +120,7 @@ After an interruption:
 3. If it exited without the result, use `-Resume`, `-FromPr`, or `-ContinueLatest`.
 4. Start fresh only when no session exists or the user explicitly asks.
 
-The separate diagnostic JSONL defaults to `CLAUDE_CONFIG_DIR\logs\claude-runner`, or `~/.claude/logs/claude-runner`. Its reported summary omits prompts, allowlist contents, and passthrough values. Raw events can still be sensitive; never commit the log.
+The separate diagnostic JSONL defaults to `$CLAUDE_CONFIG_DIR/logs/claude-runner`, or `~/.claude/logs/claude-runner`. Its reported summary omits prompts, allowlist contents, and passthrough values. Raw events can still be sensitive; never commit the log.
 
 `-DryRun` reports the invocation without creating configuration or log paths. `-SelfTest` exercises rendering without a working directory and creates nothing. Tests may use `-ClaudeConfigDirectory`; intentional log overrides use `-LogDir` or `-LogPath`, resolved relative to the working directory when needed.
 

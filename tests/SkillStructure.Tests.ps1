@@ -62,7 +62,13 @@ try {
             Name = 'unterminated quoted description'
             Path = $skillPath
             Mutate = { param($text) $text -replace '(?m)^description: (.*)$', 'description: "$1' }
-            Expected = "Malformed double-quoted 'description'"
+            Expected = "Malformed or unsupported double-quoted 'description'"
+        },
+        @{
+            Name = 'unsupported escape in a quoted name'
+            Path = $skillPath
+            Mutate = { param($text) $text -replace '(?m)^name: .*$', 'name: "\144yslexia-friendly-formatter"' }
+            Expected = "Malformed or unsupported double-quoted 'name'"
         },
         @{
             Name = 'frontmatter continuation line'
@@ -105,11 +111,11 @@ try {
     Write-Host 'Skill structure: decoding quoted CRLF frontmatter'
     $original = [IO.File]::ReadAllText($skillPath)
     $quoted = $original.Replace("`r`n", "`n") -replace '(?m)^name: .*$', "name: 'dyslexia-friendly-formatter'" `
-        -replace '(?m)^description: .*$', 'description: "Formats text; it''s the \"reader\" view. Use when asked."'
+        -replace '(?m)^description: .*$', 'description: "Formats text; it''s the \"reader\" view at C:\\docs. Use when asked."'
     [IO.File]::WriteAllText($skillPath, $quoted.Replace("`n", "`r`n"))
     $frontmatter = Get-SkillFrontmatter -Path $skillPath
     Assert-True ($frontmatter.name -ceq 'dyslexia-friendly-formatter') 'Single-quoted CRLF name was not decoded.'
-    Assert-True ($frontmatter.description -ceq 'Formats text; it''s the "reader" view. Use when asked.') "Double-quoted description was not decoded: $($frontmatter.description)"
+    Assert-True ($frontmatter.description -ceq 'Formats text; it''s the "reader" view at C:\docs. Use when asked.') "Double-quoted description was not decoded: $($frontmatter.description)"
     $output = @(& pwsh -NoProfile -File $verifier 2>&1)
     Assert-True ($LASTEXITCODE -eq 0) ('Verifier rejected quoted CRLF frontmatter: ' + ($output -join ' '))
     [IO.File]::WriteAllText($skillPath, $original)

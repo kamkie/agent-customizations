@@ -61,9 +61,10 @@ function Get-SkillFrontmatter {
         if ($value -match '^[>|]') {
             throw "Block scalar for '$key' is unsupported in $Path"
         } elseif ($value.StartsWith('"')) {
-            $quoted = [regex]::Match($value, '^"((?:[^"\\]|\\.)*)"$')
-            if (-not $quoted.Success) { throw "Malformed double-quoted '$key' in $Path" }
-            $value = [regex]::Unescape($quoted.Groups[1].Value)
+            # Only \" and \\ are supported; other YAML escapes would need YAML decoding.
+            $quoted = [regex]::Match($value, '^"((?:[^"\\]|\\["\\])*)"$')
+            if (-not $quoted.Success) { throw "Malformed or unsupported double-quoted '$key' in $Path" }
+            $value = [regex]::Replace($quoted.Groups[1].Value, '\\(["\\])', '$1')
         } elseif ($value.StartsWith("'")) {
             $quoted = [regex]::Match($value, "^'((?:[^']|'')*)'$")
             if (-not $quoted.Success) { throw "Malformed single-quoted '$key' in $Path" }

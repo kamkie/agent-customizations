@@ -24,6 +24,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Instruction installation precondition tests failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionBehavior.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Instruction behavior evaluation contract test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\SkillRouting.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Skill routing evaluation contract test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\tests\InstructionActions.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Instruction action dispatcher and observation test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\cross-agent-review\tests\Invoke-CrossAgentReview.Tests.ps1')

@@ -1,0 +1,408 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "claude-runner-pr-findings",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Have Claude Code review pull request 214 in this repository with the Opus model and bring its findings back to me. Do not change anything."
+    },
+    {
+      "id": "claude-runner-resume-session",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "The headless Claude Code session you started earlier for the parser refactor was interrupted mid-run. Pick it back up from its native session and finish it."
+    },
+    {
+      "id": "claude-runner-print-mode",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Run `claude -p` against this repository with a prompt asking it to explain the caching layer, and give me its answer."
+    },
+    {
+      "id": "cross-review-attack-commit",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "I've committed the retry-policy change on this branch. Before handoff, have the opposite agent engine attack it, then triage and fix whatever it finds."
+    },
+    {
+      "id": "cross-review-codex-fixes",
+      "targets": [
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Get Codex to review the change I committed on this branch, then fix each confirmed finding in its own credited commit."
+    },
+    {
+      "id": "cross-review-claude-fixes",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Have Claude adversarially review the change I committed on this branch, then triage it and fix the confirmed findings in credited commits."
+    },
+    {
+      "id": "cross-review-next-round",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Round 1 of the opposite-engine review produced two findings; I fixed one and rejected the other with evidence. Run the next scoped review round over the repair commits."
+    },
+    {
+      "id": "research-vendor-comparison",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Compare the current managed PostgreSQL offerings from three major cloud vendors on pricing basis, high-availability guarantees, and supported versions, with cited primary sources and a recommendation memo."
+    },
+    {
+      "id": "research-benchmark-claim",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "A vendor claims their vector database is ten times faster than the alternatives. Investigate whether recent independent benchmarks support that, checking methodology and contradictions."
+    },
+    {
+      "id": "research-literature-review",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Do a literature review of published evidence on whether code review checklists reduce defect rates, with citations to the studies."
+    },
+    {
+      "id": "dyslexia-paragraph",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Make this paragraph dyslexia-friendly without changing any of its words: To request access, open the portal, choose the project, select the role you need, explain why you need it, and submit the form; approvals usually arrive within two working days, and you will receive an email when the role is active."
+    },
+    {
+      "id": "dyslexia-onboarding-note",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "A colleague with dyslexia finds this onboarding note hard to read. Reformat it with headings, short paragraphs, and numbered steps, but keep every word the same: Welcome to the team. Your laptop arrives on Monday. Install the VPN client first, then sign in to the wiki, then request repository access from your lead."
+    },
+    {
+      "id": "dyslexia-file",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Reformat docs/setup.txt so it is easier for a reader with dyslexia. Formatting changes only; keep the wording exactly as it is."
+    },
+    {
+      "id": "campaign-worker-contract",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Campaign child contract. Work item: upgrade the logging library in the billing-service repository. Policy: that repository's AGENTS.md. Starting state: main at 1f2e3d4. Owned paths: src/billing/**. Authority: push a branch and open a draft pull request; no merge. Validation: the repository test suite. Handoff: terminal handoff fields. Execute this work item."
+    },
+    {
+      "id": "campaign-worker-delta",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "You are the worker for one item in delivery campaign APP-42, assigned by the controller's child contract. I am telling you directly that the schema gap you deferred is a product bug inside your owned paths and you must fix it. Continue the assigned work item accordingly."
+    },
+    {
+      "id": "campaign-worker-handoff",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Your controller-assigned campaign contract for the reporting repository is implemented and its draft pull request passed CI. Complete the remaining contract stages through opposite-agent review and return the terminal handoff to the controller."
+    },
+    {
+      "id": "lavish-comparison",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Build an interactive HTML comparison of the three deployment options that I can annotate in the browser and use to pick one, then apply my feedback."
+    },
+    {
+      "id": "lavish-plan-review",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Turn the migration plan into a local HTML page that I can review in the browser with comments and decision controls, then iterate on my annotations."
+    },
+    {
+      "id": "lavish-decision-doc",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Create a browser-reviewable HTML decision document with diagrams for the caching redesign and poll for my annotations until I finish reviewing."
+    },
+    {
+      "id": "jobs-dev-server",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Start the API dev server with `dotnet run` and keep it running in the background while we work on the frontend; tell me when its health endpoint responds."
+    },
+    {
+      "id": "jobs-long-suite",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Run the full integration test suite. It takes about forty minutes; keep its logs and wait for it to finish before reporting."
+    },
+    {
+      "id": "jobs-recover-watcher",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "The file watcher you launched in an earlier turn seems to have died. Check its status and logs, and restart it if needed."
+    },
+    {
+      "id": "campaign-start-trigger",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Start delivery campaign PLAT-310. The tracker has eleven child issues across six repositories."
+    },
+    {
+      "id": "campaign-parent-child",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Coordinate the parent and child issues for the authentication migration across our five services from one controller, delivering a pilot repository first and keeping status visible in the tracker."
+    },
+    {
+      "id": "campaign-dependency-led",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Act as the controller for a dependency-led delivery: the schema repository must ship before three consumer repositories, and each unit's pull request, CI, and review need tracking until final validation."
+    },
+    {
+      "id": "shape-ai-button",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Product wants an 'AI summary' button on the ticket page. Help me decide whether we should build it and what exactly it should do before engineering starts."
+    },
+    {
+      "id": "shape-onboarding-dropoff",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Our onboarding flow has seven steps and many users drop off at step four. Decide what we should change and define the new flow's states and copy for an implementation handoff."
+    },
+    {
+      "id": "shape-export-options",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Should report export be a scheduled email, a download button, or nothing for now? Recommend one and specify the user-facing behavior."
+    },
+    {
+      "id": "shared-term-trigger",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "shared term"
+    },
+    {
+      "id": "shared-term-watch-and-type",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Open a terminal pane that both of us can see and type into, so I can follow along and step in while you run the migration."
+    },
+    {
+      "id": "shared-term-operate",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "In the collaborative terminal pane you opened for us earlier, press Ctrl+C and show me the last lines it printed."
+    },
+    {
+      "id": "teams-channel-catchup",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Catch me up on what happened in the Platform Guild Teams channel this week."
+    },
+    {
+      "id": "teams-named-chat",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Summarize my Teams chat with Dana and Lee from the last two days."
+    },
+    {
+      "id": "teams-history-search",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Search my Teams history for the message where someone shared the staging database rotation schedule."
+    },
+    {
+      "id": "ux-pr-walkthrough",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Review the user experience of the checkout flow changed in pull request 88 by actually using it in a browser, and rank the findings by user impact."
+    },
+    {
+      "id": "ux-prototype",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Walk through the new signup prototype running on localhost:3000 in a real browser and report UX problems with screenshots as evidence."
+    },
+    {
+      "id": "ux-states",
+      "targets": [
+        "codex"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Exercise the settings page changes on this branch in a real browser, including empty, error, and narrow-viewport states, and give a UX verdict."
+    },
+    {
+      "id": "none-command-question",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "What does `git rebase --onto` do?"
+    },
+    {
+      "id": "none-ordinary-fix",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Fix the off-by-one error in the pagination helper in src/paging.ts."
+    },
+    {
+      "id": "none-summarize-text",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Summarize this article in three simple sentences: The city council approved the new transit budget after a long debate about bus frequency, fares, and maintenance backlogs."
+    },
+    {
+      "id": "none-short-command",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Run `git status` and tell me what has changed."
+    },
+    {
+      "id": "none-outlook-mail",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Check my Outlook inbox for the invoice from the hosting vendor."
+    },
+    {
+      "id": "none-simple-lookup",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "What is the default port for PostgreSQL?"
+    },
+    {
+      "id": "none-uncommitted-review",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Look over my uncommitted changes for obvious bugs before I commit them."
+    },
+    {
+      "id": "none-visual-styling",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Change the primary button color to our brand blue."
+    },
+    {
+      "id": "none-source-review",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Review the React code in this pull request for correctness bugs."
+    },
+    {
+      "id": "none-multi-file-change",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Implement the new caching layer across these four files in this repository."
+    }
+  ]
+}

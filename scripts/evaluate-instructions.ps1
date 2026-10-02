@@ -3,6 +3,11 @@ param(
     [ValidateSet('codex', 'claude', 'all')]
     [string]$Target = 'all',
 
+    # behavior scores global-guidance decisions; skill-routing scores which
+    # installed skill a fresh agent would load for each request.
+    [ValidateSet('behavior', 'skill-routing')]
+    [string]$Suite = 'behavior',
+
     [Alias('Case')]
     [string[]]$CaseId,
 
@@ -18,6 +23,8 @@ param(
     [string]$CodexModel,
     [ValidateSet('none', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
     [string]$CodexReasoningEffort,
+    # Claude model alias or ID, such as haiku, sonnet, or opus.
+    [string]$ClaudeModel,
 
     # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
     [switch]$StockCodexInstructions
@@ -39,9 +46,10 @@ if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $nul
     if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Reviewed Codex model instructions file not found: $CodexModelInstructionsFile" }
 }
 $fixtureRoot = Join-Path $repositoryRoot 'tests\fixtures'
-$casesPath = Join-Path $fixtureRoot 'instruction-behavior-cases.json'
-$expectationsPath = Join-Path $fixtureRoot 'instruction-behavior-expectations.json'
-$schemaPath = Join-Path $fixtureRoot 'instruction-behavior-response.schema.json'
+$fixturePrefix = if ($Suite -eq 'skill-routing') { 'skill-routing' } else { 'instruction-behavior' }
+$casesPath = Join-Path $fixtureRoot "$fixturePrefix-cases.json"
+$expectationsPath = Join-Path $fixtureRoot "$fixturePrefix-expectations.json"
+$schemaPath = Join-Path $fixtureRoot "$fixturePrefix-response.schema.json"
 
 $caseDocument = Get-Content -LiteralPath $casesPath -Raw | ConvertFrom-Json
 $expectationDocument = Get-Content -LiteralPath $expectationsPath -Raw | ConvertFrom-Json
@@ -55,12 +63,12 @@ $selectedCases = @($caseDocument.cases | Where-Object {
 })
 
 if ($selectedCases.Count -eq 0) {
-    throw 'No instruction behavior cases matched the requested target and case filters.'
+    throw "No $Suite cases matched the requested target and case filters."
 }
 if ($CaseId) {
     $missingCases = @($CaseId | Where-Object { $_ -notin @($caseDocument.cases.id) })
     if ($missingCases.Count -gt 0) {
-        throw 'Unknown instruction behavior case(s): ' + ($missingCases -join ', ')
+        throw "Unknown $Suite case(s): " + ($missingCases -join ', ')
     }
 }
 
@@ -101,6 +109,14 @@ function Write-CompiledInstructions {
             $skill = [IO.File]::ReadAllText($skillPath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
             $content = $content.TrimEnd([char[]]"`r`n") + "`n`n" + $skill + "`n"
         }
+        'skill-catalog' {
+            # Mirror the agent's skill listing: routing sees only names and descriptions.
+            $catalog = foreach ($skillName in @($targetProperty.Value.skills)) {
+                $frontmatter = Get-SkillFrontmatter -Path (Join-Path $repositoryRoot "skills\$skillName\SKILL.md")
+                "- $($frontmatter.name): $($frontmatter.description)"
+            }
+            $content = $content.TrimEnd([char[]]"`r`n") + "`n`n## Available skills`n`n" + ($catalog -join "`n") + "`n"
+        }
         default { throw "Unknown instruction set: $InstructionSet" }
     }
     [IO.File]::WriteAllText(
@@ -112,6 +128,19 @@ function Write-CompiledInstructions {
 
 function Get-EvaluationPrompt {
     param([Parameter(Mandatory)]$Case)
+
+    if ($Suite -eq 'skill-routing') {
+        return @"
+This is a read-only skill-routing evaluation. Do not use tools or change any
+state. The active instructions end with the available skills and their routing
+descriptions. Choose the one skill you would load first to handle the request,
+or none when no listed skill applies. Return only the JSON object required by
+the response schema.
+
+Request:
+$($Case.prompt)
+"@
+    }
 
     return @"
 This is a read-only behavioral evaluation of the active instructions. Do not
@@ -209,10 +238,11 @@ function Read-AgentResponse {
                 # Claude accepts inline JSON for --json-schema; --tools ''
                 # disables built-in tools. Empty setting sources also prevent
                 # user or repository hooks from contaminating the fresh run.
+                $modelArguments = if ($ClaudeModel) { @('--model', $ClaudeModel) } else { @() }
                 $raw = & claude --print --no-session-persistence --permission-mode dontAsk `
                     --setting-sources '' --disable-slash-commands --tools '' `
                     --system-prompt-file $instructionsPath --json-schema $schema `
-                    --output-format json $prompt
+                    --output-format json @modelArguments $prompt
                 $claudeExit = $LASTEXITCODE
             } finally {
                 Pop-Location
@@ -313,7 +343,9 @@ try {
 
     $failed = @($results | Where-Object { -not $_.passed })
     [pscustomobject]@{
+        suite = $Suite
         targets = $requestedTargets
+        claudeModel = $ClaudeModel
         codexModel = $CodexModel
         codexReasoningEffort = $CodexReasoningEffort
         cases = $results.Count

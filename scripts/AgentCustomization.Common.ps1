@@ -46,16 +46,30 @@ function Get-MissingMarkdownFileLink {
 function Get-SkillFrontmatter {
     param([Parameter(Mandatory)][string]$Path)
 
-    # Skills keep single-line scalar frontmatter values; block scalars are unsupported.
+    # Skills use single-line scalar frontmatter. Reject any other YAML so that
+    # checks and routing catalogs never see a value different from the deployed one.
     $text = [IO.File]::ReadAllText($Path).Replace("`r`n", "`n")
     $match = [regex]::Match($text, '\A---\n(.*?)\n---(?:\n|\z)', [Text.RegularExpressions.RegexOptions]::Singleline)
-    if (-not $match.Success) { return $null }
+    if (-not $match.Success) { throw "No frontmatter block opens $Path" }
     $fields = [ordered]@{}
     foreach ($line in $match.Groups[1].Value -split "`n") {
-        $field = [regex]::Match($line, '^([A-Za-z][\w-]*):\s*(.*)$')
-        if ($field.Success) {
-            $fields[$field.Groups[1].Value] = $field.Groups[2].Value.Trim().Trim('"', "'")
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $field = [regex]::Match($line, '^([A-Za-z][\w-]*):[ \t]*(.*?)[ \t]*$')
+        if (-not $field.Success) { throw "Unsupported frontmatter line in ${Path}: $line" }
+        $key = $field.Groups[1].Value
+        $value = $field.Groups[2].Value
+        if ($value -match '^[>|]') {
+            throw "Block scalar for '$key' is unsupported in $Path"
+        } elseif ($value.StartsWith('"')) {
+            $quoted = [regex]::Match($value, '^"((?:[^"\\]|\\.)*)"$')
+            if (-not $quoted.Success) { throw "Malformed double-quoted '$key' in $Path" }
+            $value = [regex]::Unescape($quoted.Groups[1].Value)
+        } elseif ($value.StartsWith("'")) {
+            $quoted = [regex]::Match($value, "^'((?:[^']|'')*)'$")
+            if (-not $quoted.Success) { throw "Malformed single-quoted '$key' in $Path" }
+            $value = $quoted.Groups[1].Value.Replace("''", "'")
         }
+        $fields[$key] = $value
     }
     return [pscustomobject]$fields
 }

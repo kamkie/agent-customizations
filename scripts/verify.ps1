@@ -157,7 +157,12 @@ foreach ($skillName in $declaredSkills) {
     # Frontmatter limits follow Anthropic's skill authoring rules. The reserved
     # words apply only where Claude loads the skill; Codex-only skills may name
     # the Claude tool they wrap.
-    $frontmatter = Get-SkillFrontmatter -Path $skillFile
+    try {
+        $frontmatter = Get-SkillFrontmatter -Path $skillFile
+    } catch {
+        $errors.Add("Skill '$skillName' frontmatter is unsupported: $($_.Exception.Message)")
+        $frontmatter = $null
+    }
     $name = if ($frontmatter -and $frontmatter.PSObject.Properties['name']) { [string]$frontmatter.name } else { '' }
     $description = if ($frontmatter -and $frontmatter.PSObject.Properties['description']) { [string]$frontmatter.description } else { '' }
     if ([string]::IsNullOrWhiteSpace($name)) {

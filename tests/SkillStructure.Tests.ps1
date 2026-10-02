@@ -53,6 +53,24 @@ try {
             Expected = "Skill 'dyslexia-friendly-formatter' frontmatter contains an XML tag"
         },
         @{
+            Name = 'block scalar description'
+            Path = $skillPath
+            Mutate = { param($text) $text -replace '(?m)^description: .*$', ("description: >`n  " + ('x' * 1100)) }
+            Expected = "Skill 'dyslexia-friendly-formatter' frontmatter is unsupported: Block scalar for 'description'"
+        },
+        @{
+            Name = 'unterminated quoted description'
+            Path = $skillPath
+            Mutate = { param($text) $text -replace '(?m)^description: (.*)$', 'description: "$1' }
+            Expected = "Malformed double-quoted 'description'"
+        },
+        @{
+            Name = 'frontmatter continuation line'
+            Path = $skillPath
+            Mutate = { param($text) $text -replace '(?m)^(description: .*)$', "`$1`n  <instructions>continued</instructions>" }
+            Expected = 'Unsupported frontmatter line'
+        },
+        @{
             Name = 'uppercase name'
             Path = $skillPath
             Mutate = { param($text) $text -replace '(?m)^name: .*$', 'name: Dyslexia-Friendly-Formatter' }
@@ -83,6 +101,18 @@ try {
             Remove-Item -LiteralPath (Split-Path -Parent $case.Path) -Recurse
         }
     }
+
+    Write-Host 'Skill structure: decoding quoted CRLF frontmatter'
+    $original = [IO.File]::ReadAllText($skillPath)
+    $quoted = $original.Replace("`r`n", "`n") -replace '(?m)^name: .*$', "name: 'dyslexia-friendly-formatter'" `
+        -replace '(?m)^description: .*$', 'description: "Formats text; it''s the \"reader\" view. Use when asked."'
+    [IO.File]::WriteAllText($skillPath, $quoted.Replace("`n", "`r`n"))
+    $frontmatter = Get-SkillFrontmatter -Path $skillPath
+    Assert-True ($frontmatter.name -ceq 'dyslexia-friendly-formatter') 'Single-quoted CRLF name was not decoded.'
+    Assert-True ($frontmatter.description -ceq 'Formats text; it''s the "reader" view. Use when asked.') "Double-quoted description was not decoded: $($frontmatter.description)"
+    $output = @(& pwsh -NoProfile -File $verifier 2>&1)
+    Assert-True ($LASTEXITCODE -eq 0) ('Verifier rejected quoted CRLF frontmatter: ' + ($output -join ' '))
+    [IO.File]::WriteAllText($skillPath, $original)
 
     Write-Host 'Skill structure: accepting a long reference that opens with contents'
     $null = New-Item -ItemType Directory -Path (Split-Path -Parent $referencePath) -Force

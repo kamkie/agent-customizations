@@ -1,6 +1,6 @@
 ---
 name: teams-graph-connector
-description: Read, summarize, or search Microsoft Teams chats, channels, meeting chats, and older history through a Graph-backed connector in Codex or Claude Code. Also governs explicitly requested Teams messages and replies. Do not use for Outlook mail, calendar, or SharePoint files.
+description: Check, summarize, catch up on, or search Microsoft Teams chats, channels, meeting chats, chat or message links, conversations with named people, and older history through a Graph-backed connector in Codex or Claude Code. Also governs explicitly requested Teams messages and replies. Do not use for Outlook mail, calendar, or SharePoint files.
 ---
 
 # Teams via a Graph-backed connector

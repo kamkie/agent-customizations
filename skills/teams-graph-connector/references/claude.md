@@ -24,16 +24,11 @@ For a linked meeting chat, a `chatRenamed` system event can give its title.
 
 ## Recent-read completeness
 
-The chat resource returns the 50 most recently **updated** messages. Reactions
-and edits can pull an old message in and push newer sent messages out. Read
-the trailing `truncated` note: it means older messages exist.
-
-When truncated, a period is complete only for messages created strictly after
-the oldest `lastModifiedDateTime` returned, provided that timestamp is present
-for every returned message: an unreturned message was last updated, and thus
-created, no later than that boundary. The oldest `createdDateTime` is not a
-completeness boundary. If modification timestamps are missing, treat no period
-as complete. Keep searched periods separately labeled in the final coverage.
+The [entrypoint's read steps](../SKILL.md#read-and-summarize) own the
+completeness boundary for the chat resource. It holds because an unreturned
+message was last updated, and thus created, no later than the oldest returned
+`lastModifiedDateTime`. Keep searched periods separately labeled in the final
+coverage.
 
 ## Older chat history
 

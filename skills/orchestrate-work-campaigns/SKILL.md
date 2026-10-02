@@ -14,6 +14,21 @@ delivery unit. Apply the pilot, visible matrix, and denominator per unit.
 
 ## Run the Common Path
 
+Copy this checklist into the controller's progress updates and keep it current:
+
+```text
+- [ ] 1. Fit and authority confirmed
+- [ ] 2. One controller established
+- [ ] 3. Execution profile and inventory recorded
+- [ ] 4. Visible campaign matrix created
+- [ ] 5. Delivery-viability gate passed
+- [ ] 6. Representative pilot delivered
+- [ ] 7. Bounded workers launched
+- [ ] 8. Execution and steering controlled
+- [ ] 9. Every handoff audited
+- [ ] 10. Units integrated, denominator reconciled, outcome reported
+```
+
 1. **Confirm fit and authority.** Read the active repository and global
    instructions. Use a campaign only for several bounded delivery or experiment
    units whose dependencies, ownership, evidence, or integration require one

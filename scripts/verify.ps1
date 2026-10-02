@@ -154,13 +154,45 @@ foreach ($skillName in $declaredSkills) {
         [void]$markdownFiles.Add($file.FullName)
     }
 
-    $nameLine = Get-Content -LiteralPath $skillFile -TotalCount 20 |
-        Select-String -Pattern '^name:\s*["'']?([^"'']+)["'']?\s*$' |
-        Select-Object -First 1
-    if (-not $nameLine) {
+    # Frontmatter limits follow Anthropic's skill authoring rules. The reserved
+    # words apply only where Claude loads the skill; Codex-only skills may name
+    # the Claude tool they wrap.
+    try {
+        $frontmatter = Get-SkillFrontmatter -Path $skillFile
+    } catch {
+        $errors.Add("Skill '$skillName' frontmatter is unsupported: $($_.Exception.Message)")
+        $frontmatter = $null
+    }
+    $name = if ($frontmatter -and $frontmatter.PSObject.Properties['name']) { [string]$frontmatter.name } else { '' }
+    $description = if ($frontmatter -and $frontmatter.PSObject.Properties['description']) { [string]$frontmatter.description } else { '' }
+    if ([string]::IsNullOrWhiteSpace($name)) {
         $errors.Add("Skill '$skillName' has no parseable frontmatter name")
-    } elseif ($nameLine.Matches[0].Groups[1].Value.Trim() -ne $skillName) {
-        $errors.Add("Skill directory '$skillName' does not match frontmatter name '$($nameLine.Matches[0].Groups[1].Value.Trim())'")
+    } elseif ($name -cne $skillName) {
+        $errors.Add("Skill directory '$skillName' does not match frontmatter name '$name'")
+    } elseif ($name.Length -gt 64 -or $name -cnotmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') {
+        $errors.Add("Skill '$skillName' name must be at most 64 lowercase letters, digits, and single hyphens")
+    } elseif ($skillName -in @($manifest.targets.claude.skills) -and $name -match 'anthropic|claude') {
+        $errors.Add("Claude-deployed skill '$skillName' name contains a reserved word")
+    }
+    if ([string]::IsNullOrWhiteSpace($description)) {
+        $errors.Add("Skill '$skillName' has no frontmatter description")
+    } elseif ($description.Length -gt 1024) {
+        $errors.Add("Skill '$skillName' description exceeds 1024 characters")
+    }
+    if ("$name $description" -match '<[A-Za-z/][^>]*>') {
+        $errors.Add("Skill '$skillName' frontmatter contains an XML tag")
+    }
+
+    # Partial reads must still reveal a long reference's scope.
+    $referenceRoot = Join-Path $skillRoot 'references'
+    if (Test-Path -LiteralPath $referenceRoot -PathType Container) {
+        foreach ($reference in Get-ChildItem -LiteralPath $referenceRoot -Recurse -File -Filter '*.md') {
+            $lines = @(Get-Content -LiteralPath $reference.FullName)
+            $firstSection = $lines | Where-Object { $_ -match '^## ' } | Select-Object -First 1
+            if ($lines.Count -gt 100 -and $firstSection -notmatch '^## Contents\s*$') {
+                $errors.Add("Reference over 100 lines needs '## Contents' as its first section: skills/$skillName/references/$($reference.Name)")
+            }
+        }
     }
 }
 foreach ($skillName in $actualSkills) {

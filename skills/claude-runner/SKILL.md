@@ -11,7 +11,7 @@ and writes separate diagnostics outside target repositories.
 ## Happy path
 
 ```powershell
-$runner = Join-Path $claudeRunnerSkillDirectory 'scripts\Invoke-ClaudeRunner.ps1'
+$runner = Join-Path $claudeRunnerSkillDirectory 'scripts/Invoke-ClaudeRunner.ps1'
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
     throw 'Install and authenticate Claude Code CLI before a live run.'
 }

@@ -50,7 +50,8 @@ tools' live configuration directories are deployment targets.
   common publication hazards.
 - `scripts/evaluate-instructions.ps1` — runs input-only scenarios in fresh,
   read-only Codex or Claude sessions and scores their structured behavior
-  against separately stored expectations.
+  against separately stored expectations; `-Suite skill-routing` scores which
+  skill each request would load.
 - `scripts/evaluate-instruction-actions.ps1` — exercises a bounded tool protocol
   in disposable repositories and scores file effects and call order.
 - `scripts/status.ps1` — reports drift between this repository and live agent
@@ -110,6 +111,13 @@ CLI and may incur usage):
 
 ```powershell
 pwsh ./scripts/evaluate-instructions.ps1 -Target all
+```
+
+Run the live skill-routing suite after adding a skill or changing a skill
+description, once per Claude model expected to load the skill:
+
+```powershell
+pwsh ./scripts/evaluate-instructions.ps1 -Suite skill-routing -Target claude -ClaudeModel haiku
 ```
 
 Run the small live action suite for a consequential instruction change:

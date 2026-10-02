@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "skill"
+  ],
+  "properties": {
+    "skill": {
+      "type": "string",
+      "enum": [
+        "claude-runner",
+        "cross-agent-review",
+        "deep-research",
+        "dyslexia-friendly-formatter",
+        "execute-campaign-work-item",
+        "lavish",
+        "managed-jobs",
+        "orchestrate-work-campaigns",
+        "shape-product-decisions",
+        "shared-term",
+        "teams-graph-connector",
+        "ux-review",
+        "none"
+      ]
+    }
+  }
+}

@@ -79,6 +79,27 @@ as the canonical rule for what belongs in `SKILL.md` versus `references/`.
 Link each reference at the decision point that requires it. Do not require a
 reference merely to finish setup or construct the common invocation.
 
+`verify.ps1` enforces the Agent Skills frontmatter limits: a name of at most 64
+lowercase letters, digits, and hyphens; a non-empty description of at most 1,024
+characters; and no XML tags. Claude-deployed skill names must not contain
+`anthropic` or `claude`; a Codex-only skill may name the Claude tool it wraps,
+as `claude-runner` does. Name a new skill for the activity it performs in
+lowercase hyphenated words, such as `shape-product-decisions`; a product name
+fits only a skill that wraps that product, as `lavish` does. Do not rename an
+existing skill only for style, because the manifest, guidance, and installed
+homes all refer to it by name.
+
+Write paths in skill examples with forward slashes; PowerShell accepts them on
+every platform. Refer to an MCP tool by its fully qualified `Server:tool` name
+when the server name is stable. When a connector's server name varies by
+installation, use the bare tool name and make the skill discover the connected
+tools and inspect their schemas before calling them.
+
+A reference longer than 100 lines must open with a `## Contents` section as its
+first `##` heading, so a partial read still shows its scope; `verify.ps1`
+enforces this. Give a long multistep workflow a short progress checklist the
+agent can copy into its updates.
+
 Compactness is an outcome, not a line-count target. Remove repetition and
 low-value prose, but do not shorten an entrypoint until its examples depend on
 undefined variables, hidden setup, or mandatory reference loading. Keep each
@@ -116,6 +137,16 @@ evaluations use the selected agent CLI and are intentionally separate from the
 deterministic `verify.ps1` and `test.ps1` checks; run the affected target and
 case set when instruction behavior changes, then report the exact cases,
 targets, and results.
+
+Validate routing separately. `scripts/evaluate-instructions.ps1 -Suite
+skill-routing` gives a fresh session each target's compiled guidance plus the
+names and descriptions of that target's skills, then scores which skill it would
+load first. Each deployed skill keeps at least three positive cases per target,
+and each target keeps at least three near-miss requests that must load no skill;
+`tests/SkillRouting.Tests.ps1` enforces that coverage. Run the suite when a skill
+is added or removed or its description changes. Use `-ClaudeModel` for each
+Claude model expected to load the skill, such as `haiku`, `sonnet`, and `opus`,
+and `-CodexModel` for Codex models.
 
 For consequential changes to authorization, continuation, or stop behavior, also
 run the applicable cases in `scripts/evaluate-instruction-actions.ps1`. This

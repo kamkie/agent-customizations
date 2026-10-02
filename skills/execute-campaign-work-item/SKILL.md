@@ -48,6 +48,20 @@ state and report the exact additional write scope or authority required.
 
 ## Execute the Common Path
 
+Copy this checklist into your progress updates and keep it current:
+
+```text
+- [ ] Contract validated before writes
+- [ ] 1. Instruction sources read and recorded
+- [ ] 2. Base, worktree, branch, and locks proven
+- [ ] 3. Assigned work done within owned paths
+- [ ] 4. Long-running work under the durable process mechanism
+- [ ] 5. Required validation run against the exact output
+- [ ] 6. Authorized delivery stages completed through final-head validation
+- [ ] 7. Terminal actions taken only with explicit authority
+- [ ] 8. Final diff inspected and terminal handoff returned
+```
+
 1. Read every applicable instruction source and record the exact version or
    scope inspected. Newly discovered policy may narrow work or strengthen
    validation; it may not broaden authority or owned paths.

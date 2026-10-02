@@ -43,6 +43,38 @@ function Get-MissingMarkdownFileLink {
     }
 }
 
+function Get-SkillFrontmatter {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # Skills use single-line scalar frontmatter. Reject any other YAML so that
+    # checks and routing catalogs never see a value different from the deployed one.
+    $text = [IO.File]::ReadAllText($Path).Replace("`r`n", "`n")
+    $match = [regex]::Match($text, '\A---\n(.*?)\n---(?:\n|\z)', [Text.RegularExpressions.RegexOptions]::Singleline)
+    if (-not $match.Success) { throw "No frontmatter block opens $Path" }
+    $fields = [ordered]@{}
+    foreach ($line in $match.Groups[1].Value -split "`n") {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $field = [regex]::Match($line, '^([A-Za-z][\w-]*):[ \t]*(.*?)[ \t]*$')
+        if (-not $field.Success) { throw "Unsupported frontmatter line in ${Path}: $line" }
+        $key = $field.Groups[1].Value
+        $value = $field.Groups[2].Value
+        if ($value -match '^[>|]') {
+            throw "Block scalar for '$key' is unsupported in $Path"
+        } elseif ($value.StartsWith('"')) {
+            # Only \" and \\ are supported; other YAML escapes would need YAML decoding.
+            $quoted = [regex]::Match($value, '^"((?:[^"\\]|\\["\\])*)"$')
+            if (-not $quoted.Success) { throw "Malformed or unsupported double-quoted '$key' in $Path" }
+            $value = [regex]::Replace($quoted.Groups[1].Value, '\\(["\\])', '$1')
+        } elseif ($value.StartsWith("'")) {
+            $quoted = [regex]::Match($value, "^'((?:[^']|'')*)'$")
+            if (-not $quoted.Success) { throw "Malformed single-quoted '$key' in $Path" }
+            $value = $quoted.Groups[1].Value.Replace("''", "'")
+        }
+        $fields[$key] = $value
+    }
+    return [pscustomobject]$fields
+}
+
 function Get-CustomizationTarget {
     param([Parameter(Mandatory)][string]$Name)
 

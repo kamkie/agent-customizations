@@ -12,6 +12,12 @@ Both delegation thresholds must hold: three independent evidence streams make
 the workload worth considering, and at least two concurrent scout slots make
 parallel collection worthwhile.
 
+## Contents
+
+- [Discover and Use Capacity](#discover-and-use-capacity)
+- [Create Each Scout Contract](#create-each-scout-contract)
+- [Converge and Audit](#converge-and-audit)
+
 ## Discover and Use Capacity
 
 1. Read the active runtime instructions and the agent-spawn tool schema for the

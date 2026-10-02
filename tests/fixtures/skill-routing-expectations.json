@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "expectations": {
+    "claude-runner-pr-findings": {
+      "skill": "claude-runner"
+    },
+    "claude-runner-resume-session": {
+      "skill": "claude-runner"
+    },
+    "claude-runner-print-mode": {
+      "skill": "claude-runner"
+    },
+    "cross-review-attack-commit": {
+      "skill": "cross-agent-review"
+    },
+    "cross-review-codex-fixes": {
+      "skill": "cross-agent-review"
+    },
+    "cross-review-claude-fixes": {
+      "skill": "cross-agent-review"
+    },
+    "cross-review-next-round": {
+      "skill": "cross-agent-review"
+    },
+    "research-vendor-comparison": {
+      "skill": "deep-research"
+    },
+    "research-benchmark-claim": {
+      "skill": "deep-research"
+    },
+    "research-literature-review": {
+      "skill": "deep-research"
+    },
+    "dyslexia-paragraph": {
+      "skill": "dyslexia-friendly-formatter"
+    },
+    "dyslexia-onboarding-note": {
+      "skill": "dyslexia-friendly-formatter"
+    },
+    "dyslexia-file": {
+      "skill": "dyslexia-friendly-formatter"
+    },
+    "campaign-worker-contract": {
+      "skill": "execute-campaign-work-item"
+    },
+    "campaign-worker-delta": {
+      "skill": "execute-campaign-work-item"
+    },
+    "campaign-worker-handoff": {
+      "skill": "execute-campaign-work-item"
+    },
+    "lavish-comparison": {
+      "skill": "lavish"
+    },
+    "lavish-plan-review": {
+      "skill": "lavish"
+    },
+    "lavish-decision-doc": {
+      "skill": "lavish"
+    },
+    "jobs-dev-server": {
+      "skill": "managed-jobs"
+    },
+    "jobs-long-suite": {
+      "skill": "managed-jobs"
+    },
+    "jobs-recover-watcher": {
+      "skill": "managed-jobs"
+    },
+    "campaign-start-trigger": {
+      "skill": "orchestrate-work-campaigns"
+    },
+    "campaign-parent-child": {
+      "skill": "orchestrate-work-campaigns"
+    },
+    "campaign-dependency-led": {
+      "skill": "orchestrate-work-campaigns"
+    },
+    "shape-ai-button": {
+      "skill": "shape-product-decisions"
+    },
+    "shape-onboarding-dropoff": {
+      "skill": "shape-product-decisions"
+    },
+    "shape-export-options": {
+      "skill": "shape-product-decisions"
+    },
+    "shared-term-trigger": {
+      "skill": "shared-term"
+    },
+    "shared-term-watch-and-type": {
+      "skill": "shared-term"
+    },
+    "shared-term-operate": {
+      "skill": "shared-term"
+    },
+    "teams-channel-catchup": {
+      "skill": "teams-graph-connector"
+    },
+    "teams-named-chat": {
+      "skill": "teams-graph-connector"
+    },
+    "teams-history-search": {
+      "skill": "teams-graph-connector"
+    },
+    "ux-pr-walkthrough": {
+      "skill": "ux-review"
+    },
+    "ux-prototype": {
+      "skill": "ux-review"
+    },
+    "ux-states": {
+      "skill": "ux-review"
+    },
+    "none-command-question": {
+      "skill": "none"
+    },
+    "none-ordinary-fix": {
+      "skill": "none"
+    },
+    "none-summarize-text": {
+      "skill": "none"
+    },
+    "none-short-command": {
+      "skill": "none"
+    },
+    "none-outlook-mail": {
+      "skill": "none"
+    },
+    "none-simple-lookup": {
+      "skill": "none"
+    },
+    "none-uncommitted-review": {
+      "skill": "none"
+    },
+    "none-visual-styling": {
+      "skill": "none"
+    },
+    "none-source-review": {
+      "skill": "none"
+    },
+    "none-multi-file-change": {
+      "skill": "none"
+    }
+  }
+}

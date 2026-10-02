@@ -2,6 +2,18 @@
 
 Use this checklist before accepting a child result, advancing the accepted integration state, starting dependent work, or crossing a readiness, merge, or delivery gate. A child report is a claim until the controller verifies it against exact live state.
 
+## Contents
+
+1. [Freeze and identify the child state](#1-freeze-and-identify-the-child-state)
+2. [Verify contract, scope, and repository state](#2-verify-contract-scope-and-repository-state)
+3. [Verify validation, evidence, and limitations](#3-verify-validation-evidence-and-limitations)
+4. [Verify remote delivery state when applicable](#4-verify-remote-delivery-state-when-applicable)
+5. [Perform an authorized terminal action](#5-perform-an-authorized-terminal-action)
+6. [Record the audit outcome and campaign decision](#6-record-the-audit-outcome-and-campaign-decision)
+7. [Recover without losing ownership or provenance](#7-recover-without-losing-ownership-or-provenance)
+8. [Reconcile campaign visibility and denominator](#8-reconcile-campaign-visibility-and-denominator)
+- [Audit Record](#audit-record)
+
 ## 1. Freeze and identify the child state
 
 - Record the visible task/session, assigned worktree, branch owner, expected input SHA, actual base SHA, output HEAD or artifact version, and resource-lock state.

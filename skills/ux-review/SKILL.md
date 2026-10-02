@@ -37,6 +37,20 @@ the interface in a real browser.
 
 ## Run the Common Path
 
+Copy this checklist into your progress updates and keep it current:
+
+```text
+- [ ] 1. Review unit resolved
+- [ ] 2. User's work established
+- [ ] 3. Runnable environment attached
+- [ ] 4. Task walked
+- [ ] 5. Relevant states exercised
+- [ ] 6. Consistency and humane behavior checked
+- [ ] 7. Evidence captured
+- [ ] 8. Findings written
+- [ ] 9. Environment and evidence cleaned up
+```
+
 1. **Resolve the review unit.** Identify the pull request, branch, working tree,
    prototype, or named flow. For a code change, inspect its diff against the
    repository-defined base and list the user-visible surfaces it can affect.
@@ -65,20 +79,11 @@ the interface in a real browser.
    semantic roles, labels, or visible text. Do not infer behavior from source or
    screenshots when the live interface can answer it.
 
-5. **Exercise relevant states.** Check the states that the change or task can
-   realistically reach:
-
-   - default and populated;
-   - empty;
-   - loading or delayed;
-   - partial data;
-   - validation and system error;
-   - no permission or signed out;
-   - long content or large values;
-   - narrow viewport and zoom;
-   - keyboard focus and accessible naming;
-   - alternate theme when the product exposes one.
-
+5. **Exercise relevant states.** Check each state the change or task can
+   realistically reach: default and populated, empty, loading or delayed,
+   partial data, validation and system error, no permission or signed out, long
+   content or large values, narrow viewport and zoom, keyboard focus and
+   accessible naming, and an alternate theme when the product exposes one.
    A state that the task needs but the interface does not provide is a finding.
    Mark a state `not exercised` when it cannot be reached safely; do not silently
    count it as passing.
@@ -91,16 +96,15 @@ the interface in a real browser.
    observed usability failures, established heuristics, and reviewer judgment.
 
 7. **Capture evidence.** Preserve a screenshot or browser snapshot for each
-   finding and for important passing states when the available browser supports
-   it. Unless the user or repository specifies another location, store evidence
-   in a task-scoped temporary directory outside the source branch. Name files by
-   review step and state, verify that each artifact exists, and redact or omit
-   sensitive content. Retain artifacts while writing the review. Before final
-   handoff, delete the task-scoped temporary directory unless the user asks to
-   keep it or the repository requires retained evidence. For retained artifacts,
-   report the exact location, sensitivity, and cleanup responsibility. For
-   deleted artifacts, preserve the exact observation in the finding and report
-   that the temporary evidence was removed; never leave a dangling path.
+   finding and important passing state when the browser supports it. Unless the
+   user or repository names a location, use a task-scoped temporary directory
+   outside the source branch; name files by step and state, verify each exists,
+   and redact or omit sensitive content. Delete that directory before final
+   handoff unless the user asks to keep it or the repository requires retained
+   evidence. Report retained artifacts' exact location, sensitivity, and cleanup
+   responsibility. For deleted artifacts, keep the exact observation in the
+   finding and say the temporary evidence was removed; never leave a dangling
+   path.
 
 8. **Write actionable findings.** Rank findings by the combination of impact,
    likely frequency, and reach, not by ease of repair. Each finding must include:

@@ -64,8 +64,9 @@ Never invent gates.
 
 An explicit repository implementation command includes validation, commit,
 branch push, and PR delivery unless the user or repository limits it. Follow
-repository gates. Wait for required CI on the current head and triage review
-before calling a PR ready; never skip or cancel automatic jobs. Merge and
+repository gates. Monitor required CI on the current head yourself until it
+finishes, then triage review and complete the authorized gates; pending CI is
+never a handoff point, and never skip or cancel automatic jobs. Merge and
 deployment require separate authority.
 
 For a pull request whose verified target repository is

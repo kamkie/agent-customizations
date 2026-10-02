@@ -77,8 +77,11 @@ keep only results whose `chatUri` equals the target chat's
 
 Work backwards window by window from the completeness boundary step 2
 established, or from now when it established none, and deduplicate by message
-ID against what you already read. Stop when a window holds no messages from
-the chat or you reach its first message.
+ID against what you already read. An empty window is a quiet period, not the
+start of the chat: continue past it. Stop at the user's requested start date
+or the chat's first message (its creation event, or the chat's
+`createdDateTime` when a tool returns it). If neither is known, ask how far
+back to go or report the coverage as incomplete.
 
 ## Channels
 

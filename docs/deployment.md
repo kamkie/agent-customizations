@@ -205,10 +205,10 @@ Sessions already running keep the hook snapshot captured at startup.
 The Codex target deploys `global/codex-model-instructions.md` to
 `~/.codex/model-instructions-astra.md` (a legacy destination name). That file
 replaces Codex's built-in model instructions; it is the stock Sol 6.1 prompt
-with closing-status and authorization overrides. The overrides preserve the
-authority and work modes owned by `global/shared.md`: questions permit
-inspection, implementation requires an explicit command, and skills or plugins
-cannot authorize messages on the user's behalf.
+with closing-status and explicit-command authorization overrides. The
+authorization overrides defer to the effective `AGENTS.md`: questions permit
+inspection, and implementation requires an explicit command. Messaging and
+persistence use the stock Sol 6.1 paragraphs.
 
 The stock baseline comes from `gpt-6.1-sol`'s
 `model_messages.instructions_template` in the

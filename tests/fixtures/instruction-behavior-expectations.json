@@ -295,6 +295,22 @@
       "deploymentAuthorized": false,
       "blockerSource": "none"
     },
+    "skill-invocation-no-message-authority": {
+      "autonomous": false,
+      "primaryAction": "answer-read-only",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
+    },
+    "explicit-message-authority": {
+      "autonomous": false,
+      "primaryAction": "continue-authorized-work",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
+    },
     "timeout-unknown-duration-analysis": {
       "autonomous": false,
       "primaryAction": "implement-and-deliver",

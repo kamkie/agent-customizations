@@ -204,10 +204,18 @@ Sessions already running keep the hook snapshot captured at startup.
 
 The Codex target deploys `global/codex-model-instructions.md` to
 `~/.codex/model-instructions-astra.md` (a legacy destination name). That file
-replaces Codex's built-in model instructions; it is the stock Sol 6 prompt with
-one compact closing-status patch. Re-base it when OpenAI changes the stock
-prompt (compare the `base_instructions` recorded in a fresh session's
-`session_meta`).
+replaces Codex's built-in model instructions; it is the stock Sol 6.1 prompt
+with closing-status and explicit-command authorization overrides. The
+authorization overrides defer to the effective `AGENTS.md`: questions permit
+inspection, and implementation requires an explicit command. Messaging and
+persistence use the stock Sol 6.1 paragraphs.
+
+The stock baseline comes from `gpt-6.1-sol`'s
+`model_messages.instructions_template` in the
+[OpenAI model catalog](https://github.com/openai/codex/blob/b1e72963c3b71a9265a551e54beff078384efed9/codex-rs/models-manager/models.json),
+with trailing whitespace and the final newline normalized. Re-base it when
+OpenAI changes that prompt, keeping the clean stock import and our overrides
+in separate commits so their differences remain reviewable.
 
 Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not
 managed by this repository; add the key once, at the top level, before any
@@ -226,7 +234,7 @@ prompt. Use `-CodexModel` and `-CodexReasoningEffort` to test a specific model:
 
 ```powershell
 pwsh ./scripts/evaluate-instructions.ps1 -Target codex
-pwsh ./scripts/evaluate-instructions.ps1 -Target codex -CodexModel gpt-6-sol -CodexReasoningEffort medium
+pwsh ./scripts/evaluate-instructions.ps1 -Target codex -CodexModel gpt-6.1-sol -CodexReasoningEffort high
 pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -StockCodexInstructions
 ```
 

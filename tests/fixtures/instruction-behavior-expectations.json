@@ -18,8 +18,7 @@
     "pr-ready-explicit-in-scope-matrix": {
       "primaryAction": "keep-draft-and-report",
       "mergeAuthorized": false,
-      "deploymentAuthorized": false,
-      "blockerSource": "access"
+      "deploymentAuthorized": false
     },
     "pr-ready-agent-review-incomplete": {
       "primaryAction": "run-scoped-review",

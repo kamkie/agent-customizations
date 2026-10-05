@@ -71,6 +71,16 @@ required check without waiting for the rest of the pipeline. Every watcher must
 end when checks finish or fail; stop any that is no longer needed. Never skip
 or cancel automatic jobs. Merge and deployment require separate authority.
 
+Draft means a PR is not ready for the maintainer's review. Once its scoped
+changes, required checks, agent review, and applicable explicit PR-readiness
+gates are complete, mark it ready automatically. Verify its live draft/ready
+state before handoff or asking the maintainer to review or approve. Agent review
+and automated validation precede the maintainer review that starts after Ready.
+Pending merge approval or release/deployment work outside the PR's scope does
+not justify draft status. If it remains draft, identify the unfinished PR work
+or cite the exact applicable restriction; keep task-specific readiness gates
+visible and distinguish them from later merge or deployment gates.
+
 For a pull request whose verified target repository is
 `github.com/kamkie/<repository>`, use `kamkie-codex-bot` to create and mutate it
 when the repository does not define another actor. Keep `kamkie` as the active

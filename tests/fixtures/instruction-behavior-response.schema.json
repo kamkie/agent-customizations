@@ -16,6 +16,7 @@
     "autonomous": { "type": "boolean" },
     "primaryAction": {
       "type": "string",
+      "description": "mark-ready-and-verify means issue a Ready mutation and then verify live state. refresh-live-state means read current state, including verifying a Ready mutation already issued successfully. keep-draft-and-report means retain draft and report unfinished PR work or the applicable restriction.",
       "enum": [
         "answer-read-only",
         "continue-design-discussion",
@@ -38,6 +39,8 @@
         "inventory-authority-checkpoint",
         "deliver-pilot-before-fanout",
         "refresh-live-state",
+        "mark-ready-and-verify",
+        "keep-draft-and-report",
         "obtain-evidence-yourself"
       ]
     },

@@ -1,13 +1,14 @@
 # Agent customizations repository
 
-This repository is the reviewed source for the global guidance, skills, and hook
-registrations in `config/manifest.json`. Live Codex and Claude Code configuration
+This repository is the reviewed source for the global guidance, skills, plugins,
+and hook registrations in `config/manifest.json`. Live Codex and Claude Code configuration
 directories are deployment targets, not editing locations.
 
 ## Working rules
 
 - Put shared defaults in `global/shared.md`, agent-specific guidance in its
-  overlay, and each skill in `skills/<name>/`. Classify changes with
+  overlay, each skill in `skills/<name>/`, and each agent plugin in
+  `plugins/<target>/<name>/`. Classify changes with
   [customization ownership](docs/customization-ownership.md); portable skills
   discover repository contracts rather than embed them.
 - Follow [maintenance guidance](docs/maintaining-customizations.md). Keep each

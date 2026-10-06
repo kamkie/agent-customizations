@@ -43,6 +43,7 @@ if (Test-Path -LiteralPath $codeownersPath -PathType Leaf) {
 $targetNames = @($manifest.targets.PSObject.Properties.Name)
 if ($targetNames.Count -eq 0) { $errors.Add('Manifest declares no targets') }
 $declaredSkills = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$declaredPlugins = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 $supportedHookEvents = @(
     'SessionStart', 'SessionEnd', 'SubagentStart', 'SubagentStop',
     'PreToolUse', 'PostToolUse', 'PermissionRequest',
@@ -100,6 +101,34 @@ foreach ($targetName in $targetNames) {
 
     foreach ($skillName in @($target.skills)) {
         [void]$declaredSkills.Add([string]$skillName)
+    }
+
+    $pluginsProperty = $target.PSObject.Properties['plugins']
+    if ($pluginsProperty) {
+        $plugins = $pluginsProperty.Value
+        if ([string]::IsNullOrWhiteSpace([string]$plugins.destination)) {
+            $errors.Add("Target '$targetName' plugins have no destination")
+        }
+        foreach ($pluginName in @($plugins.entries)) {
+            [void]$declaredPlugins.Add("$targetName/$pluginName")
+            if ([string]$plugins.destination -eq 'skills' -and $pluginName -in @($target.skills)) {
+                $errors.Add("Target '$targetName' plugin '$pluginName' collides with a skill of the same name")
+            }
+            $pluginManifest = Join-Path $repositoryRoot "plugins\$targetName\$pluginName\.claude-plugin\plugin.json"
+            if (-not (Test-Path -LiteralPath $pluginManifest -PathType Leaf)) {
+                $errors.Add("Plugin '$targetName/$pluginName' has no .claude-plugin/plugin.json")
+                continue
+            }
+            try {
+                $nameProperty = (Get-Content -LiteralPath $pluginManifest -Raw | ConvertFrom-Json).PSObject.Properties['name']
+                $manifestName = if ($nameProperty) { [string]$nameProperty.Value } else { '' }
+            } catch {
+                $manifestName = ''
+            }
+            if ($manifestName -cne $pluginName) {
+                $errors.Add("Plugin directory '$targetName/$pluginName' does not match plugin.json name '$manifestName'")
+            }
+        }
     }
 
     if ($target.PSObject.Properties.Name -contains 'hooks') {
@@ -200,6 +229,17 @@ foreach ($skillName in $actualSkills) {
         $errors.Add("Undeclared skill directory: $skillName")
     }
 }
+$pluginsRoot = Join-Path $repositoryRoot 'plugins'
+if (Test-Path -LiteralPath $pluginsRoot -PathType Container) {
+    foreach ($targetDirectory in Get-ChildItem -LiteralPath $pluginsRoot -Directory -Force) {
+        foreach ($pluginDirectory in Get-ChildItem -LiteralPath $targetDirectory.FullName -Directory -Force) {
+            $pluginKey = $targetDirectory.Name + '/' + $pluginDirectory.Name
+            if (-not $declaredPlugins.Contains($pluginKey)) {
+                $errors.Add("Undeclared plugin directory: plugins/$pluginKey")
+            }
+        }
+    }
+}
 
 foreach ($file in $markdownFiles | Sort-Object) {
     foreach ($missing in Get-MissingMarkdownFileLink -Path $file) {
@@ -211,6 +251,7 @@ foreach ($file in $markdownFiles | Sort-Object) {
 $managedRoots = @(
     (Join-Path $repositoryRoot 'global'),
     (Join-Path $repositoryRoot 'skills'),
+    (Join-Path $repositoryRoot 'plugins'),
     (Join-Path $repositoryRoot 'hooks'),
     (Join-Path $repositoryRoot 'tests')
 )
@@ -260,6 +301,7 @@ if ($errors.Count -gt 0) {
     schemaVersion = $manifest.schemaVersion
     targets = $targetNames.Count
     skills = $declaredSkills.Count
+    plugins = $declaredPlugins.Count
     managedSourceFiles = $managedFiles.Count
     result = 'Valid'
 } | ConvertTo-Json -Depth 4

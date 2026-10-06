@@ -86,7 +86,6 @@ foreach ($targetName in $selectedTargets) {
 
     $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $backupRoot = Join-Path $resolvedHome "customization-backups\$timestamp"
-    $skillsRoot = Join-Path $resolvedHome 'skills'
 
     if ($PSCmdlet.ShouldProcess($resolvedHome, "Install $($drift.Count) $($targetConfig.displayName) customization change(s)")) {
         if ($ExpectedInstructionHashes) {
@@ -95,7 +94,7 @@ foreach ($targetName in $selectedTargets) {
                 Assert-CustomizationInstructionHash -Path (Join-Path $resolvedHome $targetConfig.modelInstructions.destination) -Expected $ExpectedModelInstructionHashes[$targetName]
             }
         }
-        New-Item -ItemType Directory -Path $resolvedHome, $skillsRoot, $backupRoot -Force | Out-Null
+        New-Item -ItemType Directory -Path $resolvedHome, $backupRoot -Force | Out-Null
 
         $instructionContent = Get-CustomizationInstructionContent -Target $targetConfig
         $instructionTarget = Join-Path $resolvedHome ([string]$targetConfig.instructions.destination)
@@ -121,16 +120,17 @@ foreach ($targetName in $selectedTargets) {
             Move-Item -LiteralPath $temporaryModel -Destination $modelTarget -Force
         }
 
-        foreach ($skillName in @($targetConfig.skills)) {
-            $skillDrift = @($status | Where-Object { $_.Kind -eq 'Skill' -and $_.Name -eq $skillName -and $_.State -ne 'InSync' })
-            if ($skillDrift.Count -eq 0) { continue }
+        foreach ($item in Get-CustomizationDirectoryItems -TargetName $targetName) {
+            $itemDrift = @($status | Where-Object { $_.Kind -eq $item.Kind -and $_.Name -eq $item.Name -and $_.State -ne 'InSync' })
+            if ($itemDrift.Count -eq 0) { continue }
 
-            $source = Join-Path $repositoryRoot "skills\$skillName"
-            $destination = Join-Path $skillsRoot $skillName
-            $staging = Join-Path $skillsRoot ('.' + $skillName + '.install-' + [guid]::NewGuid().ToString('N'))
-            $backup = Join-Path (Join-Path $backupRoot 'skills') $skillName
+            $destination = Join-Path $resolvedHome $item.Destination
+            $destinationRoot = Split-Path -Parent $destination
+            $staging = Join-Path $destinationRoot ('.' + $item.Name + '.install-' + [guid]::NewGuid().ToString('N'))
+            $backup = Join-Path $backupRoot $item.Destination
 
-            Copy-Item -LiteralPath $source -Destination $staging -Recurse -Force
+            New-Item -ItemType Directory -Path $destinationRoot -Force | Out-Null
+            Copy-Item -LiteralPath $item.Source -Destination $staging -Recurse -Force
             try {
                 if (Test-Path -LiteralPath $destination -PathType Container) {
                     New-Item -ItemType Directory -Path (Split-Path -Parent $backup) -Force | Out-Null

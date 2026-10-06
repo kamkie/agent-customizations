@@ -336,6 +336,39 @@ try {
         throw 'Claude hook repair must preserve unrelated settings and hook entries.'
     }
 
+    $installedPlugin = Join-Path $claudeSandbox 'skills\session-cost'
+    if (-not (Test-Path -LiteralPath (Join-Path $installedPlugin '.claude-plugin\plugin.json') -PathType Leaf)) {
+        throw 'Claude installation did not deploy the session-cost plugin into its skills directory.'
+    }
+    if (Test-Path -LiteralPath (Join-Path $codexSandbox 'skills\session-cost')) {
+        throw 'Codex installation must not deploy Claude plugins.'
+    }
+    $generatedTypes = Join-Path $installedPlugin '.claude-plugin\types\claude-code'
+    $null = New-Item -ItemType Directory -Path $generatedTypes -Force
+    Set-Content -LiteralPath (Join-Path $generatedTypes 'index.d.ts') -Value 'export {}'
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
+        -Target Claude `
+        -ClaudeHome $claudeSandbox `
+        -SummaryOnly
+    if ($LASTEXITCODE -ne 0) { throw 'Type declarations Claude Code generates in a plugin must not count as drift.' }
+
+    $installedModule = Join-Path $installedPlugin 'hooks\register.tsx'
+    Add-Content -LiteralPath $installedModule -Value '// deliberate test drift'
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
+        -Target Claude `
+        -ClaudeHome $claudeSandbox `
+        -SummaryOnly
+    if ($LASTEXITCODE -ne 1) { throw 'Claude status should detect plugin drift.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'install.ps1') `
+        -Target Claude `
+        -ClaudeHome $claudeSandbox `
+        -AllowDirty `
+        -AllowNonMain
+    if ($LASTEXITCODE -ne 0) { throw 'Claude plugin repair installation failed.' }
+    if (-not (Test-FilesEqual -Source (Join-Path $PSScriptRoot '..\plugins\claude\session-cost\hooks\register.tsx') -Target $installedModule)) {
+        throw 'Claude plugin repair did not restore the reviewed module.'
+    }
+
     Add-Content -LiteralPath (Join-Path $claudeSandbox 'CLAUDE.md') -Value "`n# deliberate test drift"
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
         -Target Claude `

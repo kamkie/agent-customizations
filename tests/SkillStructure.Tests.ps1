@@ -15,7 +15,7 @@ function Assert-True($Condition, [string]$Message) {
 try {
     $fixture = Join-Path $sandbox 'repository'
     $null = New-Item -ItemType Directory -Path $fixture, (Join-Path $fixture 'scripts'), (Join-Path $fixture '.github')
-    foreach ($directory in @('config', 'global', 'skills', 'hooks', 'tests')) {
+    foreach ($directory in @('config', 'global', 'skills', 'plugins', 'hooks', 'tests')) {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot $directory) -Destination $fixture -Recurse
     }
     foreach ($file in @('AGENTS.md', 'CLAUDE.md', 'README.md', 'LICENSE', 'SECURITY.md', '.github/CODEOWNERS', 'scripts/verify.ps1', 'scripts/AgentCustomization.Common.ps1')) {
@@ -28,7 +28,31 @@ try {
     $manifestPath = Join-Path $fixture 'config/manifest.json'
     $skillPath = Join-Path $fixture 'skills/dyslexia-friendly-formatter/SKILL.md'
     $referencePath = Join-Path $fixture 'skills/dyslexia-friendly-formatter/references/long.md'
+    $pluginManifestPath = Join-Path $fixture 'plugins/claude/session-cost/.claude-plugin/plugin.json'
     $cases = @(
+        @{
+            Name = 'plugin manifest name mismatch'
+            Path = $pluginManifestPath
+            Mutate = { param($text) $text -replace '"name": "session-cost"', '"name": "other-name"' }
+            Expected = "Plugin directory 'claude/session-cost' does not match plugin.json name 'other-name'"
+        },
+        @{
+            Name = 'undeclared plugin directory'
+            Path = Join-Path $fixture 'plugins/claude/stray-plugin/notes.txt'
+            Mutate = { param($text) 'stray' }
+            Expected = 'Undeclared plugin directory: plugins/claude/stray-plugin'
+        },
+        @{
+            Name = 'plugin colliding with a skill'
+            Path = $manifestPath
+            Mutate = {
+                param($text)
+                $manifest = $text | ConvertFrom-Json
+                $manifest.targets.claude.plugins.entries = @('managed-jobs') + @($manifest.targets.claude.plugins.entries)
+                $manifest | ConvertTo-Json -Depth 20
+            }
+            Expected = "Target 'claude' plugin 'managed-jobs' collides with a skill of the same name"
+        },
         @{
             Name = 'reserved word in a Claude-deployed skill name'
             Path = $manifestPath

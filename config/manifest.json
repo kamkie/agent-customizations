@@ -131,7 +131,13 @@
         "shape-product-decisions",
         "shared-term",
         "teams-graph-connector"
-      ]
+      ],
+      "plugins": {
+        "destination": "skills",
+        "entries": [
+          "session-cost"
+        ]
+      }
     }
   }
 }

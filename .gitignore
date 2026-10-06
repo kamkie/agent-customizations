@@ -23,6 +23,8 @@ memories/
 plugins/cache/
 sessions/
 hooks.json
+# Reviewed plugin module registrations are source, not Codex runtime state.
+!/plugins/*/*/hooks/hooks.json
 
 # Disposable repository artifacts
 .tmp/

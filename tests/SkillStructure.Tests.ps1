@@ -37,6 +37,12 @@ try {
             Expected = "Plugin directory 'claude/session-cost' does not match plugin.json name 'other-name'"
         },
         @{
+            Name = 'plugin hooks module that does not exist'
+            Path = Join-Path $fixture 'plugins/claude/session-cost/hooks/hooks.json'
+            Mutate = { param($text) '{ "modules": ["./missing.tsx"] }' }
+            Expected = "Plugin 'claude/session-cost' hooks module does not exist: ./missing.tsx"
+        },
+        @{
             Name = 'undeclared plugin directory'
             Path = Join-Path $fixture 'plugins/claude/stray-plugin/notes.txt'
             Mutate = { param($text) 'stray' }

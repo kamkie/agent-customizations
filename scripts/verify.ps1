@@ -128,6 +128,21 @@ foreach ($targetName in $targetNames) {
             if ($manifestName -cne $pluginName) {
                 $errors.Add("Plugin directory '$targetName/$pluginName' does not match plugin.json name '$manifestName'")
             }
+            $hooksFile = Join-Path $repositoryRoot "plugins\$targetName\$pluginName\hooks\hooks.json"
+            try {
+                $modulesProperty = (Get-Content -LiteralPath $hooksFile -Raw -ErrorAction Stop | ConvertFrom-Json).PSObject.Properties['modules']
+                $modules = @(if ($modulesProperty) { $modulesProperty.Value })
+            } catch {
+                $modules = @()
+            }
+            if ($modules.Count -eq 0) {
+                $errors.Add("Plugin '$targetName/$pluginName' has no hooks/hooks.json modules entry")
+            }
+            foreach ($module in $modules) {
+                if (-not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $hooksFile) ([string]$module)) -PathType Leaf)) {
+                    $errors.Add("Plugin '$targetName/$pluginName' hooks module does not exist: $module")
+                }
+            }
         }
     }
 

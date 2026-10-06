@@ -35,10 +35,13 @@ tools' live configuration directories are deployment targets.
   Microsoft 365 (Graph) MCP connector customizations.
 - `skills/ux-review` — Codex-specific browser walkthroughs with evidence-backed,
   acceptance-testable UX findings.
+- `plugins/claude/session-cost` — Claude Code plugin that shows the app and
+  transcript session IDs, with copy buttons, and the session cost estimate in
+  a band above the prompt.
 - `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.
 - `hooks/claude` — Claude Code-specific managed-job lifecycle cleanup scripts.
-- `config/manifest.json` — the exact files and hook registrations managed for
-  each supported agent.
+- `config/manifest.json` — the exact files, plugins, and hook registrations
+  managed for each supported agent.
 - `docs/customization-ownership.md` — classification, admission, ownership,
   precedence, and authoring rules for proposed customizations.
 - `docs/deployment.md` — validation, drift inspection, explicit activation,

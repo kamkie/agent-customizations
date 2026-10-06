@@ -53,7 +53,7 @@ try {
     Write-Host 'Markdown links: testing verifier integration with shipped sources'
     $fixture = Join-Path $sandbox 'repository'
     $null = New-Item -ItemType Directory -Path $fixture, (Join-Path $fixture 'scripts'), (Join-Path $fixture '.github')
-    foreach ($directory in @('config', 'global', 'skills', 'hooks', 'tests')) {
+    foreach ($directory in @('config', 'global', 'skills', 'plugins', 'hooks', 'tests')) {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot $directory) -Destination $fixture -Recurse
     }
     foreach ($file in @('AGENTS.md', 'CLAUDE.md', 'README.md', 'LICENSE', 'SECURITY.md', '.github/CODEOWNERS', 'scripts/verify.ps1', 'scripts/AgentCustomization.Common.ps1')) {

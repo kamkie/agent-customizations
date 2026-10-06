@@ -200,6 +200,15 @@ state.
 Claude Code applies changed hook definitions when a new session starts.
 Sessions already running keep the hook snapshot captured at startup.
 
+## Apply plugin changes
+
+Claude Code loads each plugin installed under `~/.claude/skills/<name>` as
+`<name>@skills-dir` in new sessions; `claude plugin list` shows its state. A
+same-named plugin loaded through `CLAUDE_CODE_PLUGIN_DIRS` or `--plugin-dir`
+takes precedence, so remove that entry to load the reviewed copy. Status
+ignores the type declarations Claude Code generates under a plugin's
+`.claude-plugin/types/`.
+
 ## Point Codex at the reviewed model instructions
 
 The Codex target deploys `global/codex-model-instructions.md` to
@@ -245,6 +254,8 @@ For each selected target, the manifest owns:
 - the ordered sources composing the target's global instruction file;
 - the optional replacement model-instructions file for that target;
 - the compatible skills listed for that target;
+- the target's plugins from `plugins/<target>/<name>`, copied into the
+  manifest's plugin destination;
 - the reviewed hook scripts; and
 - the reviewed hook registrations in `hooks.json` for Codex or `settings.json`
   for Claude Code.
@@ -253,7 +264,7 @@ The installer preserves unrelated hook entries and Claude Code settings when it
 merges reviewed registrations. The merge preserves those entries semantically
 but may reformat the machine-local JSON file.
 
-The repository does not manage unrelated settings, authentication, plugins,
-caches, memories, sessions, logs, artifacts, managed-job records, or other
+The repository does not manage unrelated settings, authentication, other
+plugins, marketplaces, plugin caches, memories, sessions, logs, artifacts, managed-job records, or other
 machine-generated state. These surfaces can contain private or machine-specific
 material and remain outside the reviewed source boundary.

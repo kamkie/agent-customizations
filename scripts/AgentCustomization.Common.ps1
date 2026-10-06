@@ -104,7 +104,10 @@ function Resolve-CustomizationHome {
 }
 
 function Get-RelativeFileMap {
-    param([Parameter(Mandatory)][string]$Root)
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [string]$ExcludePrefix
+    )
 
     $map = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
     if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
@@ -113,9 +116,42 @@ function Get-RelativeFileMap {
 
     foreach ($file in Get-ChildItem -LiteralPath $Root -Recurse -File -Force) {
         $relative = [IO.Path]::GetRelativePath($Root, $file.FullName).Replace('\', '/')
+        if ($ExcludePrefix -and $relative.StartsWith($ExcludePrefix, [StringComparison]::OrdinalIgnoreCase)) { continue }
         $map[$relative] = $file.FullName
     }
     return $map
+}
+
+# Claude Code writes plugin type declarations into a loaded plugin's folder;
+# they are generated per engine build, not reviewed source.
+$CustomizationPluginGeneratedPrefix = '.claude-plugin/types/'
+
+# Skills and plugins are both deployed as whole directories under the target home.
+function Get-CustomizationDirectoryItems {
+    param([Parameter(Mandatory)][string]$TargetName)
+
+    $repositoryRoot = Get-CustomizationRepositoryRoot
+    $target = Get-CustomizationTarget -Name $TargetName
+    foreach ($skillName in @($target.skills)) {
+        [pscustomobject]@{
+            Kind = 'Skill'
+            Name = [string]$skillName
+            Source = Join-Path $repositoryRoot "skills\$skillName"
+            Destination = "skills\$skillName"
+            ExcludePrefix = $null
+        }
+    }
+    if ($null -ne $target.PSObject.Properties['plugins']) {
+        foreach ($pluginName in @($target.plugins.entries)) {
+            [pscustomobject]@{
+                Kind = 'Plugin'
+                Name = [string]$pluginName
+                Source = Join-Path $repositoryRoot "plugins\$TargetName\$pluginName"
+                Destination = Join-Path ([string]$target.plugins.destination) $pluginName
+                ExcludePrefix = $CustomizationPluginGeneratedPrefix
+            }
+        }
+    }
 }
 
 function Test-FilesEqual {
@@ -482,11 +518,9 @@ function Get-CustomizationStatus {
         }
     }
 
-    foreach ($skillName in @($target.skills)) {
-        $sourceRoot = Join-Path $repositoryRoot "skills\$skillName"
-        $targetRoot = Join-Path $HomePath "skills\$skillName"
-        $sourceFiles = Get-RelativeFileMap -Root $sourceRoot
-        $targetFiles = Get-RelativeFileMap -Root $targetRoot
+    foreach ($item in Get-CustomizationDirectoryItems -TargetName $TargetName) {
+        $sourceFiles = Get-RelativeFileMap -Root $item.Source -ExcludePrefix $item.ExcludePrefix
+        $targetFiles = Get-RelativeFileMap -Root (Join-Path $HomePath $item.Destination) -ExcludePrefix $item.ExcludePrefix
         $relativePaths = @($sourceFiles.Keys) + @($targetFiles.Keys) | Sort-Object -Unique
 
         foreach ($relativePath in $relativePaths) {
@@ -504,8 +538,8 @@ function Get-CustomizationStatus {
 
             $results.Add([pscustomobject]@{
                 Target = $TargetName
-                Kind = 'Skill'
-                Name = [string]$skillName
+                Kind = $item.Kind
+                Name = $item.Name
                 RelativePath = $relativePath
                 State = $state
             })

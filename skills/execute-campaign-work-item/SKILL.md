@@ -54,15 +54,12 @@ Copy this checklist into your progress updates and keep it current:
 
 ```text
 Outcome: [COMPLETE/BLOCKED and ACCEPT/ACCEPT ENABLER/NEUTRAL/REJECT/INCONCLUSIVE/DEFER, with impact].
-Contract delta: [latest direct user instruction and provenance, affected stale
-state and lock rechecks, or none].
+Contract delta: [latest direct user instruction and provenance, affected stale state and lock rechecks, or none].
 Deliverable: [exact input/output, remote branch, PR/MR, head, CI and review].
-Delivery state: [performed and withheld external actions, readiness,
-merge/deploy, and integration state].
+Delivery state: [performed and withheld external actions, readiness, merge/deploy, and integration state].
 Scope: [owned diff, write ownership, read-only inputs, unrelated preservation].
 Validation: [result summary and private exact-evidence location].
-Evidence: [artifacts/retention, worktree/clean state/locks, policy rechecks,
-and exact audit record in the private evidence location].
+Evidence: [artifacts/retention, worktree/clean state/locks, policy rechecks, and exact audit record in the private evidence location].
 Limitations: [blocker, stale evidence, deviations, or none].
 Next: [specific controller action and remaining authority].
 ```

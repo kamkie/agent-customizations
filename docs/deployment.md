@@ -1,18 +1,12 @@
 # Deployment
 
-This guide owns validation, live-drift inspection, and activation of the
-reviewed sources declared in [`config/manifest.json`](../config/manifest.json)
-for Codex and Claude Code.
+This guide owns validation, live-drift inspection, and activation of the reviewed sources declared in [`config/manifest.json`](../config/manifest.json) for Codex and Claude Code.
 
 ## Authorization boundary
 
-Deployment writes to live agent configuration directories and requires a
-separate, explicit instruction to activate reviewed changes. Authorization to
-edit, validate, commit, push, or open a pull request does not authorize
-`scripts/install.ps1`.
+Deployment writes to live agent configuration directories and requires a separate, explicit instruction to activate reviewed changes. Authorization to edit, validate, commit, push, or open a pull request does not authorize `scripts/install.ps1`.
 
-Edit the reviewed sources in this repository, not their installed copies.
-Verification, tests, and status inspection do not deploy changes.
+Edit the reviewed sources in this repository, not their installed copies. Verification, tests, and status inspection do not deploy changes.
 
 ## Requirements
 
@@ -34,8 +28,7 @@ Run the deployment smoke test:
 pwsh ./scripts/test.ps1
 ```
 
-The smoke test installs into temporary sandboxes. It does not write to the live
-Codex or Claude Code configuration directories.
+The smoke test installs into temporary sandboxes. It does not write to the live Codex or Claude Code configuration directories.
 
 ## Inspect live drift
 
@@ -52,20 +45,13 @@ pwsh ./scripts/status.ps1 -Target Codex
 pwsh ./scripts/status.ps1 -Target Claude
 ```
 
-`CODEX_HOME` and `CLAUDE_CONFIG_DIR` select non-default live directories.
-For one-off inspection, pass `-CodexHome <path>` or `-ClaudeHome <path>`.
+`CODEX_HOME` and `CLAUDE_CONFIG_DIR` select non-default live directories. For one-off inspection, pass `-CodexHome <path>` or `-ClaudeHome <path>`.
 
-The status command reports managed files as in sync, missing, different, or
-extra. It exits with status 1 when it detects drift. Drift is evidence to
-review; it is not permission to install.
+The status command reports managed files as in sync, missing, different, or extra. It exits with status 1 when it detects drift. Drift is evidence to review; it is not permission to install.
 
-Before activation, review the content differences in each drifted instruction
-file, not only the drift count. Account for live-only guidance in the reviewed
-sources or obtain explicit authority to discard it before replacing that file.
-A backup preserves recovery data; it does not make an unreviewed loss acceptable.
+Before activation, review the content differences in each drifted instruction file, not only the drift count. Account for live-only guidance in the reviewed sources or obtain explicit authority to discard it before replacing that file. A backup preserves recovery data; it does not make an unreviewed loss acceptable.
 
-Compare both the composed global instructions and any replacement model prompt
-from the repository root (diff exit code 1 means differences were found):
+Compare both the composed global instructions and any replacement model prompt from the repository root (diff exit code 1 means differences were found):
 
 ```powershell
 . ./scripts/AgentCustomization.Common.ps1
@@ -118,14 +104,11 @@ pwsh ./scripts/install.ps1 -Target Codex -WhatIf
 pwsh ./scripts/install.ps1 -Target Claude -ClaudeHome <path> -WhatIf
 ```
 
-The installer runs repository verification and its clean-`main` safeguards
-before producing a preview. `-WhatIf` does not bypass those safeguards, so run
-previews from a clean, current `main` checkout.
+The installer runs repository verification and its clean-`main` safeguards before producing a preview. `-WhatIf` does not bypass those safeguards, so run previews from a clean, current `main` checkout.
 
 ## Activate reviewed changes
 
-Activation requires its own explicit authorization. Deploy from a clean,
-current `main` checkout:
+Activation requires its own explicit authorization. Deploy from a clean, current `main` checkout:
 
 ```powershell
 git switch main
@@ -150,96 +133,39 @@ Install only one target:
     -ExpectedInstructionHashes @{ claude = $reviewedHashes.claude }
 ```
 
-The installer verifies the repository before writing and refuses dirty,
-detached, or non-`main` checkouts by default. `-AllowDirty` and
-`-AllowNonMain` are explicit safeguards for exceptional use; they do not grant
-deployment authorization.
+The installer verifies the repository before writing and refuses dirty, detached, or non-`main` checkouts by default. `-AllowDirty` and `-AllowNonMain` are explicit safeguards for exceptional use; they do not grant deployment authorization.
 
-Only drifted managed files are replaced. The installer composes each target's
-ordered shared and overlay instruction sources into its destination file.
-Existing files are backed up under a timestamped `customization-backups`
-directory in the selected target home, and the installer checks for remaining
-drift before it succeeds.
+Only drifted managed files are replaced. The installer composes each target's ordered shared and overlay instruction sources into its destination file. Existing files are backed up under a timestamped `customization-backups` directory in the selected target home, and the installer checks for remaining drift before it succeeds.
 
-`status.ps1` reports `instructionHash` for the composed instruction file and
-`modelInstructionHash` for the replacement model prompt. Each is `missing` when
-its managed file is absent, or `null` with its corresponding `*HashError` when
-the file cannot be hashed. For a target without a managed model prompt, both
-model fields are `null` (not applicable). The summary counts the two error kinds
-separately, and either causes a nonzero exit without erasing the drift report.
+`status.ps1` reports `instructionHash` for the composed instruction file and `modelInstructionHash` for the replacement model prompt. Each is `missing` when its managed file is absent, or `null` with its corresponding `*HashError` when the file cannot be hashed. For a target without a managed model prompt, both model fields are `null` (not applicable). The summary counts the two error kinds separately, and either causes a nonzero exit without erasing the drift report.
 
-A hash proves file identity, not content review. `-ExpectedInstructionHashes`
-must contain exactly the selected targets. A guarded install that selects a
-managed model prompt also requires `-ExpectedModelInstructionHashes`, containing
-exactly those selected targets with a model prompt (currently `codex`). Old
-guarded Codex calls must add this second map; a global instruction hash alone
-cannot protect the separate base prompt. A model-only guard is rejected. Pass
-the maps from PowerShell, not as serialized strings to `pwsh -File`. Alternate
-homes must be the same ones used for comparison.
+A hash proves file identity, not content review. `-ExpectedInstructionHashes` must contain exactly the selected targets. A guarded install that selects a managed model prompt also requires `-ExpectedModelInstructionHashes`, containing exactly those selected targets with a model prompt (currently `codex`). Old guarded Codex calls must add this second map; a global instruction hash alone cannot protect the separate base prompt. A model-only guard is rejected. Pass the maps from PowerShell, not as serialized strings to `pwsh -File`. Alternate homes must be the same ones used for comparison.
 
-The precondition checks both instruction files for all selected targets before
-installation and checks each target again before creating its directories or
-replacing files. A stale model hash therefore prevents changes to global
-instructions, skills, hooks and other selected targets, including in `-WhatIf`.
-On mismatch, reread and reconcile
-the changed content rather than blindly replacing the expected hash. It detects
-stale snapshots, including a previously missing file appearing, but is not an
-atomic lock against a writer racing the final filesystem replacement. Coordinate
-active writers before activation. The options add no deployment authority;
-omitting both preserves the unguarded installer interface, not an exemption from
-the content-review requirement above.
+The precondition checks both instruction files for all selected targets before installation and checks each target again before creating its directories or replacing files. A stale model hash therefore prevents changes to global instructions, skills, hooks and other selected targets, including in `-WhatIf`. On mismatch, reread and reconcile the changed content rather than blindly replacing the expected hash. It detects stale snapshots, including a previously missing file appearing, but is not an atomic lock against a writer racing the final filesystem replacement. Coordinate active writers before activation. The options add no deployment authority; omitting both preserves the unguarded installer interface, not an exemption from the content-review requirement above.
 
 ## Apply hook changes
 
-Codex requires separate review and trust for new or changed personal hook
-definitions. After a Codex deployment changes hooks, start Codex, open
-`/hooks`, and trust each reviewed definition. Repository status proves source
-and registration equality, but it cannot prove Codex's per-definition trust
-state.
+Codex requires separate review and trust for new or changed personal hook definitions. After a Codex deployment changes hooks, start Codex, open `/hooks`, and trust each reviewed definition. Repository status proves source and registration equality, but it cannot prove Codex's per-definition trust state.
 
-Claude Code applies changed hook definitions when a new session starts.
-Sessions already running keep the hook snapshot captured at startup.
+Claude Code applies changed hook definitions when a new session starts. Sessions already running keep the hook snapshot captured at startup.
 
 ## Apply plugin changes
 
-Claude Code loads each plugin installed under `~/.claude/skills/<name>` as
-`<name>@skills-dir` in new sessions; `claude plugin list` shows its state. A
-same-named plugin loaded through `CLAUDE_CODE_PLUGIN_DIRS` or `--plugin-dir`
-takes precedence, so remove that entry to load the reviewed copy. Status
-ignores the type declarations Claude Code generates under a plugin's
-`.claude-plugin/types/`.
+Claude Code loads each plugin installed under `~/.claude/skills/<name>` as `<name>@skills-dir` in new sessions; `claude plugin list` shows its state. A same-named plugin loaded through `CLAUDE_CODE_PLUGIN_DIRS` or `--plugin-dir` takes precedence, so remove that entry to load the reviewed copy. Status ignores the type declarations Claude Code generates under a plugin's `.claude-plugin/types/`.
 
 ## Point Codex at the reviewed model instructions
 
-The Codex target deploys `global/codex-model-instructions.md` to
-`~/.codex/model-instructions-astra.md` (a legacy destination name). That file
-replaces Codex's built-in model instructions; it is the stock Sol 6.1 prompt
-with closing-status and explicit-command authorization overrides. The
-authorization overrides defer to the effective `AGENTS.md`: questions permit
-inspection, and implementation requires an explicit command. Messaging and
-persistence use the stock Sol 6.1 paragraphs.
+The Codex target deploys `global/codex-model-instructions.md` to `~/.codex/model-instructions-astra.md` (a legacy destination name). That file replaces Codex's built-in model instructions; it is the stock Sol 6.1 prompt with closing-status and explicit-command authorization overrides. The authorization overrides defer to the effective `AGENTS.md`: questions permit inspection, and implementation requires an explicit command. Messaging and persistence use the stock Sol 6.1 paragraphs.
 
-The stock baseline comes from `gpt-6.1-sol`'s
-`model_messages.instructions_template` in the
-[OpenAI model catalog](https://github.com/openai/codex/blob/b1e72963c3b71a9265a551e54beff078384efed9/codex-rs/models-manager/models.json),
-with trailing whitespace and the final newline normalized. Re-base it when
-OpenAI changes that prompt, keeping the clean stock import and our overrides
-in separate commits so their differences remain reviewable.
+The stock baseline comes from `gpt-6.1-sol`'s `model_messages.instructions_template` in the [OpenAI model catalog](https://github.com/openai/codex/blob/b1e72963c3b71a9265a551e54beff078384efed9/codex-rs/models-manager/models.json), with trailing whitespace and the final newline normalized. Re-base it when OpenAI changes that prompt, keeping the clean stock import and our overrides in separate commits so their differences remain reviewable.
 
-Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not
-managed by this repository; add the key once, at the top level, before any
-`[table]` section:
+Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not managed by this repository; add the key once, at the top level, before any `[table]` section:
 
 ```toml
 model_instructions_file = "C:/Users/<you>/.codex/model-instructions-astra.md"
 ```
 
-Status reports the file as `ModelInstructions`; it does not verify the
-`config.toml` key. The evaluation clients ignore user configuration, so both
-evaluation scripts pass the manifest's reviewed file explicitly by default; the
-shared rules are written against that configuration. Pass another file with
-`-CodexModelInstructionsFile`, or `-StockCodexInstructions` to measure the stock
-prompt. Use `-CodexModel` and `-CodexReasoningEffort` to test a specific model:
+Status reports the file as `ModelInstructions`; it does not verify the `config.toml` key. The evaluation clients ignore user configuration, so both evaluation scripts pass the manifest's reviewed file explicitly by default; the shared rules are written against that configuration. Pass another file with `-CodexModelInstructionsFile`, or `-StockCodexInstructions` to measure the stock prompt. Use `-CodexModel` and `-CodexReasoningEffort` to test a specific model:
 
 ```powershell
 pwsh ./scripts/evaluate-instructions.ps1 -Target codex
@@ -254,17 +180,10 @@ For each selected target, the manifest owns:
 - the ordered sources composing the target's global instruction file;
 - the optional replacement model-instructions file for that target;
 - the compatible skills listed for that target;
-- the target's plugins from `plugins/<target>/<name>`, copied into the
-  manifest's plugin destination;
+- the target's plugins from `plugins/<target>/<name>`, copied into the manifest's plugin destination;
 - the reviewed hook scripts; and
-- the reviewed hook registrations in `hooks.json` for Codex or `settings.json`
-  for Claude Code.
+- the reviewed hook registrations in `hooks.json` for Codex or `settings.json` for Claude Code.
 
-The installer preserves unrelated hook entries and Claude Code settings when it
-merges reviewed registrations. The merge preserves those entries semantically
-but may reformat the machine-local JSON file.
+The installer preserves unrelated hook entries and Claude Code settings when it merges reviewed registrations. The merge preserves those entries semantically but may reformat the machine-local JSON file.
 
-The repository does not manage unrelated settings, authentication, other
-plugins, marketplaces, plugin caches, memories, sessions, logs, artifacts, managed-job records, or other
-machine-generated state. These surfaces can contain private or machine-specific
-material and remain outside the reviewed source boundary.
+The repository does not manage unrelated settings, authentication, other plugins, marketplaces, plugin caches, memories, sessions, logs, artifacts, managed-job records, or other machine-generated state. These surfaces can contain private or machine-specific material and remain outside the reviewed source boundary.

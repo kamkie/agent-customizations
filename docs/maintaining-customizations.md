@@ -1,33 +1,18 @@
 # Maintaining agent instructions and skills
 
-Use this guide when changing reviewed agent instructions, an existing skill, or
-the references and tooling that support them. It complements the
-[customization ownership and skill-admission policy](customization-ownership.md),
-which remains authoritative for deciding where a rule belongs.
+Use this guide when changing reviewed agent instructions, an existing skill, or the references and tooling that support them. It complements the [customization ownership and skill-admission policy](customization-ownership.md), which remains authoritative for deciding where a rule belongs.
 
 ## Establish the maintenance boundary
 
-1. Edit the reviewed sources in this repository, not files in a live agent
-   home. Deployment is a separate, explicitly authorized activation step.
-2. Read the complete canonical instruction or `SKILL.md`, every reference
-   required by the changed behavior, and the relevant target mapping in
-   `config/manifest.json` before editing.
-   For global guidance, read `global/shared.md` and the applicable target
-   overlay; the installed instruction is their ordered composition.
-3. Classify each new or changed rule by ownership. Keep stable personal defaults
-   in global guidance, repeated portable workflows in skills, and repository
-   contracts in the repository that owns them.
-4. Preserve precedence. A skill may discover and obey higher-precedence policy,
-   but it must not copy repository actors, commands, merge gates, or other
-   target-specific contracts into a reusable workflow.
-5. Keep runtime state and private material out of reviewed sources. Do not
-   import sessions, logs, records, credentials, machine paths, or generated
-   configuration as durable instructions.
+1. Edit the reviewed sources in this repository, not files in a live agent home. Deployment is a separate, explicitly authorized activation step.
+2. Read the complete canonical instruction or `SKILL.md`, every reference required by the changed behavior, and the relevant target mapping in `config/manifest.json` before editing. For global guidance, read `global/shared.md` and the applicable target overlay; the installed instruction is their ordered composition.
+3. Classify each new or changed rule by ownership. Keep stable personal defaults in global guidance, repeated portable workflows in skills, and repository contracts in the repository that owns them.
+4. Preserve precedence. A skill may discover and obey higher-precedence policy, but it must not copy repository actors, commands, merge gates, or other target-specific contracts into a reusable workflow.
+5. Keep runtime state and private material out of reviewed sources. Do not import sessions, logs, records, credentials, machine paths, or generated configuration as durable instructions.
 
 ## Maintain agent instructions
 
-Before editing a repository instruction file, check whether it briefly defines,
-where applicable:
+Before editing a repository instruction file, check whether it briefly defines, where applicable:
 
 - the product or system purpose and primary users;
 - non-negotiable product or operational qualities;
@@ -37,144 +22,60 @@ where applicable:
 - the validation map for each major area; and
 - destructive or production-sensitive boundaries.
 
-Include only information an agent needs before changing the repository. Do not
-duplicate the README or general architecture documentation.
+Include only information an agent needs before changing the repository. Do not duplicate the README or general architecture documentation.
 
-- Keep a rule only when it is stable, broadly applicable at that instruction
-  scope, and likely to change agent behavior materially.
-- Write direct, testable instructions. State the trigger, required behavior,
-  important boundary, and expected evidence when those are not obvious.
-- Replace obsolete behavior instead of preserving contradictory old and new
-  rules. Remove duplicated copies whose independent maintenance could drift.
-- When another source owns a mutable detail, link to or discover that source at
-  runtime. Repeat only a short safety boundary that readers need at both routing
-  points, and identify the canonical owner.
-- Keep target-specific behavior in the target's instruction file. Change both
-  Codex and Claude guidance only when the behavior is intentionally shared and
-  valid for both agents.
-- Classify each imported live rule before copying it. Preserve the user's stated
-  reuse scope: a global preference does not become repository-only because its
-  latest occurrence was local. When rejecting an ownership review finding, cite
-  the owning contract; passing behavior tests does not establish portability.
+- Keep a rule only when it is stable, broadly applicable at that instruction scope, and likely to change agent behavior materially.
+- Write direct, testable instructions. State the trigger, required behavior, important boundary, and expected evidence when those are not obvious.
+- Replace obsolete behavior instead of preserving contradictory old and new rules. Remove duplicated copies whose independent maintenance could drift.
+- When another source owns a mutable detail, link to or discover that source at runtime. Repeat only a short safety boundary that readers need at both routing points, and identify the canonical owner.
+- Keep target-specific behavior in the target's instruction file. Change both Codex and Claude guidance only when the behavior is intentionally shared and valid for both agents.
+- Classify each imported live rule before copying it. Preserve the user's stated reuse scope: a global preference does not become repository-only because its latest occurrence was local. When rejecting an ownership review finding, cite the owning contract; passing behavior tests does not establish portability.
 
 ## Maintain skill entrypoints and references
 
-Treat `SKILL.md` as both the routing surface and the executable entrypoint for
-the normal workflow.
+Treat `SKILL.md` as both the routing surface and the executable entrypoint for the normal workflow.
 
-The entrypoint must contain enough information to complete the common path
-without opening a reference:
+The entrypoint must contain enough information to complete the common path without opening a reference:
 
-- a bounded frontmatter description with positive and important negative
-  triggers;
+- a bounded frontmatter description with positive and important negative triggers;
 - controller, script, or resource discovery and required setup;
-- one complete normal invocation or action sequence with every variable defined
-  and every user-supplied placeholder explicit;
-- non-negotiable authorization, safety, secret-handling, and process-lifecycle
-  rules needed on a normal run; and
+- one complete normal invocation or action sequence with every variable defined and every user-supplied placeholder explicit;
+- non-negotiable authorization, safety, secret-handling, and process-lifecycle rules needed on a normal run; and
 - the normal completion, evidence, or handoff expectation.
 
-Use [Author the routing surface](customization-ownership.md#author-the-routing-surface)
-as the canonical rule for what belongs in `SKILL.md` versus `references/`.
-Link each reference at the decision point that requires it. Do not require a
-reference merely to finish setup or construct the common invocation.
+Use [Author the routing surface](customization-ownership.md#author-the-routing-surface) as the canonical rule for what belongs in `SKILL.md` versus `references/`. Link each reference at the decision point that requires it. Do not require a reference merely to finish setup or construct the common invocation.
 
-`verify.ps1` enforces the Agent Skills frontmatter limits: a name of at most 64
-lowercase letters, digits, and hyphens; a non-empty description of at most 1,024
-characters; and no XML tags. Claude-deployed skill names must not contain
-`anthropic` or `claude`; a Codex-only skill may name the Claude tool it wraps,
-as `claude-runner` does. Name a new skill for the activity it performs in
-lowercase hyphenated words, such as `shape-product-decisions`; a product name
-fits only a skill that wraps that product, as `lavish` does. Do not rename an
-existing skill only for style, because the manifest, guidance, and installed
-homes all refer to it by name.
+`verify.ps1` enforces the Agent Skills frontmatter limits: a name of at most 64 lowercase letters, digits, and hyphens; a non-empty description of at most 1,024 characters; and no XML tags. Claude-deployed skill names must not contain `anthropic` or `claude`; a Codex-only skill may name the Claude tool it wraps, as `claude-runner` does. Name a new skill for the activity it performs in lowercase hyphenated words, such as `shape-product-decisions`; a product name fits only a skill that wraps that product, as `lavish` does. Do not rename an existing skill only for style, because the manifest, guidance, and installed homes all refer to it by name.
 
-Write paths in skill examples with forward slashes; PowerShell accepts them on
-every platform. Refer to an MCP tool by its fully qualified `Server:tool` name
-when the server name is stable. When a connector's server name varies by
-installation, use the bare tool name and make the skill discover the connected
-tools and inspect their schemas before calling them.
+Write paths in skill examples with forward slashes; PowerShell accepts them on every platform. Refer to an MCP tool by its fully qualified `Server:tool` name when the server name is stable. When a connector's server name varies by installation, use the bare tool name and make the skill discover the connected tools and inspect their schemas before calling them.
 
-A reference longer than 100 lines must open with a `## Contents` section as its
-first `##` heading, so a partial read still shows its scope; `verify.ps1`
-enforces this. Give a long multistep workflow a short progress checklist the
-agent can copy into its updates.
+A reference longer than 100 lines must open with a `## Contents` section as its first `##` heading, so a partial read still shows its scope; `verify.ps1` enforces this. Give a long multistep workflow a short progress checklist the agent can copy into its updates.
 
-Compactness is an outcome, not a line-count target. Remove repetition and
-low-value prose, but do not shorten an entrypoint until its examples depend on
-undefined variables, hidden setup, or mandatory reference loading. Keep each
-reference focused enough that an agent can load the needed branch without
-loading unrelated material.
+Compactness is an outcome, not a line-count target. Remove repetition and low-value prose, but do not shorten an entrypoint until its examples depend on undefined variables, hidden setup, or mandatory reference loading. Keep each reference focused enough that an agent can load the needed branch without loading unrelated material.
 
-When behavior changes, update the entrypoint, directly affected references,
-scripts, and deterministic tests together. Change the manifest or deployment
-tooling only when target mapping or installation behavior actually changes.
+When behavior changes, update the entrypoint, directly affected references, scripts, and deterministic tests together. Change the manifest or deployment tooling only when target mapping or installation behavior actually changes.
 
 ## Validate progressive disclosure
 
 Use realistic forward tests in addition to structural checks.
 
-1. Give a fresh agent the skill entrypoint and a representative common-path
-   task while making references unavailable. It must identify the workflow,
-   construct a complete invocation, preserve the required guardrails, and stop
-   before any unauthorized or paid action.
-2. Give a fresh agent one advanced scenario. It should follow the entrypoint's
-   link to the directly relevant reference and should not need unrelated
-   references.
-3. Test every executable example for defined variables, explicit placeholders,
-   correct path resolution, and valid parameters. Prefer deterministic mocks or
-   dry runs over paid or state-mutating validation.
-4. Review the diff for publication hazards, ownership drift, stale links,
-   duplicated mutable rules, and details that belong to runtime state.
+1. Give a fresh agent the skill entrypoint and a representative common-path task while making references unavailable. It must identify the workflow, construct a complete invocation, preserve the required guardrails, and stop before any unauthorized or paid action.
+2. Give a fresh agent one advanced scenario. It should follow the entrypoint's link to the directly relevant reference and should not need unrelated references.
+3. Test every executable example for defined variables, explicit placeholders, correct path resolution, and valid parameters. Prefer deterministic mocks or dry runs over paid or state-mutating validation.
+4. Review the diff for publication hazards, ownership drift, stale links, duplicated mutable rules, and details that belong to runtime state.
 
-Record what each forward test could and could not prove. A test that opened a
-reference does not prove that the entrypoint is self-contained.
+Record what each forward test could and could not prove. A test that opened a reference does not prove that the entrypoint is self-contained.
 
-Keep forward-test prompts separate from their expected behavior so the agent
-cannot read its rubric. Use `scripts/evaluate-instructions.ps1` to run each case
-in a fresh, read-only classification session and score the structured result. These live
-evaluations use the selected agent CLI and are intentionally separate from the
-deterministic `verify.ps1` and `test.ps1` checks; run the affected target and
-case set when instruction behavior changes, then report the exact cases,
-targets, and results.
+Keep forward-test prompts separate from their expected behavior so the agent cannot read its rubric. Use `scripts/evaluate-instructions.ps1` to run each case in a fresh, read-only classification session and score the structured result. These live evaluations use the selected agent CLI and are intentionally separate from the deterministic `verify.ps1` and `test.ps1` checks; run the affected target and case set when instruction behavior changes, then report the exact cases, targets, and results.
 
-Validate routing separately. `scripts/evaluate-instructions.ps1 -Suite
-skill-routing` gives a fresh session each target's compiled guidance plus the
-names and descriptions of that target's skills, then scores which skill it would
-load first. Each deployed skill keeps at least three positive cases per target,
-and each target keeps at least three near-miss requests that must load no skill;
-`tests/SkillRouting.Tests.ps1` enforces that coverage. Run the suite when a skill
-is added or removed or its description changes. Use `-ClaudeModel` for each
-Claude model expected to load the skill, such as `haiku`, `sonnet`, and `opus`,
-and `-CodexModel` for Codex models.
+Validate routing separately. `scripts/evaluate-instructions.ps1 -Suite skill-routing` gives a fresh session each target's compiled guidance plus the names and descriptions of that target's skills, then scores which skill it would load first. Each deployed skill keeps at least three positive cases per target, and each target keeps at least three near-miss requests that must load no skill; `tests/SkillRouting.Tests.ps1` enforces that coverage. Run the suite when a skill is added or removed or its description changes. Use `-ClaudeModel` for each Claude model expected to load the skill, such as `haiku`, `sonnet`, and `opus`, and `-CodexModel` for Codex models.
 
-For consequential changes to authorization, continuation, or stop behavior, also
-run the applicable cases in `scripts/evaluate-instruction-actions.ps1`. This
-small suite dispatches actual bounded file/tool requests in disposable
-repositories and scores effects and ordering against separate expectations.
-Use the faster classification cases for routine wording checks. Action cases
-use a controlled JSON tool protocol with user-message injection between requests;
-they do not establish native-tool integration or in-flight cancellation behavior.
-Record the exact targets, cases, observed results, and retained trace location.
+For consequential changes to authorization, continuation, or stop behavior, also run the applicable cases in `scripts/evaluate-instruction-actions.ps1`. This small suite dispatches actual bounded file/tool requests in disposable repositories and scores effects and ordering against separate expectations. Use the faster classification cases for routine wording checks. Action cases use a controlled JSON tool protocol with user-message injection between requests; they do not establish native-tool integration or in-flight cancellation behavior. Record the exact targets, cases, observed results, and retained trace location.
 
-For continuation changes, preserve the question-only and stop cases and inject
-corrections, side questions, and cancellation of secondary work between actions.
-Score actual effects and remaining checks, not promises to continue. Inspect the
-retained final messages for completed work, outstanding items and next action;
-the action scorer does not establish semantic completeness of free-text reports.
-Compare a failed unchanged boundary case against the unchanged source before
-attributing it to the new instructions; retain both results without weakening
-the expectation or calling the failing boundary verified.
+For continuation changes, preserve the question-only and stop cases and inject corrections, side questions, and cancellation of secondary work between actions. Score actual effects and remaining checks, not promises to continue. Inspect the retained final messages for completed work, outstanding items and next action; the action scorer does not establish semantic completeness of free-text reports. Compare a failed unchanged boundary case against the unchanged source before attributing it to the new instructions; retain both results without weakening the expectation or calling the failing boundary verified.
 
-Delivery requirements have one owner: `AGENTS.md` owns repository stages, gates,
-and evidence refresh points; the review skill owns portable triage and re-review
-decisions. Summaries link to those owners instead of maintaining another gate
-list. Use the same Prepare -> Implement -> Validate -> Review -> Ready labels in
-human-facing progress; show authorized merge or deployment separately.
+Delivery requirements have one owner: `AGENTS.md` owns repository stages, gates, and evidence refresh points; the review skill owns portable triage and re-review decisions. Summaries link to those owners instead of maintaining another gate list. Use the same Prepare -> Implement -> Validate -> Review -> Ready labels in human-facing progress; show authorized merge or deployment separately.
 
 ## Validate and deliver
 
-Follow the canonical [implementation and delivery workflow](../AGENTS.md#implement-validate-and-commit)
-in `AGENTS.md`. It owns the exact validation triggers, drift inspection,
-activation boundary, final-diff review, branch and pull-request workflow,
-cross-review, and current-head readiness checks.
+Follow the canonical [implementation and delivery workflow](../AGENTS.md#implement-validate-and-commit) in `AGENTS.md`. It owns the exact validation triggers, drift inspection, activation boundary, final-diff review, branch and pull-request workflow, cross-review, and current-head readiness checks.

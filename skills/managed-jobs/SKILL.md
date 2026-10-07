@@ -23,20 +23,11 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 ```
 
 - Keep short commands attached to the active tool call.
-- Default long work to hidden supervised execution. The installed startup hook
-  reconciles global state asynchronously; do not run `reconcile` around starts.
-- `Auto` uses the current agent turn when ownership is available. Use
-  `-Lifetime Session` only across turns and `Persistent` only across sessions.
+- Default long work to hidden supervised execution. The installed startup hook reconciles global state asynchronously; do not run `reconcile` around starts.
+- `Auto` uses the current agent turn when ownership is available. Use `-Lifetime Session` only across turns and `Persistent` only across sessions.
 - Use the returned job instead of a global `list`; target `status` when needed.
-- Use `wait -Id <job-id>` when the next step needs process completion. It blocks
-  until the job is completed, failed, stopped, or orphaned and returns the final
-  record, including `exitCode` when the host recorded one. Check that status and
-  exit code before treating the work as successful; an orphan may have no exit code.
-- Keep that tool call pending until it returns. If its transport yields a
-  session ID, wait on that session and, where supported, combine transport waits
-  inside one tool invocation so the model stays idle. Do not make repeated
-  agent-side `status` calls. A background job does not wake an idle agent by
-  itself.
+- Use `wait -Id <job-id>` when the next step needs process completion. It blocks until the job is completed, failed, stopped, or orphaned and returns the final record, including `exitCode` when the host recorded one. Check that status and exit code before treating the work as successful; an orphan may have no exit code.
+- Keep that tool call pending until it returns. If its transport yields a session ID, wait on that session and, where supported, combine transport waits inside one tool invocation so the model stays idle. Do not make repeated agent-side `status` calls. A background job does not wake an idle agent by itself.
 - For finite work, use `-TimeoutSeconds` to bound the wait:
 
   ```powershell
@@ -46,13 +37,10 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
   ```
 
   A timeout leaves the target job running. Stop it separately if it is no longer needed.
-- `wait` follows the job record, so it also finishes when a completed
-  `-KeepTerminalOpen` job leaves its visible terminal open.
+- `wait` follows the job record, so it also finishes when a completed `-KeepTerminalOpen` job leaves its visible terminal open.
 - Treat arguments, environment values, records, and logs as non-secret.
-- Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen`
-  leaves a completed terminal for the user to close manually.
-- Never replace this controller with a detached/background launch. Use
-  `claude-runner` for Claude session, resume, and review behavior.
+- Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen` leaves a completed terminal for the user to close manually.
+- Never replace this controller with a detached/background launch. Use `claude-runner` for Claude session, resume, and review behavior.
 
 Stop running work that is no longer needed; a terminal job needs no stop call:
 
@@ -60,35 +48,19 @@ Stop running work that is no longer needed; a terminal job needs no stop call:
 & $jobs stop -Id <job-id>
 ```
 
-Hand off the id, status, lifetime, log path, working directory, and exact
-status/logs/stop commands for any session or persistent job left running.
+Hand off the id, status, lifetime, log path, working directory, and exact status/logs/stop commands for any session or persistent job left running.
 
 ## Agent progress and completion
 
-For a CLI agent or an agent-driven test, track three separate facts: the managed
-process state, the native session's latest completed tool/output event, and the
-required result artifacts. A live PID, startup log or heartbeat proves liveness,
-not useful progress. Inspect the returned job and its native session/log paths;
-use a filtered registry lookup only to recover a lost job ID, not as routine
-polling. Preserve the PID/start identity when diagnosing a vanished supervisor.
+For a CLI agent or an agent-driven test, track three separate facts: the managed process state, the native session's latest completed tool/output event, and the required result artifacts. A live PID, startup log or heartbeat proves liveness, not useful progress. Inspect the returned job and its native session/log paths; use a filtered registry lookup only to recover a lost job ID, not as routine polling. Preserve the PID/start identity when diagnosing a vanished supervisor.
 
-A coordinator's final message does not establish that its child workers finished.
-Keep the owner waiting through the runtime's supported completion mechanism;
-check child terminal state and required artifacts before workspace teardown.
-Inspect interruption timestamps and effective child settings before assigning
-the failure to the model, wrapper or harness. Reuse a recoverable session rather
-than launching a duplicate paid attempt without the applicable retry authority.
+A coordinator's final message does not establish that its child workers finished. Keep the owner waiting through the runtime's supported completion mechanism; check child terminal state and required artifacts before workspace teardown. Inspect interruption timestamps and effective child settings before assigning the failure to the model, wrapper or harness. Reuse a recoverable session rather than launching a duplicate paid attempt without the applicable retry authority.
 
-If a final usage/export record is absent, inspect native usage events before
-calling it lost. For comparisons, report cost per completed attempt separately
-from failures/retries, orchestration and grading. Missing cost stays unknown.
-Retain failure evidence; cleanup may remove only this job's owned scratch paths,
-not another task's logs or review inputs.
+If a final usage/export record is absent, inspect native usage events before calling it lost. For comparisons, report cost per completed attempt separately from failures/retries, orchestration and grading. Missing cost stays unknown. Retain failure evidence; cleanup may remove only this job's owned scratch paths, not another task's logs or review inputs.
 
 ## HTTP readiness
 
-When downstream work needs a local service immediately, add a credential-free
-loopback HTTP(S) readiness gate to `start`:
+When downstream work needs a local service immediately, add a credential-free loopback HTTP(S) readiness gate to `start`:
 
 ```powershell
 $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
@@ -96,21 +68,12 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
     -ReadinessTimeoutSeconds 60 | Out-String) | ConvertFrom-Json
 ```
 
-The gate returns after a 2xx/3xx response and stops only the newly created job
-on timeout. Use `wait-ready -Id <job-id> -ReadinessUri <loopback-url>` to probe
-an existing job without stopping it on failure.
+The gate returns after a 2xx/3xx response and stops only the newly created job on timeout. Use `wait-ready -Id <job-id> -ReadinessUri <loopback-url>` to probe an existing job without stopping it on failure.
 
 ## Advanced operations
 
-The installed session hook owns global reconciliation. Run synchronous
-`reconcile` only to retry a reported hook failure. Preview destructive cleanup
-with `prune -OlderThanDays 14 -WhatIf`, obtain explicit authorization for the
-reported scope, then run the same command without `-WhatIf`.
+The installed session hook owns global reconciliation. Run synchronous `reconcile` only to retry a reported hook failure. Preview destructive cleanup with `prune -OlderThanDays 14 -WhatIf`, obtain explicit authorization for the reported scope, then run the same command without `-WhatIf`.
 
-Set `MANAGED_JOBS_ROOT` before starting either agent when they must share a
-non-default registry. One-off `-StateRoot` overrides are only for persistent
-jobs; turn and session jobs must remain visible to their cleanup hooks.
+Set `MANAGED_JOBS_ROOT` before starting either agent when they must share a non-default registry. One-off `-StateRoot` overrides are only for persistent jobs; turn and session jobs must remain visible to their cleanup hooks.
 
-The HTTP readiness workflow adapts Open Mercato's
-`om-prepare-test-env` under the MIT License; see
-[open-mercato-license.md](references/open-mercato-license.md).
+The HTTP readiness workflow adapts Open Mercato's `om-prepare-test-env` under the MIT License; see [open-mercato-license.md](references/open-mercato-license.md).

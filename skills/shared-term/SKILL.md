@@ -5,8 +5,7 @@ description: Open and operate a visible collaborative Windows Terminal pane shar
 
 # Shared Terminal
 
-Resolve `$sharedTermSkillDirectory` to this file's directory. The installed
-`managed-jobs` controller is the process backend:
+Resolve `$sharedTermSkillDirectory` to this file's directory. The installed `managed-jobs` controller is the process backend:
 
 ```powershell
 $skillsRoot = Split-Path -Parent $sharedTermSkillDirectory
@@ -19,9 +18,7 @@ $job = (& $controller start -Name console -Executable pwsh.exe `
 [pscustomobject]@{ controller = $controller; job = $job } | ConvertTo-Json -Depth 12
 ```
 
-Use the returned job directly. Do not run `reconcile` or `list` around the
-launch. Add `-RequireBackgroundTab` only when focus must not change; it fails
-instead of opening a foreground terminal window.
+Use the returned job directly. Do not run `reconcile` or `list` around the launch. Add `-RequireBackgroundTab` only when focus must not change; it fails instead of opening a foreground terminal window.
 
 Operate only the registered pane:
 
@@ -33,10 +30,6 @@ Operate only the registered pane:
 & $controller stop -Id $job.id
 ```
 
-`send-input` is literal. Never send credentials; the user types them directly.
-Do not capture while a secret prompt is waiting. Treat captured pane content as
-sensitive and never copy it into logs, records, or other durable artifacts.
+`send-input` is literal. Never send credentials; the user types them directly. Do not capture while a secret prompt is waiting. Treat captured pane content as sensitive and never copy it into logs, records, or other durable artifacts.
 
-After a launch, report only the requested result and job id. Keep controller
-commands internal; print them only when the user explicitly asks how to control
-the pane. For later operations, answer only the current request.
+After a launch, report only the requested result and job id. Keep controller commands internal; print them only when the user explicitly asks how to control the pane. For later operations, answer only the current request.

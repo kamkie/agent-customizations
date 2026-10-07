@@ -116,6 +116,5 @@ Keep this view in the campaign tracker or another team-visible host. The ledger 
 
 ## Final deliverables, remaining authority, and delivery order
 
-Delivery-unit total: [count]. Applicable: [count]. Delivered: [count]. Blocked:
-[count]. Deferred: [count]. Omitted: [count; must be zero for completion].
+Delivery-unit total: [count]. Applicable: [count]. Delivered: [count]. Blocked: [count]. Deferred: [count]. Omitted: [count; must be zero for completion].
 ```

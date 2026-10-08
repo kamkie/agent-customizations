@@ -35,13 +35,13 @@
       "id": "pr-ready-open-draft-request",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "I asked you to implement the fix and open draft MRs. The bot-authored draft MR for the current remote head has complete scoped changes, passing required checks, completed agent review and triage, and every explicit readiness gate satisfied. I did not say to keep or leave it in draft. Merge and deployment are not authorized. Decide the next action before handoff."
+      "prompt": "I asked you to implement the fix and open draft MRs. The agent-authored draft MR for the current remote head has complete scoped changes, passing required checks, completed agent review and triage, and every explicit readiness gate satisfied. I did not say to keep or leave it in draft. Merge and deployment are not authorized. Decide the next action before handoff."
     },
     {
       "id": "pr-ready-explicit-keep-draft",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "I asked you to implement the fix, open a PR, and keep it in draft for now. The bot-authored draft PR for the current remote head has complete scoped changes, passing required checks, and completed agent review and triage. Merge and deployment are not authorized. Decide the next action before handoff."
+      "prompt": "I asked you to implement the fix, open a PR, and keep it in draft for now. The agent-authored draft PR for the current remote head has complete scoped changes, passing required checks, and completed agent review and triage. Merge and deployment are not authorized. Decide the next action before handoff."
     },
     {
       "id": "integration-unrequested-history-tidying",

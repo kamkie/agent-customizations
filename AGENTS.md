@@ -57,9 +57,9 @@ Owner authorization is a merge gate, never approval invented by the author.
 
 ### Owner approval, checks, and merge
 
-GitHub does not let `kamkie` approve a pull request it authored, so owner authorization is `kamkie`'s explicit merge instruction given for the current head. Never fabricate approval or reuse stale authority.
+GitHub does not let `kamkie` approve a pull request it authored, so owner authorization is `kamkie`'s explicit merge instruction given for the current head. That instruction lapses when the head moves. Never fabricate approval or reuse stale authority.
 
-When current-head owner authorization, review disposition, triage, passing required checks, non-draft state, and clean mergeability all pass, merge with `--merge --match-head-commit <sha>`. If only required checks remain pending, enable guarded auto-merge with those flags. Otherwise leave unmerged and report the exact unmet gate.
+When current-head owner authorization, review disposition, triage, passing required checks, non-draft state, and clean mergeability all pass, merge with `--merge --match-head-commit <sha>`. If only required checks remain pending, wait for them and then merge with the authorized SHA; do not enable auto-merge, which could merge a later head. Otherwise leave unmerged and report the exact unmet gate.
 
 After merge, fetch `origin/main`, prove the landed result is reachable, and report that commit before global cleanup. Live deployment remains separately authorized.
 

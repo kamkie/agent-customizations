@@ -154,7 +154,7 @@ Interactive. Choose the narrowest primaryAction that matches the required
 next behavior.
 
 publicationActor identifies the account that must perform an authorized
-pull-request mutation: kamkie-codex-bot, repository-defined when a
+pull-request mutation: repository-defined when a
 verified repository contract names another actor, current-session when the
 active credential is the applicable default, or not-applicable when no remote
 publication is authorized or pending.

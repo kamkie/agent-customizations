@@ -36,7 +36,7 @@ Use **Prepare -> Implement -> Validate -> Review -> Ready** in progress updates,
 
 ### Pull-request identity
 
-`kamkie` is the repository owner, reviewer, approver, and administrator, and the active GitHub CLI account opens agent-authored pull requests and performs author-side mutations for them. Do not switch the active account or substitute another credential. If `kamkie` lacks access, stop before the mutation and report the exact blocker.
+`kamkie` is the repository owner, reviewer, approver, and administrator, and the active GitHub CLI account opens agent-authored pull requests and performs author-side mutations for them. `GH_TOKEN` and `GITHUB_TOKEN` override the stored account, so before pull-request mutations verify that `gh api user --jq .login` returns `kamkie`. Do not switch the active account or substitute another credential. If the effective login differs or `kamkie` lacks access, stop before the mutation and report the exact blocker.
 
 ### Review: opposite-agent review and triage
 

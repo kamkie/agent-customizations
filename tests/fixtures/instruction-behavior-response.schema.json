@@ -49,7 +49,7 @@
     "publicationAuthorized": { "type": "boolean" },
     "publicationActor": {
       "type": "string",
-      "enum": ["not-applicable", "current-session", "kamkie-codex-bot", "repository-defined"]
+      "enum": ["not-applicable", "current-session", "repository-defined"]
     },
     "mergeAuthorized": { "type": "boolean" },
     "deploymentAuthorized": { "type": "boolean" },

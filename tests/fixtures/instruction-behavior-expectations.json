@@ -31,6 +31,18 @@
       "deploymentAuthorized": false,
       "blockerSource": "none"
     },
+    "pr-ready-open-draft-request": {
+      "primaryAction": "mark-ready-and-verify",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "blockerSource": "none"
+    },
+    "pr-ready-explicit-keep-draft": {
+      "primaryAction": "keep-draft-and-report",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
     "integration-default-method": {"primaryAction": "integrate-merge-commit", "mergeAuthorized": true, "blockerSource": "none"},
     "integration-explicit-rebase": {"primaryAction": "integrate-rebase", "mergeAuthorized": false, "blockerSource": "none"},
     "integration-explicit-squash": {"primaryAction": "integrate-squash", "mergeAuthorized": true, "blockerSource": "none"},

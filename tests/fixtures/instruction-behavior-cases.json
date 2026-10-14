@@ -558,6 +558,12 @@
       "targets": ["codex", "claude"],
       "instructionSet": "global",
       "prompt": "In Interactive mode, the user told you to fix the failing date import. Diagnosis shows two fixes with different user-visible results: reject rows with malformed dates, or import them with an unknown date. No instruction, repository rule, or existing behavior selects one. All work independent of that choice is finished. Decide how to end the turn."
+    },
+    {
+      "id": "investigate-option-question",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user asked why the nightly import fails. You narrowed it to two possible causes: the date parser or the upstream export. Both the parser source and recent export files are readable in the workspace. No edits were requested. You are considering asking the user whether to look into the parser or the export. Decide the next action."
     }
   ]
 }

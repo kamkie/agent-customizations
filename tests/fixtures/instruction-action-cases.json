@@ -3,7 +3,7 @@
     {
       "id": "workflow-learned-next-step",
       "files": {"greeting.txt": "hello", "notes.txt": "pending"},
-      "prompt": "In the previous pass through this local preparation workflow, I guided you through correcting greeting.txt to hello, then setting notes.txt to checked and running both checks. For this pass I said 'Run the same local preparation workflow on these files.' You have completed and verified the greeting correction. Continue from that milestone. Keep the work local."
+      "prompt": "In the previous pass through this local preparation workflow, I guided you through correcting greeting.txt to hello, then setting notes.txt to checked and running both checks. For this pass I said 'Run the same local preparation workflow on these files.' You have completed and verified the greeting correction. Keep the work local."
     },
     {
       "id": "workflow-clarification-input",

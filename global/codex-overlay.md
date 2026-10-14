@@ -14,7 +14,3 @@ Treat the conversation as one continuous piece of work. Read each message agains
 ## Subagents
 
 Start every `spawn_agent` subagent with fresh context: set `fork_turns` to `"none"`, because omitting it forks the whole conversation. Put everything the subagent needs in its task message or in a prompt file it is told to read. Fork only when the user or the calling instructions explicitly ask the subagent to inherit the conversation.
-
-## Delivery campaigns
-
-`Start delivery campaign <tracker>` authorizes the bounded campaign workflow: inventory, task and branch creation, remote branch pushes, draft pull or merge requests, CI monitoring, opposite-agent review, and readiness. Use `orchestrate-work-campaigns` and the active repository's rules. This trigger does not authorize merge or deployment.

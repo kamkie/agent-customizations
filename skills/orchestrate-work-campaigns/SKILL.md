@@ -9,6 +9,19 @@ Act only as the campaign bootstrap or controller. Never implement, repair, or in
 
 Treat each repository as a delivery unit in a multi-repository campaign. In a single-repository campaign, use each independently reviewable outcome as the delivery unit. Apply the pilot, visible matrix, and denominator per unit.
 
+## Map Host Capabilities
+
+Discover the host's tools before step 2 and use these equivalents. If the host cannot create a visible owner task, stop at a proposal checkpoint instead of substituting another mechanism.
+
+| Campaign term | Codex | Claude Code |
+|---|---|---|
+| Visible owner task | A task with its own worktree | A separate session the user can open, started in its own git worktree, never a subagent |
+| Explicit skill invocation | `$skill-name` | `/skill-name` |
+| Controller notification | The host's task messaging, else the handoff | Cross-session messaging to the controller session ID, else the handoff |
+| Opposite-agent review | `cross-agent-review` with Claude | `cross-agent-review` with Codex |
+
+Hidden subagents (Codex `spawn_agent`, Claude Code's agent tool) may gather read-only context for the controller, but they are never owner tasks. Record each owner task's returned ID; it is the address for steering, audit returns, and recovery.
+
 ## Run the Common Path
 
 Copy this checklist into the controller's progress updates and keep it current:
@@ -27,12 +40,12 @@ Copy this checklist into the controller's progress updates and keep it current:
 ```
 
 1. **Confirm fit and authority.** Read the active repository and global instructions. Use a campaign only for several bounded delivery or experiment units whose dependencies, ownership, evidence, or integration require one coordinating state. Resolve the authority for inventory, task/worktree and branch creation, commits, publication, tracker updates, CI, review, merge, and deployment. Never infer merge or deployment authority from publication.
-2. **Establish one controller.** If this is already the explicitly assigned controller task, do not create another. Otherwise, create exactly one visible project task with an isolated worktree only when task creation is authorized. Record the returned task and worktree before launching workers. If a separate controller is required but unauthorized, stop at a proposal or approval checkpoint.
+2. **Establish one controller.** If this is already the explicitly assigned controller task, do not create another. Otherwise, create exactly one visible owner task with an isolated worktree only when task creation is authorized. Record the returned task and worktree before launching workers. If a separate controller is required but unauthorized, stop at a proposal or approval checkpoint.
 3. **Build the live execution profile and inventory.** Record instruction sources and exact versions, original baseline, current accepted state, topology, dependencies, shared locks, validation contract, delivery gates, actor identities, policy refresh points, and the full in-scope delivery-unit denominator. Discover repository-specific values at runtime.
 4. **Create the primary campaign view.** Maintain a tracker- or host-visible matrix with one row per in-scope delivery unit and columns for applicability, owner task, branch, PR/MR, exact head, CI, opposite review, and outcome or blocker. Keep a private ledger for exact evidence, locks, and audit history; it is secondary and must not replace team-visible delivery state. Reconcile live tasks, jobs, branches, and PRs before creating replacements.
 5. **Pass the delivery-viability gate.** Before broad implementation, confirm that authority, actor identities, host access, tools, and repository policy allow one owner to attempt local preflight, commit, remote branch, draft PR/MR, tracker link, repository CI (or explicit evidence that none exists), required opposite-agent review, finding fixes and re-review, and final-head validation. The representative pilot in step 6 supplies the live delivery proof; do not run a duplicate pilot here. If publication or review authority is absent, finish the bounded inventory and stop at a delivery-authority checkpoint. Do not fan out implementation or accumulate hidden local commits.
-6. **Deliver one representative pilot.** Select one typical applicable delivery unit and create its visible owner task. Begin the prompt with `Use $execute-campaign-work-item` and include the same complete contract required for every worker below. Audit it through draft PR/MR, CI, opposite-agent findings and fixes, re-review, and final-head validation. Do not fan out until this proves the delivery path or exposes a campaign-wide blocker. A local commit is not a successful pilot.
-7. **Launch bounded workers.** After the pilot gate passes, create a separate visible, worktree-backed task for each authorized implementation, investigation, integration, or final-review unit. Begin each prompt with `Use $execute-campaign-work-item` and include the complete contract below; never rely on the worker reading this coordinator skill or its references. Do not substitute hidden subagents for inspectable work.
+6. **Deliver one representative pilot.** Select one typical applicable delivery unit and create its visible owner task. Begin the prompt with the worker agent's explicit invocation of `execute-campaign-work-item` and include the same complete contract required for every worker below. Audit it through draft PR/MR, CI, opposite-agent findings and fixes, re-review, and final-head validation. Do not fan out until this proves the delivery path or exposes a campaign-wide blocker. A local commit is not a successful pilot.
+7. **Launch bounded workers.** After the pilot gate passes, create a separate visible, worktree-backed owner task for each authorized implementation, investigation, integration, or final-review unit. Begin each prompt with the worker agent's explicit invocation of `execute-campaign-work-item` and include the complete contract below; never rely on the worker reading this coordinator skill or its references. Do not substitute hidden subagents for inspectable work.
 8. **Control execution and steering.** Serialize shared mutation or measurement surfaces and parallelize only proven-independent work. Treat a direct user instruction in any worker as a contract delta that supersedes stale controller decisions unless it conflicts with higher-priority safety or policy. Require the worker to notify the controller, mark affected audits, decisions, and evidence stale, and reconcile the matrix and contract. Return ambiguity to the user; do not override the user, stop the worker, or clean its recovery state from an earlier audit.
 9. **Audit each handoff.** Verify identity, ownership, exact inputs and outputs, complete diff, scope, clean worktree state, validation, artifacts, locks, delivery authority, and live remote head. Audit establishes evidence and state; it does not veto or reinterpret user product or architecture decisions. Return discrepancies to the same worker and re-audit every head changed by fixes.
 10. **Integrate and finish.** Follow the repository-defined topology; do not invent an integration branch or combined PR. Resolve interaction failures through owning workers. Reconcile applicable delivery units so delivered, blocked, deferred, and omitted equal the applicable count; completion requires `omitted = 0`. Count a delivery unit as delivered only when its team-visible artifact reaches the contract's CI, review, and final-head state; classify local-only commits as blocked at publication. Report the outcome and denominator first, then concise links, blockers, limitations, remaining merge/deploy authority, and next action.
@@ -42,7 +55,7 @@ Copy this checklist into the controller's progress updates and keep it current:
 Use this compact prompt when creating a separate controller task:
 
 ```text
-Use $orchestrate-work-campaigns as the active controller for [objective] in [repository/project]. Do not create another controller and do not implement worker scopes in this checkout.
+[Explicit invocation of orchestrate-work-campaigns] Act as the active controller for [objective] in [repository/project]. Do not create another controller and do not implement worker scopes in this checkout.
 
 Registration: [parent item, controller task pending, registration owner].
 Authority: [authorized actions, actors, activation triggers, forbidden actions].
@@ -61,7 +74,8 @@ For a campaign with extensive tracker registration or terminal-delivery gates, r
 Every worker prompt must resolve all fields in this contract:
 
 ```text
-Use $execute-campaign-work-item to execute this assigned campaign contract.
+[Explicit invocation of execute-campaign-work-item] Execute this assigned campaign contract.
+Controller: [controller task or session ID and notification channel].
 Work item: [one independently reviewable outcome and tracking item].
 Policy: [sources, consequences, precedence, and refresh points].
 Scope: [objective, acceptance criteria, non-goals, owned and forbidden paths].
@@ -78,7 +92,7 @@ Handoff: [outcome/impact, latest user contract delta and provenance, exact input
 
 Keep writes within the owned repository and paths. Exact-ref, read-only inputs from another repository are valid dependencies when provenance and purpose are recorded; they do not transfer write ownership.
 
-Use `none` or `not applicable` with a reason where appropriate. Never launch a contract with unresolved placeholders. For complex validation, delivery, or artifact matrices, read [child-contract-template.md](references/child-contract-template.md).
+Use `none` or `not applicable` with a reason where appropriate. Resolve each `[Explicit invocation of ...]` with the target agent's syntax from the capability map. Never launch a contract with unresolved placeholders. For complex validation, delivery, or artifact matrices, read [child-contract-template.md](references/child-contract-template.md).
 
 ## Audit and Recover
 

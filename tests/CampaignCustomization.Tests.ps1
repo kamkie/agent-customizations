@@ -4,7 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 
-$global = Get-Content -LiteralPath (Join-Path $repositoryRoot 'global\codex-overlay.md') -Raw
+$global = Get-Content -LiteralPath (Join-Path $repositoryRoot 'global\shared.md') -Raw
 $controller = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\SKILL.md') -Raw
 $controllerTemplate = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\controller-template.md') -Raw
 $audit = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\handoff-audit-checklist.md') -Raw
@@ -108,6 +108,19 @@ Assert-PolicyMatch -Case 'audit rejects local commits as delivery' `
 Assert-PolicyMatch -Case 'worker cannot claim local-only delivery' `
     -Content $worker `
     -Pattern '(?s)local-only commit is\s+not delivered or complete delivery'
+
+$campaignSources = @(
+    Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns'), (Join-Path $repositoryRoot 'skills\execute-campaign-work-item') -Filter '*.md' -File -Recurse
+)
+foreach ($source in $campaignSources) {
+    $content = Get-Content -LiteralPath $source.FullName -Raw
+    if ($content -match '\$(?:orchestrate-work-campaigns|execute-campaign-work-item)\b|\bproject task\b') {
+        throw "Campaign skill source '$($source.Name)' uses target-specific skill invocation or task terms; use the capability map."
+    }
+}
+Assert-PolicyMatch -Case 'controller maps visible owner tasks for both agents' `
+    -Content $controller `
+    -Pattern '(?s)Map Host Capabilities.*Visible owner task.*Codex.*Claude Code.*never a subagent'
 
 $caseCount = ([regex]::Matches($forwardCases, '(?m)^## Case \d+\b')).Count
 if ($caseCount -lt 6) {

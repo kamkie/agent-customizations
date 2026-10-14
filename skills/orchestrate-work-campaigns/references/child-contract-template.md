@@ -9,7 +9,7 @@ Use this template after replacing bracketed fields with live, issue-specific det
 ## Template
 
 ```text
-Use $execute-campaign-work-item to execute this assigned campaign contract. You own [work item and independently reviewable outcome] in [repository/project].
+[Explicit invocation of execute-campaign-work-item] Execute this assigned campaign contract. Notify the controller at [controller task or session ID and channel]. You own [work item and independently reviewable outcome] in [repository/project].
 
 Applicable live policy:
 - Sources and scopes: [instruction paths, tracker rules, external policy, and precedence].

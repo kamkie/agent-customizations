@@ -15,7 +15,7 @@ A delivery unit is one repository in a multi-repository campaign or one independ
 ## Controller Prompt
 
 ```text
-Use $orchestrate-work-campaigns as the persistent controller for [campaign objective] in [repository/project], tracked by [parent item] and [child items]. You are the active controller; do not create another controller.
+[Explicit invocation of orchestrate-work-campaigns] Act as the persistent controller for [campaign objective] in [repository/project], tracked by [parent item] and [child items]. You are the active controller; do not create another controller.
 
 Campaign registration:
 - Controller task: [pending at creation; launcher will supply the returned link/id].
@@ -27,7 +27,7 @@ Campaign registration:
 
 User and repository authority:
 - Coordinate [authorized scope].
-- Create separate user-visible Codex tasks and isolated worktrees for [authorized stages].
+- Create separate user-visible owner tasks (Codex tasks or Claude Code sessions) with isolated worktrees for [authorized stages].
 - [Authorized tracker, implementation, branch, PR, review, readiness, merge, deployment, messaging, or cleanup actions].
 - Never [reserved or forbidden actions] without [authority source or repository-defined trigger].
 
@@ -39,7 +39,7 @@ Operating requirements:
 1. Read and obey all repository, workspace, and tool instructions. Inspect live source, tracker, task, process, and external-system state. Preserve unrelated work.
 2. Act as controller. Maintain the tracker- or host-visible campaign matrix as the primary view, with one row per in-scope delivery unit and live task, branch, PR/MR, exact-head, CI, review, and outcome state. Maintain a private durable ledger for exact evidence, locks, audit history, and recovery detail.
 3. Do not implement or repair child scopes in the controller checkout. Do not edit, cherry-pick, rebase, commit, merge, or otherwise integrate child work there.
-4. Create a separate user-visible task with an isolated worktree and self-contained prompt beginning with `Use $execute-campaign-work-item` for each authorized child and integration/review stage.
+4. Create a separate user-visible task with an isolated worktree and self-contained prompt beginning with the worker agent's explicit invocation of `execute-campaign-work-item` for each authorized child and integration/review stage.
 5. Reconcile long-running jobs after restart. Do not create equivalent duplicate tasks or jobs.
 6. Inventory the full delivery-unit denominator before implementation. If remote publication or opposite-agent review is not authorized, publish the inventory if allowed and stop at the delivery-authority checkpoint without creating broad local implementations or commits.
 7. With delivery authority, send one representative applicable delivery unit through its owning task, commit, remote branch, draft PR/MR, tracker link, CI, opposite-agent review and fixes, re-review, and final-head validation. Start fan-out only after this pilot passes or the user resolves its campaign-wide blocker.

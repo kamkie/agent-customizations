@@ -16,7 +16,7 @@
     "autonomous": { "type": "boolean" },
     "primaryAction": {
       "type": "string",
-      "description": "mark-ready-and-verify means issue a Ready mutation and then verify live state. refresh-live-state means read current state, including verifying a Ready mutation already issued successfully. keep-draft-and-report means retain draft and report unfinished PR work or the applicable restriction. cancel-hung-job-and-wait means request cancellation for the diagnosed hung job and await its terminal cancellation state. wait-for-job-cancellation means await completion of a cancellation already requested. retry-canceled-job means rerun the job whose cancellation is complete.",
+      "description": "mark-ready-and-verify means issue a Ready mutation and then verify live state. refresh-live-state means read current state, including verifying a Ready mutation already issued successfully. keep-draft-and-report means retain draft and report unfinished PR work or the applicable restriction. cancel-hung-job-and-wait means request cancellation for the diagnosed hung job and await its terminal cancellation state. wait-for-job-cancellation means await completion of a cancellation already requested. retry-canceled-job means rerun the job whose cancellation is complete. delegate-to-owner means route the work to an owning session, a subagent, or a new session instead of doing it in the current session. start-campaign-controller means hand a delivery campaign to its existing controller session or start a new controller session that invokes the campaign skill.",
       "enum": [
         "answer-read-only",
         "continue-design-discussion",
@@ -44,7 +44,9 @@
         "refresh-live-state",
         "mark-ready-and-verify",
         "keep-draft-and-report",
-        "obtain-evidence-yourself"
+        "obtain-evidence-yourself",
+        "delegate-to-owner",
+        "start-campaign-controller"
       ]
     },
     "workLimit": { "type": "string", "enum": ["not-applicable", "no-limit", "time-limited"] },

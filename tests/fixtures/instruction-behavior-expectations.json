@@ -1,6 +1,22 @@
 {
   "schemaVersion": 1,
   "expectations": {
+    "coordinator-status-question": {
+      "primaryAction": "answer-read-only",
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "coordinator-question-then-implement": {
+      "primaryAction": "implement-and-deliver",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "coordinator-active-implement": {
+      "primaryAction": "delegate-to-owner",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
     "delivery-repeated-hang-diagnosis": {"primaryAction": "recheck-and-diagnose", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},
     "delivery-stalled-log-diagnosis": {"primaryAction": "recheck-and-diagnose", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},
     "delivery-confirmed-hung-job": {"primaryAction": "cancel-hung-job-and-wait", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},

@@ -27,7 +27,7 @@ if (@($ids | Where-Object { $_ -notin $expectedIds }).Count -gt 0 -or
 }
 
 $allowedTargets = @('codex', 'claude')
-$allowedInstructionSets = @('global', 'campaign', 'review')
+$allowedInstructionSets = @('global', 'campaign', 'review', 'coordinator')
 $knownProperties = @($schema.properties.PSObject.Properties.Name)
 $answerLeakPattern = '(?im)(?:^\s*(?:expected|answer|rubric|solution)\b|\b(?:expected\s+(?:answer|outcome|behavior|result)|answer\s*:|rubric\s*:|solution\s*:))'
 foreach ($sample in @(
@@ -58,6 +58,9 @@ foreach ($case in $cases.cases) {
     }
     if ($case.instructionSet -notin $allowedInstructionSets) {
         throw "Instruction behavior case '$($case.id)' has an invalid instruction set."
+    }
+    if ($case.instructionSet -eq 'coordinator' -and @($case.targets | Where-Object { $_ -ne 'claude' }).Count -gt 0) {
+        throw "Coordinator behavior case '$($case.id)' must target only Claude, where coordinate-sessions is deployed."
     }
     if ($case.prompt -match $answerLeakPattern) {
         throw "Instruction behavior case '$($case.id)' leaks its expectation into the prompt."

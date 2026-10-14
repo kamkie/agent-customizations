@@ -11,9 +11,6 @@ tools' live configuration directories are deployment targets.
 - `global/shared.md` with Codex and Claude overlays — canonical personal
   guidance composed into each target's installed instruction file.
 - `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
-- `skills/coordinate-sessions` — Claude Code standing coordinator that triages,
-  files, delegates, relays, and verifies work across other sessions without
-  doing it.
 - `skills/cross-agent-review` — opposite-engine adversarial review with triage,
   credited fix commits, and bounded rounds, shared by Codex and Claude Code.
 - `skills/deep-research` — Codex-specific, evidence-driven research with

@@ -101,14 +101,6 @@ function Write-CompiledInstructions {
             $skillPath = Join-Path $repositoryRoot 'skills\cross-agent-review\SKILL.md'
             $content = $content.TrimEnd() + "`n`n" + [IO.File]::ReadAllText($skillPath) + "`n"
         }
-        'coordinator' {
-            if ($AgentTarget -ne 'claude') {
-                throw "Instruction set '$InstructionSet' is not supported for target '$AgentTarget'."
-            }
-            $skillPath = Join-Path $repositoryRoot 'skills\coordinate-sessions\SKILL.md'
-            $skill = [IO.File]::ReadAllText($skillPath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
-            $content = $content.TrimEnd([char[]]"`r`n") + "`n`n" + $skill + "`n"
-        }
         'campaign' {
             $skillPath = Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\SKILL.md'
             $skill = [IO.File]::ReadAllText($skillPath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")

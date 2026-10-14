@@ -1,6 +1,9 @@
 {
   "schemaVersion": 1,
   "expectations": {
+    "coordinator-standing-role": {
+      "skill": "orchestrate-work-campaigns"
+    },
     "claude-runner-pr-findings": {
       "skill": "claude-runner"
     },
@@ -9,15 +12,6 @@
     },
     "claude-runner-print-mode": {
       "skill": "claude-runner"
-    },
-    "coordinator-standing-role": {
-      "skill": "coordinate-sessions"
-    },
-    "coordinator-session-triage": {
-      "skill": "coordinate-sessions"
-    },
-    "coordinator-relay-handoff": {
-      "skill": "coordinate-sessions"
     },
     "cross-review-attack-commit": {
       "skill": "cross-agent-review"

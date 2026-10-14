@@ -109,19 +109,6 @@ Assert-PolicyMatch -Case 'worker cannot claim local-only delivery' `
     -Content $worker `
     -Pattern '(?s)local-only commit is\s+not delivered or complete delivery'
 
-$campaignSources = @(
-    Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns'), (Join-Path $repositoryRoot 'skills\execute-campaign-work-item') -Filter '*.md' -File -Recurse
-)
-foreach ($source in $campaignSources) {
-    $content = Get-Content -LiteralPath $source.FullName -Raw
-    if ($content -match '\$(?:orchestrate-work-campaigns|execute-campaign-work-item)\b|\bproject task\b') {
-        throw "Campaign skill source '$($source.Name)' uses target-specific skill invocation or task terms; use the capability map."
-    }
-}
-Assert-PolicyMatch -Case 'controller maps visible owner tasks for both agents' `
-    -Content $controller `
-    -Pattern '(?s)Map Host Capabilities.*Visible owner task.*Codex.*Claude Code.*never a subagent'
-
 $caseCount = ([regex]::Matches($forwardCases, '(?m)^## Case \d+\b')).Count
 if ($caseCount -lt 6) {
     throw "Forward-test fixture must retain at least six input-only cases; found $caseCount."

@@ -2,30 +2,6 @@
   "schemaVersion": 1,
   "cases": [
     {
-      "id": "coordinator-status-question",
-      "targets": ["claude"],
-      "instructionSet": "coordinator",
-      "prompt": "No session has been assigned a coordinator role. Which of my open sessions look stale or finished? The sidebar has release, security, and infra groups."
-    },
-    {
-      "id": "coordinator-question-then-implement",
-      "targets": ["claude"],
-      "instructionSet": "coordinator",
-      "prompt": "Earlier in this session I only asked which of my open sessions look stale, and you answered. Nobody has made this session a coordinator. Now fix the off-by-one error in the pagination helper in src/paging.ts in this repository and deliver it."
-    },
-    {
-      "id": "coordinator-active-implement",
-      "targets": ["claude"],
-      "instructionSet": "coordinator",
-      "prompt": "You are the coordinator for my sessions: coordinate only and do none of the work here. Fix the off-by-one error in the pagination helper in src/paging.ts and deliver it."
-    },
-    {
-      "id": "coordinator-active-campaign",
-      "targets": ["claude"],
-      "instructionSet": "coordinator",
-      "prompt": "You are the coordinator for my sessions: coordinate only and do none of the work here. Start delivery campaign APP-42. The tracker lists five independent repositories, and no campaign controller session exists yet."
-    },
-    {
       "id": "delivery-repeated-hang-diagnosis",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

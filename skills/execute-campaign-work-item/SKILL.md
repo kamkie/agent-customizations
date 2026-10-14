@@ -14,7 +14,6 @@ Proceed only when the task states all of the following:
 - policy sources, their consequences, precedence, and refresh points;
 - one objective, acceptance criteria, non-goals, and owned and forbidden paths;
 - exact accepted base ref and SHA or artifact version, refresh steps, dependencies, exact-ref read-only inputs, worktree and branch owner, and shared locks;
-- the controller's task or session ID and notification channel;
 - authorized writes and external actions, required actor identities, gates, and explicitly forbidden actions;
 - required work, collateral documentation, validation and evidence, artifact placement, delivery behavior, stop conditions, and terminal handoff fields.
 
@@ -22,7 +21,7 @@ Treat unlisted external actions and scope as unauthorized. If the base, ownershi
 
 ## Apply Direct User Steering
 
-Treat a direct user instruction in this worker as a contract delta that supersedes stale controller decisions unless higher-priority safety or policy conflicts. Notify the controller immediately through the channel the contract names (cross-session messaging to the controller's task or session ID when the host supports it) with the exact delta and identify audits, decisions, validation, and delivery state that are now stale. Continue when the user instruction resolves scope and authority unambiguously, after refreshing shared locks and resource ownership. If the delta touches a serialized surface, obtain or reconfirm the same campaign lock before acting; controller coordination may sequence the work but may not override the user's decision. Return remaining ambiguity or conflict to the user instead of letting the controller silently narrow or override it.
+Treat a direct user instruction in this worker as a contract delta that supersedes stale controller decisions unless higher-priority safety or policy conflicts. Notify the controller immediately with the exact delta and identify audits, decisions, validation, and delivery state that are now stale. Continue when the user instruction resolves scope and authority unambiguously, after refreshing shared locks and resource ownership. If the delta touches a serialized surface, obtain or reconfirm the same campaign lock before acting; controller coordination may sequence the work but may not override the user's decision. Return remaining ambiguity or conflict to the user instead of letting the controller silently narrow or override it.
 
 Do not stop, discard recovery artifacts, or preserve a prior `DEFER` merely to protect the original contract. A maintained applicable repository's recoverable product, test-bootstrap, or schema defect is work to address when the current user-authorized outcome and owned write paths cover it. Otherwise preserve the state and report the exact additional write scope or authority required.
 

@@ -34,22 +34,6 @@
       "prompt": "You are the coordinator for my sessions from now on. Do not do any of the work in here yourself: small checks go to subagents and anything bigger to separate sessions."
     },
     {
-      "id": "coordinator-session-triage",
-      "targets": [
-        "claude"
-      ],
-      "instructionSet": "skill-catalog",
-      "prompt": "Go through my open sessions, tell me which ones are stale or finished, file the finished ones under done, and move the unfinished ones back to their workstream groups."
-    },
-    {
-      "id": "coordinator-relay-handoff",
-      "targets": [
-        "claude"
-      ],
-      "instructionSet": "skill-catalog",
-      "prompt": "The release session reported its merge request green and the security session is waiting on me. Pass my go to the release session, route the leftover IAM follow-up to whichever session owns it, and give me a board of what still needs me."
-    },
-    {
       "id": "cross-review-attack-commit",
       "targets": [
         "codex",

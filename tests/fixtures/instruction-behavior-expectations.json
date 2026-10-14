@@ -396,6 +396,6 @@
     "readonly-answer-edit-next-step": {"autonomous": false, "primaryAction": "answer-read-only", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "blockerSource": "none", "closingQuestion": "none"},
     "closing-required-confirmation": {"mergeAuthorized": false, "closingQuestion": "required-confirmation"},
     "closing-material-decision": {"autonomous": false, "mergeAuthorized": false, "deploymentAuthorized": false, "closingQuestion": "material-decision"},
-    "investigate-option-question": {"primaryAction": ["obtain-evidence-yourself", "recheck-and-diagnose", "answer-read-only"], "publicationAuthorized": false, "closingQuestion": "none"}
+    "investigate-option-question": {"primaryAction": ["obtain-evidence-yourself", "recheck-and-diagnose"], "publicationAuthorized": false, "closingQuestion": "none"}
   }
 }

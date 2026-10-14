@@ -145,6 +145,15 @@ try {
         throw 'The scorer accepted a closing next-step question after a finished read-only answer.'
     }
 
+    $investigateResponse = Join-Path $responseRoot 'claude/investigate-option-question.json'
+    $investigate = Get-Content -LiteralPath $investigateResponse -Raw | ConvertFrom-Json
+    $investigate.primaryAction = 'answer-read-only'
+    $investigate | ConvertTo-Json | Set-Content -LiteralPath $investigateResponse
+    $investigateOutput = @(& pwsh -NoProfile -File $runner -Target claude -CaseId investigate-option-question -ResponseDirectory $responseRoot 2>&1)
+    if ($LASTEXITCODE -eq 0 -or ($investigateOutput -join ' ') -notmatch 'primaryAction: expected one of') {
+        throw 'The scorer accepted an answer that skips available investigation.'
+    }
+
     $negativeCase = $cases.cases | Where-Object id -eq 'capability-question' | Select-Object -First 1
     if (-not $negativeCase) { throw 'The scorer negative controls require the capability-question case.' }
     $negativeExpectation = $expectations.expectations.PSObject.Properties[$negativeCase.id].Value

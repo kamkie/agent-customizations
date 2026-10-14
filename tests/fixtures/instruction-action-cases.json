@@ -13,7 +13,7 @@
     {
       "id": "workflow-stage-only",
       "files": {"greeting.txt": "hello", "notes.txt": "pending"},
-      "prompt": "The normal preparation workflow corrects greeting.txt, sets notes.txt to checked, and runs both checks. For this pass the user explicitly said 'Correct greeting.txt only; leave notes and checks for later.' The greeting correction to hello is complete and verified. Report the result."
+      "prompt": "The user requested the preparation workflow: correct greeting.txt, set notes.txt to checked, and run both checks. The user then narrowed this pass: 'Correct greeting.txt only; defer notes and checks until I resume them.' The greeting correction to hello is complete and verified. The deferred parts of the original request have not been canceled or resumed. Report the result."
     },
     {
       "id": "design-agreement",

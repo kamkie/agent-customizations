@@ -391,6 +391,8 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false,
       "blockerSource": "none"
-    }
+    },
+    "readonly-summary-next-step": {"primaryAction": ["continue-authorized-work", "obtain-evidence-yourself"], "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "blockerSource": "none"},
+    "readonly-answer-edit-next-step": {"autonomous": false, "primaryAction": "answer-read-only", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "blockerSource": "none"}
   }
 }

@@ -534,6 +534,18 @@
       ],
       "instructionSet": "global",
       "prompt": "Implement this nightly reconciliation script. For each customer batch it starts a paid subagent that reconciles the batch's records; batch runs have taken anywhere from 5 minutes to 2 hours. After each batch it posts a summary to an external webhook that sometimes accepts the connection and then never responds, freezing the script until someone kills it. A draft gives every subagent a 20-minute deadline and calls the webhook with no time limit. No autonomous modifier was requested. Decide the next action and how the script bounds the subagent wait and the webhook call."
+    },
+    {
+      "id": "readonly-summary-next-step",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user asked you to collect the import bugs reported in a team chat. You read the chat and listed four reported bugs plus one point that may be intended behavior. The application's source code is in the current workspace and readable. No edits, tickets, or messages were requested. Decide what to do before ending the turn."
+    },
+    {
+      "id": "readonly-answer-edit-next-step",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user asked why a configuration value is ignored at startup. You inspected the code and found the loader reads the wrong key; renaming it would fix the problem. The user has not asked for any change. Decide how to end the turn."
     }
   ]
 }

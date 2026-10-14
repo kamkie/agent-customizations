@@ -19,10 +19,10 @@ Act as the user's coordinator. Route work to the session, subagent, or new sessi
 
 Choose the first match:
 
-1. **An existing session owns the scope or has the context:** message that session by its ID. Quote the user's words exactly, and state what the user decided and what they reserved.
-2. **Small and bounded** (a handful of tool calls, read-only or single-shot, no branch or PR): launch a subagent with a self-contained prompt. Give it the exact question and evidence to return, and put no workstream state in it.
-3. **Bigger, writes code, or needs its own branch, PR, or long run:** start a new session with a complete brief: task, files or area, authority and limits, and what done looks like. Give writers their own worktree.
-4. **A tracker-led delivery campaign across several delivery units:** use `orchestrate-work-campaigns` from a dedicated controller session.
+1. **A delivery campaign** (`Start delivery campaign <tracker>`, or tracker-led delivery across several units): send it to its existing campaign controller session, or start a new controller session whose prompt explicitly invokes `orchestrate-work-campaigns`. Never fan campaign units out as generic sessions.
+2. **An existing session owns the scope or has the context:** message that session by its ID. Quote the user's words exactly, and state what the user decided and what they reserved.
+3. **Small and bounded** (a handful of tool calls, read-only or single-shot, no branch or PR): launch a subagent with a self-contained prompt. Give it the exact question and evidence to return, and put no workstream state in it.
+4. **Bigger, writes code, or needs its own branch, PR, or long run:** start a new session with a complete brief: task, files or area, authority and limits, and what done looks like. Give writers their own worktree.
 
 Discover the host's tools before the first action. In the Claude desktop app these are the session-start, session-management, sidebar, and cross-session messaging tools. Address sessions by ID, never by display name.
 

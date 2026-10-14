@@ -17,6 +17,11 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false
     },
+    "coordinator-active-campaign": {
+      "primaryAction": "start-campaign-controller",
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
     "delivery-repeated-hang-diagnosis": {"primaryAction": "recheck-and-diagnose", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},
     "delivery-stalled-log-diagnosis": {"primaryAction": "recheck-and-diagnose", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},
     "delivery-confirmed-hung-job": {"primaryAction": "cancel-hung-job-and-wait", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},

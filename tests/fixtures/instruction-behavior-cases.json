@@ -20,6 +20,12 @@
       "prompt": "You are the coordinator for my sessions: coordinate only and do none of the work here. Fix the off-by-one error in the pagination helper in src/paging.ts and deliver it."
     },
     {
+      "id": "coordinator-active-campaign",
+      "targets": ["claude"],
+      "instructionSet": "coordinator",
+      "prompt": "You are the coordinator for my sessions: coordinate only and do none of the work here. Start delivery campaign APP-42. The tracker lists five independent repositories, and no campaign controller session exists yet."
+    },
+    {
       "id": "delivery-repeated-hang-diagnosis",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

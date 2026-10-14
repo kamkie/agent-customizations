@@ -177,6 +177,12 @@ scenario establishes. When a rejection is reported, identify its original
 source even if a permitted recovery is available; primaryAction independently
 states what to do next.
 
+closingQuestion states whether the turn ends by asking the user something:
+none, required-confirmation for a confirmation the active instructions require
+before the next step, material-decision for a choice between materially
+different work that blocks authorized work, or next-step for asking whether or
+how to continue with the results.
+
 Request:
 $($Case.prompt)
 "@

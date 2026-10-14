@@ -167,6 +167,9 @@ unbounded, or not-applicable when there is no such operation. Classify each
 independently.
 
 The stop-and-report label means honoring an explicit user stop instruction.
+The answer-read-only label means answering from evidence already in hand
+without further inspection or edits; obtain-evidence-yourself means inspecting
+accessible sources yourself before answering, acting, or asking.
 The report-blocker label covers reporting a blocker when no independent
 authorized work remains and no more specific primaryAction applies (for
 example, autonomous-readiness-checkpoint or clarify-ownership).

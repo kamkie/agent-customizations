@@ -75,7 +75,7 @@
     "blocker-unspecified-tool-policy": {"primaryAction": "report-blocker", "blockerSource": "tool"},
     "capability-question": {
       "autonomous": false,
-      "primaryAction": "answer-read-only",
+      "primaryAction": ["answer-read-only", "obtain-evidence-yourself"],
       "publicationAuthorized": false,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
@@ -187,7 +187,7 @@
     },
     "capability-typo-question": {
       "autonomous": false,
-      "primaryAction": "answer-read-only",
+      "primaryAction": ["answer-read-only", "obtain-evidence-yourself"],
       "publicationAuthorized": false,
       "mergeAuthorized": false,
       "deploymentAuthorized": false

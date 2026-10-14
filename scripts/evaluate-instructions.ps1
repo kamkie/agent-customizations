@@ -309,6 +309,20 @@ function Compare-ExpectedBehavior {
             $mismatches.Add("missing '$($property.Name)'")
             continue
         }
+        # Enum expectations may list accepted alternatives; responses stay scalar.
+        if ($property.Value -is [array]) {
+            $contract = $schemaDocument.properties.PSObject.Properties[$property.Name].Value
+            if (-not $contract -or $contract.type -ne 'string' -or
+                $contract.PSObject.Properties.Name -notcontains 'enum' -or
+                -not $property.Value.Count -or @($property.Value | Where-Object {
+                    $_ -isnot [string] -or $_ -cnotin @($contract.enum)
+                }).Count) {
+                $mismatches.Add("$($property.Name): invalid enum alternatives")
+            } elseif ($actualProperty.Value -isnot [string] -or $actualProperty.Value -cnotin $property.Value) {
+                $mismatches.Add("$($property.Name): expected one of '$($property.Value -join ', ')', got '$($actualProperty.Value)'")
+            }
+            continue
+        }
         if ($null -eq $actualProperty.Value) {
             $mismatches.Add("$($property.Name): expected type '$($property.Value.GetType().Name)', got 'null'")
         } elseif ($actualProperty.Value.GetType() -ne $property.Value.GetType()) {

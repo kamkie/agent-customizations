@@ -73,7 +73,13 @@ foreach ($case in $cases.cases) {
         if ($property.Name -notin $knownProperties) {
             throw "Expectation '$($case.id)' contains unknown property '$($property.Name)'."
         }
-        if ($allowedValues.ContainsKey($property.Name) -and $property.Value -notin $allowedValues[$property.Name]) {
+        if ($property.Value -is [array] -and
+            (-not $allowedValues.ContainsKey($property.Name) -or -not $property.Value.Count)) {
+            throw "Expectation '$($case.id)' requires nonempty enum alternatives."
+        }
+        if ($allowedValues.ContainsKey($property.Name) -and @($property.Value | Where-Object {
+            $_ -isnot [string] -or $_ -cnotin $allowedValues[$property.Name]
+        }).Count) {
             throw "Expectation '$($case.id)' has invalid '$($property.Name)' value '$($property.Value)'."
         }
     }
@@ -99,7 +105,7 @@ try {
                 blockerSource = 'none'
             }
             foreach ($property in $expected.PSObject.Properties) {
-                $response[$property.Name] = $property.Value
+                $response[$property.Name] = if ($property.Value -is [array]) { $property.Value[0] } else { $property.Value }
             }
             $response | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $targetRoot ($case.id + '.json')) -Encoding utf8
         }
@@ -108,6 +114,25 @@ try {
     $passOutput = @(& pwsh -NoProfile -File $runner -Target all -ResponseDirectory $responseRoot 2>&1)
     if ($LASTEXITCODE -ne 0) {
         throw 'The instruction behavior scorer rejected matching responses: ' + ($passOutput -join ' ')
+    }
+
+    $monitoringResponse = Join-Path $responseRoot 'codex/delivery-quiet-progressing-job.json'
+    $monitoring = Get-Content -LiteralPath $monitoringResponse -Raw | ConvertFrom-Json
+    $monitoring.primaryAction = 'refresh-live-state'
+    $monitoring | ConvertTo-Json | Set-Content -LiteralPath $monitoringResponse
+    $alternativeOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw 'The scorer rejected an allowed monitoring alternative.' }
+    $monitoring.primaryAction = 'cancel-hung-job-and-wait'
+    $monitoring | ConvertTo-Json | Set-Content -LiteralPath $monitoringResponse
+    $cancelOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot 2>&1)
+    if ($LASTEXITCODE -eq 0 -or ($cancelOutput -join ' ') -notmatch 'expected one of') {
+        throw 'The scorer accepted cancellation of a progressing job.'
+    }
+    $monitoring.primaryAction = @('continue-authorized-work', 'refresh-live-state')
+    $monitoring | ConvertTo-Json | Set-Content -LiteralPath $monitoringResponse
+    $arrayOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot 2>&1)
+    if ($LASTEXITCODE -eq 0 -or ($arrayOutput -join ' ') -notmatch 'primaryAction must be string') {
+        throw 'The scorer accepted an array instead of a scalar response.'
     }
 
     $negativeCase = $cases.cases | Where-Object id -eq 'capability-question' | Select-Object -First 1

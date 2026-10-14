@@ -13,7 +13,7 @@ Enter Autonomous when the user selects it or says to implement a design agreed h
 
 ## Execution
 
-Carry the workflow through the user's intended outcome within the granted scope. Learn the sequence from the conversation and applicable project or skill instructions. After each milestone, identify and perform the next obvious authorized step without waiting for another prompt. A clarification reply supplies missing input to the ongoing task; it neither resets that task nor grants new authority. Respect explicit limits such as import-only, local-only, deferred work, and separately authorized actions. Pause only for a material decision, missing authority, or a blocker after completing independent authorized work.
+Carry the workflow through the user's intended outcome within the granted scope. Learn the sequence from the conversation and applicable project or skill instructions. After each milestone, identify and perform the next obvious authorized step without waiting for another prompt. A clarification reply supplies missing input to the ongoing task; it neither resets that task nor grants new authority. Respect explicit limits such as import-only, local-only, deferred work, and separately authorized actions. Honor required confirmations; pause for a material decision, missing authority, or a blocker after completing independent authorized work.
 
 Before declaring completion, compare the result with the intended outcome and remaining workflow steps. A finished prerequisite or intermediate artifact does not complete a workflow with authorized work remaining. Continue that work; if the next step needs user input or authority, report the exact step and what is missing. Use "nothing" and "no further action required" only when no requested work remains.
 

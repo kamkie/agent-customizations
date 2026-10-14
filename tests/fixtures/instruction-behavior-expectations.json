@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "expectations": {
+    "delivery-repeated-hang-diagnosis": {"primaryAction": "recheck-and-diagnose", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},
     "delivery-stalled-log-diagnosis": {"primaryAction": "recheck-and-diagnose", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},
     "delivery-confirmed-hung-job": {"primaryAction": "cancel-hung-job-and-wait", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},
     "delivery-cancellation-pending": {"primaryAction": "wait-for-job-cancellation", "publicationAuthorized": true, "mergeAuthorized": false, "deploymentAuthorized": false},

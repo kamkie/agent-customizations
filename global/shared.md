@@ -43,4 +43,4 @@ For Windows cleanup, verify the absolute target and use `Remove-Item -LiteralPat
 
 ## Delivery campaigns
 
-`Start delivery campaign <tracker>` authorizes the bounded campaign workflow: inventory, task or session and branch creation, remote branch pushes, draft pull or merge requests, CI monitoring, opposite-agent review, and readiness. It selects Autonomous mode for that campaign. Use `orchestrate-work-campaigns` and the active repository's rules. This trigger does not authorize merge or deployment.
+`Start delivery campaign <tracker>` authorizes the bounded campaign workflow: inventory, task and branch creation, remote branch pushes, draft pull or merge requests, CI monitoring, opposite-agent review, and readiness. It selects Autonomous mode for that campaign. Use `orchestrate-work-campaigns` and the active repository's rules. This trigger does not authorize merge or deployment.

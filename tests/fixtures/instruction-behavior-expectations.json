@@ -1,6 +1,9 @@
 {
   "schemaVersion": 1,
   "expectations": {
+    "workflow-intermediate-artifact": {"primaryAction": "continue-authorized-work", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "blockerSource": "none"},
+    "workflow-clarification-resumes": {"primaryAction": "continue-authorized-work", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "blockerSource": "none"},
+    "workflow-explicit-stage-limit": {"primaryAction": "stop-and-report", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false},
     "pr-ready-preparation-publication-pending": {
       "primaryAction": "mark-ready-and-verify",
       "publicationAuthorized": true,

@@ -1,6 +1,21 @@
 {
   "cases": [
     {
+      "id": "workflow-learned-next-step",
+      "files": {"greeting.txt": "hello", "notes.txt": "pending"},
+      "prompt": "In the previous pass through this local preparation workflow, I guided you through correcting greeting.txt to hello, then setting notes.txt to checked and running both checks. For this pass I said 'Run the same local preparation workflow on these files.' You have completed and verified the greeting correction. Keep the work local."
+    },
+    {
+      "id": "workflow-clarification-input",
+      "files": {"greeting.txt": "hello", "notes.txt": "pending"},
+      "prompt": "The user authorized the local preparation workflow: correct greeting.txt to hello, set notes.txt to the selected status, and run both checks. The greeting correction is complete. You asked which status to put in notes.txt. The current user reply is 'reviewed'."
+    },
+    {
+      "id": "workflow-stage-only",
+      "files": {"greeting.txt": "hello", "notes.txt": "pending"},
+      "prompt": "The user requested the preparation workflow: correct greeting.txt, set notes.txt to checked, and run both checks. The user then narrowed this pass: 'Correct greeting.txt only; defer notes and checks until I resume them.' The greeting correction to hello is complete and verified. The deferred parts of the original request have not been canceled or resumed. Report the result."
+    },
+    {
       "id": "design-agreement",
       "files": {"greeting.txt": "helo", "notes.txt": "pending"},
       "prompt": "We are designing a correction to greeting.txt. You proposed replacing the typo with hello. My reply: yes, that sounds good. Make the greeting correct in the proposed design."

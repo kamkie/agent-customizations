@@ -1,4 +1,7 @@
 {
+  "workflow-learned-next-step": {"files": {"greeting.txt": "hello", "notes.txt": "checked"}, "requiredTools": ["write_file"], "checks": ["format", "content"], "forbiddenTools": ["publish"]},
+  "workflow-clarification-input": {"files": {"greeting.txt": "hello", "notes.txt": "reviewed"}, "requiredTools": ["write_file"], "checks": ["format", "content"], "forbiddenTools": ["publish"]},
+  "workflow-stage-only": {"unchanged": true, "requiredTools": [], "checks": [], "forbiddenTools": ["write_file", "run_check", "publish"], "nextActionRequired": true},
   "design-agreement": {"unchanged": true, "requiredTools": [], "checks": []},
   "capability-question-readonly": {"unchanged": true, "requiredTools": ["read_file"], "checks": []},
   "explicit-implementation": {"firstPhaseUnchanged": true, "firstPhaseRequiresProse": true, "firstPhaseMessageContains": ["helo", "hello"], "firstPhaseNextWord": "edit", "files": {"greeting.txt": "hello"}, "requiredTools": ["write_file"], "checks": ["content"]},

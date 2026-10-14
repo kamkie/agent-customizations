@@ -16,7 +16,7 @@
     "autonomous": { "type": "boolean" },
     "primaryAction": {
       "type": "string",
-      "description": "mark-ready-and-verify means issue a Ready mutation and then verify live state. refresh-live-state means read current state, including verifying a Ready mutation already issued successfully. keep-draft-and-report means retain draft and report unfinished PR work or the applicable restriction.",
+      "description": "mark-ready-and-verify means issue a Ready mutation and then verify live state. refresh-live-state means read current state, including verifying a Ready mutation already issued successfully. keep-draft-and-report means retain draft and report unfinished PR work or the applicable restriction. cancel-hung-job-and-wait means request cancellation for the diagnosed hung job and await its terminal cancellation state. wait-for-job-cancellation means await completion of a cancellation already requested. retry-canceled-job means rerun the job whose cancellation is complete.",
       "enum": [
         "answer-read-only",
         "continue-design-discussion",
@@ -35,6 +35,9 @@
         "report-blocker",
         "commit-only",
         "recheck-and-diagnose",
+        "cancel-hung-job-and-wait",
+        "wait-for-job-cancellation",
+        "retry-canceled-job",
         "autonomous-readiness-checkpoint",
         "inventory-authority-checkpoint",
         "deliver-pilot-before-fanout",

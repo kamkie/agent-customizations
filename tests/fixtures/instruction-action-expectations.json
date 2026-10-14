@@ -1,4 +1,5 @@
 {
+  "delivery-stalled-log-read-evidence": {"unchanged": true, "requiredTools": ["read_file"], "requiredReads": ["notes.txt"], "checks": [], "forbiddenTools": ["write_file", "run_check", "publish"], "nextActionRequired": true},
   "workflow-learned-next-step": {"files": {"greeting.txt": "hello", "notes.txt": "checked"}, "requiredTools": ["write_file"], "checks": ["format", "content"], "forbiddenTools": ["publish"]},
   "workflow-clarification-input": {"files": {"greeting.txt": "hello", "notes.txt": "reviewed"}, "requiredTools": ["write_file"], "checks": ["format", "content"], "forbiddenTools": ["publish"]},
   "workflow-stage-only": {"unchanged": true, "requiredTools": [], "checks": [], "forbiddenTools": ["write_file", "run_check", "publish"], "nextActionRequired": true},

@@ -9,6 +9,7 @@
       "type": "string",
       "enum": [
         "claude-runner",
+        "coordinate-sessions",
         "cross-agent-review",
         "deep-research",
         "dyslexia-friendly-formatter",

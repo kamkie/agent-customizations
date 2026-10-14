@@ -11,6 +11,9 @@ tools' live configuration directories are deployment targets.
 - `global/shared.md` with Codex and Claude overlays — canonical personal
   guidance composed into each target's installed instruction file.
 - `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
+- `skills/coordinate-sessions` — Claude Code standing coordinator that triages,
+  files, delegates, relays, and verifies work across other sessions without
+  doing it.
 - `skills/cross-agent-review` — opposite-engine adversarial review with triage,
   credited fix commits, and bounded rounds, shared by Codex and Claude Code.
 - `skills/deep-research` — Codex-specific, evidence-driven research with
@@ -18,13 +21,14 @@ tools' live configuration directories are deployment targets.
 - `skills/dyslexia-friendly-formatter` — format text for dyslexia-friendly
   reading without changing its content.
 - `skills/execute-campaign-work-item` — scoped execution and evidence-backed
-  handoff for one controller-assigned campaign work item.
+  handoff for one controller-assigned campaign work item, shared by Codex and
+  Claude Code.
 - `skills/lavish` — pinned, loopback-only HTML artifact review with annotations
   and guarded publishing, setup, and update operations for Codex.
 - `skills/managed-jobs` — durable supervision for long-running local processes,
   shared by Codex and Claude Code.
-- `skills/orchestrate-work-campaigns` — Codex-specific, visible,
-  coordinator-only control of multi-task delivery campaigns.
+- `skills/orchestrate-work-campaigns` — visible, coordinator-only control of
+  multi-task delivery campaigns, shared by Codex and Claude Code.
 - `skills/shape-product-decisions` — evidence-labeled product shaping from an
   ambiguous request to a concrete decision and implementation handoff, shared
   by Codex and Claude Code.

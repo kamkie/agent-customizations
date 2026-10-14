@@ -10,7 +10,8 @@
     "publicationActor",
     "mergeAuthorized",
     "deploymentAuthorized",
-    "blockerSource"
+    "blockerSource",
+    "closingQuestion"
   ],
   "properties": {
     "autonomous": { "type": "boolean" },
@@ -56,6 +57,7 @@
     },
     "mergeAuthorized": { "type": "boolean" },
     "deploymentAuthorized": { "type": "boolean" },
-    "blockerSource": { "type": "string", "enum": ["none", "repository", "skill", "tool", "access", "ambiguity"] }
+    "blockerSource": { "type": "string", "enum": ["none", "repository", "skill", "tool", "access", "ambiguity"] },
+    "closingQuestion": { "type": "string", "enum": ["none", "required-confirmation", "material-decision", "next-step"] }
   }
 }

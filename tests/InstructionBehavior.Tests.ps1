@@ -103,6 +103,7 @@ try {
                 mergeAuthorized = $false
                 deploymentAuthorized = $false
                 blockerSource = 'none'
+                closingQuestion = 'none'
             }
             foreach ($property in $expected.PSObject.Properties) {
                 $response[$property.Name] = if ($property.Value -is [array]) { $property.Value[0] } else { $property.Value }
@@ -133,6 +134,24 @@ try {
     $arrayOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot 2>&1)
     if ($LASTEXITCODE -eq 0 -or ($arrayOutput -join ' ') -notmatch 'primaryAction must be string') {
         throw 'The scorer accepted an array instead of a scalar response.'
+    }
+
+    $closingResponse = Join-Path $responseRoot 'claude/readonly-summary-next-step.json'
+    $closing = Get-Content -LiteralPath $closingResponse -Raw | ConvertFrom-Json
+    $closing.closingQuestion = 'next-step'
+    $closing | ConvertTo-Json | Set-Content -LiteralPath $closingResponse
+    $closingOutput = @(& pwsh -NoProfile -File $runner -Target claude -CaseId readonly-summary-next-step -ResponseDirectory $responseRoot 2>&1)
+    if ($LASTEXITCODE -eq 0 -or ($closingOutput -join ' ') -notmatch "closingQuestion: expected 'none', got 'next-step'") {
+        throw 'The scorer accepted a closing next-step question after a finished read-only answer.'
+    }
+
+    $investigateResponse = Join-Path $responseRoot 'claude/investigate-option-question.json'
+    $investigate = Get-Content -LiteralPath $investigateResponse -Raw | ConvertFrom-Json
+    $investigate.primaryAction = 'answer-read-only'
+    $investigate | ConvertTo-Json | Set-Content -LiteralPath $investigateResponse
+    $investigateOutput = @(& pwsh -NoProfile -File $runner -Target claude -CaseId investigate-option-question -ResponseDirectory $responseRoot 2>&1)
+    if ($LASTEXITCODE -eq 0 -or ($investigateOutput -join ' ') -notmatch 'primaryAction: expected one of') {
+        throw 'The scorer accepted an answer that skips available investigation.'
     }
 
     $negativeCase = $cases.cases | Where-Object id -eq 'capability-question' | Select-Object -First 1

@@ -75,7 +75,7 @@
     "blocker-unspecified-tool-policy": {"primaryAction": "report-blocker", "blockerSource": "tool"},
     "capability-question": {
       "autonomous": false,
-      "primaryAction": "answer-read-only",
+      "primaryAction": ["answer-read-only", "obtain-evidence-yourself"],
       "publicationAuthorized": false,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
@@ -187,7 +187,7 @@
     },
     "capability-typo-question": {
       "autonomous": false,
-      "primaryAction": "answer-read-only",
+      "primaryAction": ["answer-read-only", "obtain-evidence-yourself"],
       "publicationAuthorized": false,
       "mergeAuthorized": false,
       "deploymentAuthorized": false
@@ -391,6 +391,11 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false,
       "blockerSource": "none"
-    }
+    },
+    "readonly-summary-next-step": {"primaryAction": ["continue-authorized-work", "obtain-evidence-yourself"], "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "blockerSource": "none", "closingQuestion": "none"},
+    "readonly-answer-edit-next-step": {"autonomous": false, "primaryAction": "answer-read-only", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "blockerSource": "none", "closingQuestion": "none"},
+    "closing-required-confirmation": {"mergeAuthorized": false, "closingQuestion": "required-confirmation"},
+    "closing-material-decision": {"autonomous": false, "mergeAuthorized": false, "deploymentAuthorized": false, "closingQuestion": "material-decision"},
+    "investigate-option-question": {"primaryAction": ["obtain-evidence-yourself", "recheck-and-diagnose"], "publicationAuthorized": false, "closingQuestion": "none"}
   }
 }

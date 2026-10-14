@@ -1,9 +1,6 @@
 {
   "schemaVersion": 1,
   "expectations": {
-    "coordinator-standing-role": {
-      "skill": "orchestrate-work-campaigns"
-    },
     "claude-runner-pr-findings": {
       "skill": "claude-runner"
     },

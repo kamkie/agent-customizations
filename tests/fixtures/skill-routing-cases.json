@@ -26,14 +26,6 @@
       "prompt": "Run `claude -p` against this repository with a prompt asking it to explain the caching layer, and give me its answer."
     },
     {
-      "id": "coordinator-standing-role",
-      "targets": [
-        "claude"
-      ],
-      "instructionSet": "skill-catalog",
-      "prompt": "You are the coordinator for my sessions from now on. Do not do any of the work in here yourself: small checks go to subagents and anything bigger to separate sessions."
-    },
-    {
       "id": "cross-review-attack-commit",
       "targets": [
         "codex",

@@ -102,6 +102,9 @@ function Write-CompiledInstructions {
             $content = $content.TrimEnd() + "`n`n" + [IO.File]::ReadAllText($skillPath) + "`n"
         }
         'campaign' {
+            if ($AgentTarget -ne 'codex') {
+                throw "Instruction set '$InstructionSet' is not supported for target '$AgentTarget'."
+            }
             $skillPath = Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\SKILL.md'
             $skill = [IO.File]::ReadAllText($skillPath).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
             $content = $content.TrimEnd([char[]]"`r`n") + "`n`n" + $skill + "`n"

@@ -59,6 +59,9 @@ foreach ($case in $cases.cases) {
     if ($case.instructionSet -notin $allowedInstructionSets) {
         throw "Instruction behavior case '$($case.id)' has an invalid instruction set."
     }
+    if ($case.instructionSet -eq 'campaign' -and 'claude' -in @($case.targets)) {
+        throw "Campaign behavior case '$($case.id)' cannot target Claude."
+    }
     if ($case.prompt -match $answerLeakPattern) {
         throw "Instruction behavior case '$($case.id)' leaks its expectation into the prompt."
     }

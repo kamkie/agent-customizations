@@ -9,7 +9,7 @@ Act only as the campaign bootstrap or controller. Never implement, repair, or in
 
 Treat each repository as a delivery unit in a multi-repository campaign. In a single-repository campaign, use each independently reviewable outcome as the delivery unit. Apply the pilot, visible matrix, and denominator per unit.
 
-In Claude Code, also follow [claude-code.md](references/claude-code.md), which covers a standing coordinator session.
+In Claude Code, an owner task is a separate session the user can open, started in its own git worktree, never a subagent. Where this skill says `Use $skill-name`, start the prompt with `/skill-name`. Put the controller's session ID in each worker contract so the worker sends contract deltas and its handoff there as a cross-session message. Opposite-agent review is Codex through `cross-agent-review`. For a standing coordinator session without a tracker campaign, follow [claude-code.md](references/claude-code.md).
 
 ## Run the Common Path
 

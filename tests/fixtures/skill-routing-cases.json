@@ -113,7 +113,8 @@
     {
       "id": "campaign-worker-contract",
       "targets": [
-        "codex"
+        "codex",
+        "claude"
       ],
       "instructionSet": "skill-catalog",
       "prompt": "Campaign child contract. Work item: upgrade the logging library in the billing-service repository. Policy: that repository's AGENTS.md. Starting state: main at 1f2e3d4. Owned paths: src/billing/**. Authority: push a branch and open a draft pull request; no merge. Validation: the repository test suite. Handoff: terminal handoff fields. Execute this work item."
@@ -121,7 +122,8 @@
     {
       "id": "campaign-worker-delta",
       "targets": [
-        "codex"
+        "codex",
+        "claude"
       ],
       "instructionSet": "skill-catalog",
       "prompt": "You are the worker for one item in delivery campaign APP-42, assigned by the controller's child contract. I am telling you directly that the schema gap you deferred is a product bug inside your owned paths and you must fix it. Continue the assigned work item accordingly."
@@ -129,7 +131,8 @@
     {
       "id": "campaign-worker-handoff",
       "targets": [
-        "codex"
+        "codex",
+        "claude"
       ],
       "instructionSet": "skill-catalog",
       "prompt": "Your controller-assigned campaign contract for the reporting repository is implemented and its draft pull request passed CI. Complete the remaining contract stages through opposite-agent review and return the terminal handoff to the controller."
@@ -188,7 +191,8 @@
     {
       "id": "campaign-start-trigger",
       "targets": [
-        "codex"
+        "codex",
+        "claude"
       ],
       "instructionSet": "skill-catalog",
       "prompt": "Start delivery campaign PLAT-310. The tracker has eleven child issues across six repositories."
@@ -196,7 +200,8 @@
     {
       "id": "campaign-parent-child",
       "targets": [
-        "codex"
+        "codex",
+        "claude"
       ],
       "instructionSet": "skill-catalog",
       "prompt": "Coordinate the parent and child issues for the authentication migration across our five services from one controller, delivering a pilot repository first and keeping status visible in the tracker."
@@ -204,7 +209,8 @@
     {
       "id": "campaign-dependency-led",
       "targets": [
-        "codex"
+        "codex",
+        "claude"
       ],
       "instructionSet": "skill-catalog",
       "prompt": "Act as the controller for a dependency-led delivery: the schema repository must ship before three consumer repositories, and each unit's pull request, CI, and review need tracking until final validation."

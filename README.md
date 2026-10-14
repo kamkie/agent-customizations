@@ -18,13 +18,14 @@ tools' live configuration directories are deployment targets.
 - `skills/dyslexia-friendly-formatter` — format text for dyslexia-friendly
   reading without changing its content.
 - `skills/execute-campaign-work-item` — scoped execution and evidence-backed
-  handoff for one controller-assigned campaign work item.
+  handoff for one controller-assigned campaign work item, shared by Codex and
+  Claude Code.
 - `skills/lavish` — pinned, loopback-only HTML artifact review with annotations
   and guarded publishing, setup, and update operations for Codex.
 - `skills/managed-jobs` — durable supervision for long-running local processes,
   shared by Codex and Claude Code.
-- `skills/orchestrate-work-campaigns` — Codex-specific, visible,
-  coordinator-only control of multi-task delivery campaigns.
+- `skills/orchestrate-work-campaigns` — visible, coordinator-only control of
+  multi-task delivery campaigns, shared by Codex and Claude Code.
 - `skills/shape-product-decisions` — evidence-labeled product shaping from an
   ambiguous request to a concrete decision and implementation handoff, shared
   by Codex and Claude Code.

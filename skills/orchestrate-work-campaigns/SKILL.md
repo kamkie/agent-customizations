@@ -1,6 +1,6 @@
 ---
 name: orchestrate-work-campaigns
-description: Coordinate an authorized multi-part delivery campaign through one visible controller, bounded delivery-unit owner tasks, tracker-visible delivery state, a representative pilot, CI, opposite-agent review, audited handoffs, and final validation. Use when the user says "Start delivery campaign TRACKER", for parent/child issue campaigns, dependency-led delivery, or an explicit controller task. Do not use for a single work item, ordinary multi-file implementation, simple delegation, or review-only coordination.
+description: Coordinate an authorized multi-part delivery campaign through one visible controller, bounded delivery-unit owner tasks, tracker-visible delivery state, a representative pilot, CI, opposite-agent review, audited handoffs, and final validation. Use when the user says "Start delivery campaign TRACKER", for parent/child issue campaigns, dependency-led delivery, an explicit controller task, or a standing coordinator session that delegates work to other sessions. Do not use for a single work item, ordinary multi-file implementation, one-off delegation, or review-only coordination.
 ---
 
 # Orchestrate Work Campaigns
@@ -8,6 +8,8 @@ description: Coordinate an authorized multi-part delivery campaign through one v
 Act only as the campaign bootstrap or controller. Never implement, repair, or integrate a worker's owned scope in the controller checkout.
 
 Treat each repository as a delivery unit in a multi-repository campaign. In a single-repository campaign, use each independently reviewable outcome as the delivery unit. Apply the pilot, visible matrix, and denominator per unit.
+
+In Claude Code, `Use $skill-name` becomes `/skill-name`. For a standing coordinator session, follow [claude-code.md](references/claude-code.md).
 
 ## Run the Common Path
 

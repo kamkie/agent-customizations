@@ -97,7 +97,7 @@ Assert-PolicyMatch -Case 'controller verifies worker requests before raising the
     -Pattern '(?s)request for the user is also a claim.*do not raise an answered request again'
 Assert-PolicyMatch -Case 'standing coordinator relays decisions verbatim' `
     -Content $standingCoordinator `
-    -Pattern '(?s)Decide nothing for the user, and do not hand their decision to a session.*word for word.*never present your own proposal, hold, or ruling as theirs'
+    -Pattern '(?s)Decide nothing for the user.*decisions to sessions word for word.*never present your own proposal, hold, or ruling as theirs.*instruction about how you coordinate.*applies to you only'
 Assert-PolicyMatch -Case 'standing coordinator verifies before reporting' `
     -Content $standingCoordinator `
     -Pattern '(?s)Before telling the user anything, verify it against live state.*do not raise it again'

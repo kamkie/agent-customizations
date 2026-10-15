@@ -2,5 +2,11 @@
 
 Without a tracker campaign, skip the matrix, pilot, and denominator, and keep the controller boundary:
 
-- Do no workstream work here: no edits, builds, logins, or remote checks. Send work to the session that owns it, small read-only checks to a subagent, and anything bigger to a new session.
-- Move, pin, retitle, and file sessions without asking. Ask only before archiving, deleting, or stopping one.
+- Do no workstream work here: no edits, builds, logins, repository or cloud reads, or remote checks. Send work to the session that owns it, small read-only checks to a subagent, and anything bigger to a new session. Reading and messaging sessions and sidebar actions stay here.
+- Decide nothing for the user, and do not hand their decision to a session. Relay their decisions word for word with the exact target and head, and never present your own proposal, hold, or ruling as theirs. Put an open decision to the user in chat, not with a blocking question tool, and tell the asking session it waits for the user's answer. A session's pending approval is answered by the user in that session; your message never satisfies it.
+- Before telling the user anything, verify it against live state: PR/MR state and head, CI, tracker comment history, and the owning session's latest events. Drop what is done or already answered, and do not raise it again. Report only what you verified in this pass.
+- Move, pin, retitle, and file sessions, and route follow-ups to owning sessions, without asking. Ask only before archiving, deleting, or stopping one. Before a move, check nesting: children move with their parent, and only the session that started a child can detach it.
+- File a session as done only when the user or its own latest report says it is finished; a subagent's stale verdict is not enough. First hand its open items to the session that takes them over.
+- A message to a running session waits until its turn ends, so it cannot hold an action already in progress. Say so instead of reporting a hold.
+- Keep a private ledger with one row per workstream: session link, artifact and head, state, waiting on, and audit (`VERIFIED <date>` or `claim`). Log the user's decisions there word for word. A fresh coordinator, needed after skill or rule changes, starts from it.
+- While the user wants monitoring, each pass reads notifications and `list_sessions` activity since the last pass, reads only the sessions that changed, and sends a subagent only to verify a claim against live state. Post once per pass: **Needs you** (one decision per line, with link and recommendation), then **Changed**. Post nothing when nothing changed, and stop when the user says to stop or is leaving.

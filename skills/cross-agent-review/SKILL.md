@@ -1,6 +1,6 @@
 ---
 name: cross-agent-review
-description: Have the opposite agent engine attack a committed change, then triage every finding, fix it in credited commits, and re-review in bounded rounds. Use when Claude should be reviewed by Codex or Codex by Claude before handoff, and when review findings must be triaged and fixed rather than only reported. Do not use for same-engine review, security-only audits, rescuing a blocked implementation, or reviewing uncommitted work.
+description: Have the opposite agent engine attack a committed change, then triage every finding, fix it in credited commits, and re-review in bounded rounds. Use when Claude should be reviewed by Codex, Codex by Claude, or Copilot by the opposite model family before handoff, and when review findings must be triaged and fixed rather than only reported. Do not use for same-engine review, security-only audits, rescuing a blocked implementation, or reviewing uncommitted work.
 ---
 
 # Cross-agent review
@@ -40,8 +40,8 @@ bash "$skill/scripts/invoke-cross-agent-review.sh" \
 
 Replace the explicit description placeholder before invoking. For each later round, include every still-unresolved finding and its current disposition in that round's focus file before invoking the reviewer. The snippets create a new file each time they run; carry findings into the new file explicitly. Remove that exact file after the round ends; never use a cleanup glob that can match another task's review input.
 
-- `-Direction`/`--direction`: `to-codex` when Claude implements, `to-claude` when Codex implements.
-- A round takes minutes and outlives the tool call. Run it under `managed-jobs` with `-Lifetime Session`; the default turn lifetime kills the reviewer when the turn ends while waiting. Read the verdict and result JSON from the job log as soon as they appear rather than waiting only for the job to exit.
+- `-Direction`/`--direction`: `to-codex` when Claude (or Copilot on a Claude model) implements, `to-claude` when Codex (or Copilot on a non-Claude model) implements.
+- A round takes minutes and outlives the tool call. Run it under `managed-jobs` with `-Lifetime Session` when session hooks are active, or `-Lifetime Persistent` on targets without session hooks (stopping the job if canceled); the default turn lifetime kills the reviewer when the turn ends while waiting. Read the verdict and result JSON from the job log as soon as they appear rather than waiting only for the job to exit.
 - Omit the base in round 1. In every later round pass `-Base`/`--base` with the exact head the previous round reviewed.
 - `to-claude` requires an open pull request. Round 1 uses Claude's built-in PR review, which cannot receive the focus file or vote request; record no vote. Missing reviewer agreement does not reopen an evidence-backed rejection. Later rounds use a read-only prompt restricted to `base..HEAD`, and the focus file carries unresolved findings into that range review.
 - In a later round, reject any new finding outside `base..HEAD` unless the reviewer names the changed line in that range that causes it. If the reviewer substantially ignores the range, the round failed and consumes no budget.

@@ -97,7 +97,13 @@ Assert-PolicyMatch -Case 'controller verifies worker requests before raising the
     -Pattern '(?s)request for the user is also a claim.*do not raise an answered request again'
 Assert-PolicyMatch -Case 'standing coordinator relays decisions verbatim' `
     -Content $standingCoordinator `
-    -Pattern '(?s)Decide nothing for the user.*decisions to sessions word for word.*never present your own proposal, hold, or ruling as theirs.*instruction about how you coordinate.*applies to you only'
+    -Pattern '(?s)Do not decide what belongs to the user, and never present your own call as theirs.*Pass the user''s decisions to the owning session in their exact words'
+Assert-PolicyMatch -Case 'standing coordinator classifies instruction scope' `
+    -Content $standingCoordinator `
+    -Pattern '(?s)Classify each user instruction by scope.*how you coordinate.*stays with you.*every session goes to each owning session.*single workstream goes only to its owner'
+Assert-PolicyMatch -Case 'standing coordinator raises questions without blocking' `
+    -Content $standingCoordinator `
+    -Pattern '(?s)Raise each open question to the user in chat.*Do not block on the answer or tell the session what to do meanwhile'
 Assert-PolicyMatch -Case 'standing coordinator verifies before reporting' `
     -Content $standingCoordinator `
     -Pattern '(?s)Before telling the user anything, verify it against live state.*do not raise it again'

@@ -1,8 +1,9 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Codex', 'Claude')][string]$Target = 'All',
+    [ValidateSet('All', 'Codex', 'Claude', 'Copilot')][string]$Target = 'All',
     [string]$CodexHome,
     [string]$ClaudeHome,
+    [string]$CopilotHome,
     [switch]$SummaryOnly
 )
 
@@ -12,7 +13,11 @@ $ErrorActionPreference = 'Stop'
 $allStatus = [Collections.Generic.List[object]]::new()
 $summaries = [Collections.Generic.List[object]]::new()
 foreach ($targetName in Get-CustomizationTargetNames -Target $Target) {
-    $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
+    $explicitHome = switch ($targetName) {
+        'codex' { $CodexHome }
+        'claude' { $ClaudeHome }
+        'copilot' { $CopilotHome }
+    }
     $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
     $status = @(Get-CustomizationStatus -TargetName $targetName -HomePath $resolvedHome)
     foreach ($item in $status) { $allStatus.Add($item) }

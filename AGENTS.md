@@ -1,6 +1,6 @@
 # Agent customizations repository
 
-This repository is the reviewed source for the global guidance, skills, plugins, and hook registrations in `config/manifest.json`. Live Codex and Claude Code configuration directories are deployment targets, not editing locations.
+This repository is the reviewed source for the global guidance, skills, plugins, and hook registrations in `config/manifest.json`. Live Codex, Claude Code, and GitHub Copilot configuration directories are deployment targets, not editing locations.
 
 ## Working rules
 
@@ -9,7 +9,7 @@ This repository is the reviewed source for the global guidance, skills, plugins,
 - Do not import sessions, memories, logs, artifacts, managed-job records, credentials, plugin caches, or machine-generated configuration. Keep examples portable: no usernames, home paths, repository-specific absolute paths, tokens, or session identifiers.
 - Develop on an agent-owned branch or worktree. `install.ps1` activates live configuration and requires explicit deployment authority; it is not validation. Deploy from clean `main` unless the user explicitly authorizes another source.
 
-The manifest and installer own managed-jobs hook registrations for both agents and preserve unrelated machine-local entries. Other machine-specific hooks stay outside this repository unless deliberately given a portable reviewed installer.
+The manifest and installer own managed-jobs hook registrations for Codex and Claude Code and preserve unrelated machine-local entries; GitHub Copilot receives the `managed-jobs` skill without automatic lifecycle hooks, so Copilot sessions must stop started jobs explicitly and run `reconcile` after an interrupted session. Other machine-specific hooks stay outside this repository unless deliberately given a portable reviewed installer.
 
 ## Request authority
 
@@ -25,7 +25,7 @@ Use **Prepare -> Implement -> Validate -> Review -> Ready** in progress updates,
 
 1. Confirm task scope. Before editing, read this file, `README.md`, `config/manifest.json`, and each changed skill's complete `SKILL.md` and directly required references.
 2. Fetch `origin`; identify current `origin/main`. Record the remote, branch or worktree owner, HEAD, upstream, and `git status --short --branch`.
-3. Start from that verified base in a clean agent-owned `codex/<short-task-slug>` or `claude/<short-task-slug>` branch/worktree. Preserve dirty user checkouts; use an isolated worktree when unrelated changes and ownership are clear. Clarify overlapping agent work or required local inputs before writing. Never reset, stash, overwrite, or absorb unrelated work. Stop on a stale, ambiguous, or mismatched base.
+3. Start from that verified base in a clean agent-owned `codex/<short-task-slug>`, `claude/<short-task-slug>`, or `copilot/<short-task-slug>` branch/worktree (or, in a Copilot App worktree session, an app-prefixed `<owner>-<short-task-slug>` branch renamed with `rename_branch`). Preserve dirty user checkouts; use an isolated worktree when unrelated changes and ownership are clear. Clarify overlapping agent work or required local inputs before writing. Never reset, stash, overwrite, or absorb unrelated work. Stop on a stale, ambiguous, or mismatched base.
 
 ### Implement, validate, and commit
 
@@ -42,7 +42,7 @@ Use **Prepare -> Implement -> Validate -> Review -> Ready** in progress updates,
 
 Every agent-authored PR needs initial opposite-agent review before Ready.
 
-- Codex-authored work uses `claude-runner`, Opus, medium effort: round 1 is `/review <PR number>` from the authoring checkout. Necessary later rounds are read-only and limited to repairs since the last reviewed head. Claude-authored work gets Codex review by branch name without leaving its assigned checkout.
+- Codex- and Copilot-authored work uses `claude-runner`, Opus, medium effort: round 1 is `/review <PR number>` from the authoring checkout. Necessary later rounds are read-only and limited to repairs since the last reviewed head. Claude-authored work gets Codex review by branch name without leaving its assigned checkout; Copilot-authored work running on a Claude model uses the same Codex branch review.
 - `cross-agent-review` owns triage, rejected findings, proportional re-review, post-review commit classification, and round limits. Behavior-neutral repairs may close with targeted validation and a recorded disposition; no blanket extra round. Review completes when findings and all later commits are accounted for under that skill.
 - Record the result and every finding's disposition on the PR; the author posts evidence if the reviewer cannot. Repair commits credit the reviewer with `Co-Authored-By: Claude <noreply@anthropic.com>` or `Co-Authored-By: Codex <noreply@openai.com>`.
 - Evidence-backed rejection counts as triage without reviewer agreement. Formal blocking reviews still gate Ready/merge; never bypass GitHub protection.

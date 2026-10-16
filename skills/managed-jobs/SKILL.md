@@ -23,8 +23,8 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 ```
 
 - Keep short commands attached to the active tool call.
-- Default long work to hidden supervised execution. The installed startup hook reconciles global state asynchronously; do not run `reconcile` around starts.
-- `Auto` uses the current agent turn when ownership is available. Use `-Lifetime Session` only across turns and `Persistent` only across sessions.
+- Default long work to hidden supervised execution. On targets with installed lifecycle hooks (Codex and Claude Code), the startup hook reconciles global state asynchronously; do not run `reconcile` around normal starts.
+- `Auto` uses the current agent turn when ownership is available (`CODEX_THREAD_ID` or `CLAUDE_CODE_SESSION_ID`), and resolves to `persistent` on targets without installed lifecycle hooks (GitHub Copilot). Use `-Lifetime Session` only across turns when session ownership is active, and `Persistent` across sessions or on targets without lifecycle hooks (stopping started jobs explicitly before finishing, and running `reconcile` after an interrupted session).
 - Use the returned job instead of a global `list`; target `status` when needed.
 - Use `wait -Id <job-id>` when the next step needs process completion. It blocks until the job is completed, failed, stopped, or orphaned and returns the final record, including `exitCode` when the host recorded one. Check that status and exit code before treating the work as successful; an orphan may have no exit code.
 - Keep that tool call pending until it returns. If its transport yields a session ID, wait on that session and, where supported, combine transport waits inside one tool invocation so the model stays idle. Do not make repeated agent-side `status` calls. A background job does not wake an idle agent by itself.
@@ -72,8 +72,8 @@ The gate returns after a 2xx/3xx response and stops only the newly created job o
 
 ## Advanced operations
 
-The installed session hook owns global reconciliation. Run synchronous `reconcile` only to retry a reported hook failure. Preview destructive cleanup with `prune -OlderThanDays 14 -WhatIf`, obtain explicit authorization for the reported scope, then run the same command without `-WhatIf`.
+The installed session hook owns global reconciliation on Codex and Claude Code. Run synchronous `reconcile` only to retry a reported hook failure or after an interrupted session on a target without lifecycle hooks. Preview destructive cleanup with `prune -OlderThanDays 14 -WhatIf`, obtain explicit authorization for the reported scope, then run the same command without `-WhatIf`.
 
-Set `MANAGED_JOBS_ROOT` before starting either agent when they must share a non-default registry. One-off `-StateRoot` overrides are only for persistent jobs; turn and session jobs must remain visible to their cleanup hooks.
+Set `MANAGED_JOBS_ROOT` before starting any agent when Codex, Claude Code, or GitHub Copilot must share a non-default registry. One-off `-StateRoot` overrides are only for persistent jobs; turn and session jobs must remain visible to their cleanup hooks.
 
 The HTTP readiness workflow adapts Open Mercato's `om-prepare-test-env` under the MIT License; see [open-mercato-license.md](references/open-mercato-license.md).

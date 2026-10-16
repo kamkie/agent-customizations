@@ -215,9 +215,25 @@ if ($Direction -eq 'to-codex') {
         ForEach-Object { [Console]::Error.WriteLine([string]$_) }
     $reviewerExit = $LASTEXITCODE
 } else {
+    $installedSkillsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $installedHome = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath((Split-Path -Parent $installedSkillsRoot)))
     $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
-    $runner = Join-Path $codexHome 'skills/claude-runner/scripts/Invoke-ClaudeRunner.ps1'
-    if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) {
+    $copilotHome = if ($env:COPILOT_HOME) { $env:COPILOT_HOME } else { Join-Path $HOME '.copilot' }
+    $normalizedAgentHomes = @($codexHome, $copilotHome) | ForEach-Object {
+        [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($_))
+    }
+    $runnerCandidates = @(
+        if ((Split-Path -Leaf $installedSkillsRoot) -eq 'skills' -and
+            @($normalizedAgentHomes | Where-Object { $installedHome.Equals($_, [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {
+            Join-Path $installedSkillsRoot 'claude-runner/scripts/Invoke-ClaudeRunner.ps1'
+        }
+        if ($env:CODEX_HOME) { Join-Path $env:CODEX_HOME 'skills/claude-runner/scripts/Invoke-ClaudeRunner.ps1' }
+        if ($env:COPILOT_HOME) { Join-Path $env:COPILOT_HOME 'skills/claude-runner/scripts/Invoke-ClaudeRunner.ps1' }
+        Join-Path $codexHome 'skills/claude-runner/scripts/Invoke-ClaudeRunner.ps1'
+        Join-Path $copilotHome 'skills/claude-runner/scripts/Invoke-ClaudeRunner.ps1'
+    )
+    $runner = $runnerCandidates | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+    if (-not $runner) {
         Exit-Failed 'Install the claude-runner skill before a cross-agent review.'
     }
 

@@ -28,7 +28,7 @@ Include only information an agent needs before changing the repository. Do not d
 - Write direct, testable instructions. State the trigger, required behavior, important boundary, and expected evidence when those are not obvious.
 - Replace obsolete behavior instead of preserving contradictory old and new rules. Remove duplicated copies whose independent maintenance could drift.
 - When another source owns a mutable detail, link to or discover that source at runtime. Repeat only a short safety boundary that readers need at both routing points, and identify the canonical owner.
-- Keep target-specific behavior in the target's instruction file. Change both Codex and Claude guidance only when the behavior is intentionally shared and valid for both agents.
+- Keep target-specific behavior in the target's instruction file. Change shared global guidance only when the behavior is intentionally shared and valid across all managed targets.
 - Classify each imported live rule before copying it. Preserve the user's stated reuse scope: a global preference does not become repository-only because its latest occurrence was local. When rejecting an ownership review finding, cite the owning contract; passing behavior tests does not establish portability.
 
 ## Maintain skill entrypoints and references

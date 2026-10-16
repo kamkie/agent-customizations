@@ -1,36 +1,40 @@
 # Agent customizations
 
-Version-controlled global guidance and reusable custom skills for Codex and
-Claude Code on Windows. This repository is the reviewed source of truth; the
-tools' live configuration directories are deployment targets.
+Version-controlled global guidance and reusable custom skills for Codex,
+Claude Code, and GitHub Copilot on Windows. This repository is the reviewed
+source of truth; the tools' live configuration directories are deployment
+targets.
 
 ## Contents
 
 - `AGENTS.md` with the root `CLAUDE.md` import — repository development and
-  full-delivery policy shared by Codex and Claude Code.
-- `global/shared.md` with Codex and Claude overlays — canonical personal
-  guidance composed into each target's installed instruction file.
-- `skills/claude-runner` — resume-safe Codex wrapper for Claude Code CLI.
+  full-delivery policy shared by Codex, Claude Code, and GitHub Copilot.
+- `global/shared.md` with Codex, Claude, and Copilot overlays — canonical
+  personal guidance composed into each target's installed instruction file.
+- `skills/claude-runner` — resume-safe wrapper for Claude Code CLI, shared by
+  Codex and GitHub Copilot.
 - `skills/cross-agent-review` — opposite-engine adversarial review with triage,
-  credited fix commits, and bounded rounds, shared by Codex and Claude Code.
+  credited fix commits, and bounded rounds, shared by Codex, Claude Code, and
+  GitHub Copilot.
 - `skills/deep-research` — Codex-specific, evidence-driven research with
   independent source collection, contradiction checks, and citation auditing.
 - `skills/dyslexia-friendly-formatter` — format text for dyslexia-friendly
   reading without changing its content.
 - `skills/execute-campaign-work-item` — scoped execution and evidence-backed
-  handoff for one controller-assigned campaign work item, shared by Codex and
-  Claude Code.
+  handoff for one controller-assigned campaign work item, shared by Codex,
+  Claude Code, and GitHub Copilot.
 - `skills/lavish` — pinned, loopback-only HTML artifact review with annotations
   and guarded publishing, setup, and update operations for Codex.
 - `skills/managed-jobs` — durable supervision for long-running local processes,
-  shared by Codex and Claude Code.
+  shared by Codex, Claude Code, and GitHub Copilot.
 - `skills/orchestrate-work-campaigns` — visible, coordinator-only control of
-  multi-task delivery campaigns, shared by Codex and Claude Code.
+  multi-task delivery campaigns, shared by Codex, Claude Code, and GitHub
+  Copilot.
 - `skills/shape-product-decisions` — evidence-labeled product shaping from an
   ambiguous request to a concrete decision and implementation handoff, shared
-  by Codex and Claude Code.
+  by Codex, Claude Code, and GitHub Copilot.
 - `skills/shared-term` — a focused collaborative Windows Terminal workflow,
-  shared by Codex and Claude Code.
+  shared by Codex, Claude Code, and GitHub Copilot.
 - `skills/teams-graph-connector` — shared Teams reading, history coverage, and
   send-confirmation guidance, with separate Codex Teams app and Claude
   Microsoft 365 (Graph) MCP connector customizations.
@@ -60,7 +64,7 @@ tools' live configuration directories are deployment targets.
   in disposable repositories and scores file effects and call order.
 - `scripts/status.ps1` — reports drift between this repository and live agent
   installations.
-- `scripts/install.ps1` — explicitly deploys reviewed sources to one or both
+- `scripts/install.ps1` — explicitly deploys reviewed sources to one or all
   live installations.
 - `scripts/test.ps1` — exercises verification, sandbox installations, clean
   status, target isolation, and drift detection.
@@ -70,7 +74,8 @@ tools' live configuration directories are deployment targets.
 
 Claude Code loads personal instructions from `~/.claude/CLAUDE.md` and
 personal skills from `~/.claude/skills`. Codex uses `~/.codex/AGENTS.md` and
-`~/.codex/skills`. The manifest composes `global/shared.md` with the applicable
+`~/.codex/skills`. GitHub Copilot uses `~/.copilot/copilot-instructions.md` and
+`~/.copilot/skills`. The manifest composes `global/shared.md` with the applicable
 target overlay during installation, reuses portable skills where possible, and
 keeps tool-specific skills on their compatible target. For Codex it also deploys
 `global/codex-model-instructions.md`, a reviewed replacement for the built-in
@@ -88,7 +93,7 @@ activating it.
 
 - PowerShell 7
 - Git for clean-branch deployment checks
-- A local Codex and/or Claude Code installation
+- A local Codex, Claude Code, and/or GitHub Copilot installation
 
 ## Quick start
 
@@ -143,7 +148,7 @@ prepare that sandbox before running the suite. It does not fall back to full
 access. Failed behavior checks remain failures with traces; do not weaken their
 expectations just because the agent answered classification cases correctly.
 
-Compare both live installations:
+Compare live installations:
 
 ```powershell
 pwsh ./scripts/status.ps1

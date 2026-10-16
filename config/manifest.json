@@ -140,6 +140,28 @@
           "session-cost"
         ]
       }
+    },
+    "copilot": {
+      "displayName": "GitHub Copilot",
+      "homeEnvironmentVariable": "COPILOT_HOME",
+      "defaultHomeDirectory": ".copilot",
+      "instructions": {
+        "sources": [
+          "global/shared.md",
+          "global/copilot-overlay.md"
+        ],
+        "destination": "copilot-instructions.md"
+      },
+      "skills": [
+        "claude-runner",
+        "cross-agent-review",
+        "dyslexia-friendly-formatter",
+        "execute-campaign-work-item",
+        "managed-jobs",
+        "orchestrate-work-campaigns",
+        "shape-product-decisions",
+        "shared-term"
+      ]
     }
   }
 }

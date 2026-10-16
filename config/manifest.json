@@ -160,8 +160,7 @@
         "managed-jobs",
         "orchestrate-work-campaigns",
         "shape-product-decisions",
-        "shared-term",
-        "teams-graph-connector"
+        "shared-term"
       ]
     }
   }

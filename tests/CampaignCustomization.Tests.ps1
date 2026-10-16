@@ -6,6 +6,7 @@ $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Pat
 
 $global = Get-Content -LiteralPath (Join-Path $repositoryRoot 'global\shared.md') -Raw
 $controller = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\SKILL.md') -Raw
+$standingCoordinator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\claude-code.md') -Raw
 $controllerTemplate = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\controller-template.md') -Raw
 $audit = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\orchestrate-work-campaigns\references\handoff-audit-checklist.md') -Raw
 $worker = Get-Content -LiteralPath (Join-Path $repositoryRoot 'skills\execute-campaign-work-item\SKILL.md') -Raw
@@ -87,6 +88,28 @@ Assert-PolicyMatch -Case 'controller audit cannot veto user product decisions' `
 Assert-PolicyMatch -Case 'audit checklist cannot veto user product decisions' `
     -Content $audit `
     -Pattern '(?s)does not veto or reinterpret.*direct user product or architecture decision'
+
+Assert-PolicyMatch -Case 'controller never decides in the user''s name' `
+    -Content $controller `
+    -Pattern '(?s)Never issue a ruling, hold, or skip in the user''s name.*exact words'
+Assert-PolicyMatch -Case 'controller verifies worker requests before raising them' `
+    -Content $controller `
+    -Pattern '(?s)request for the user is also a claim.*do not raise an answered request again'
+Assert-PolicyMatch -Case 'standing coordinator relays decisions verbatim' `
+    -Content $standingCoordinator `
+    -Pattern '(?s)Do not decide what belongs to the user, and never present your own call as theirs.*Pass the user''s decisions to the owning session in their exact words'
+Assert-PolicyMatch -Case 'standing coordinator classifies instruction scope' `
+    -Content $standingCoordinator `
+    -Pattern '(?s)Classify each user instruction by scope.*how you coordinate.*stays with you.*every session goes to each owning session.*single workstream goes only to its owner'
+Assert-PolicyMatch -Case 'standing coordinator raises questions without blocking' `
+    -Content $standingCoordinator `
+    -Pattern '(?s)Raise each open question to the user in chat.*Do not block on the answer or tell the session what to do meanwhile'
+Assert-PolicyMatch -Case 'standing coordinator verifies before reporting' `
+    -Content $standingCoordinator `
+    -Pattern '(?s)Before telling the user anything, verify it against live state.*do not raise it again'
+Assert-PolicyMatch -Case 'standing coordinator files done only on confirmation' `
+    -Content $standingCoordinator `
+    -Pattern '(?s)File a session as done only when the user or its own latest report says it is finished'
 
 Assert-PolicyMatch -Case 'cross-repository exact-ref reads preserve single-repository writes' `
     -Content $worker `

@@ -36,7 +36,10 @@ function Invoke-Git {
 }
 
 function Invoke-Controller {
-    param([Parameter(Mandatory)][string[]]$Arguments)
+    param(
+        [Parameter(Mandatory)][string[]]$Arguments,
+        [string]$ControllerPath = $controller
+    )
 
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = (Get-Command pwsh -ErrorAction Stop).Source
@@ -44,7 +47,7 @@ function Invoke-Controller {
     $startInfo.UseShellExecute = $false
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    foreach ($argument in @('-NoProfile', '-File', $controller) + $Arguments) {
+    foreach ($argument in @('-NoProfile', '-File', $ControllerPath) + $Arguments) {
         $startInfo.ArgumentList.Add($argument)
     }
     $process = [Diagnostics.Process]::Start($startInfo)
@@ -165,14 +168,22 @@ exit 0
 
     $copilotRunnerPath = Join-Path $fakeCopilotHome 'skills\claude-runner\scripts\Invoke-ClaudeRunner.ps1'
     $copilotCrossReviewDir = Join-Path $fakeCopilotHome 'skills\cross-agent-review\scripts'
+    $copilotController = Join-Path $copilotCrossReviewDir 'Invoke-CrossAgentReview.ps1'
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $copilotRunnerPath), $copilotCrossReviewDir | Out-Null
     Copy-Item -LiteralPath $runnerPath -Destination $copilotRunnerPath -Force
-    Copy-Item -LiteralPath $controller -Destination (Join-Path $copilotCrossReviewDir 'Invoke-CrossAgentReview.ps1') -Force
+    Copy-Item -LiteralPath $controller -Destination $copilotController -Force
     $env:CODEX_HOME = Join-Path $testRoot 'empty-codex-home'
     $env:COPILOT_HOME = $fakeCopilotHome
     $copilotFallback = Invoke-Controller @('-Direction', 'to-claude', '-FocusFile', $focusFile, '-ModelAlias', 'opus', '-Effort', 'medium')
     Assert-True ($copilotFallback.ExitCode -eq 0) "Copilot home runner fallback failed: $($copilotFallback.Stderr)"
     Assert-True (Test-Path -LiteralPath $runnerRecord) 'Copilot home claude-runner was not invoked.'
+
+    Remove-Item -LiteralPath $runnerRecord -Force
+    'exit 1' | Set-Content -LiteralPath $runnerPath -Encoding utf8NoBOM
+    $env:CODEX_HOME = $fakeCodexHome
+    $siblingRun = Invoke-Controller -ControllerPath $copilotController -Arguments @('-Direction', 'to-claude', '-FocusFile', $focusFile, '-ModelAlias', 'opus', '-Effort', 'medium')
+    Assert-True ($siblingRun.ExitCode -eq 0) "Installed Copilot sibling runner preference failed: $($siblingRun.Stderr)"
+    Assert-True (Test-Path -LiteralPath $runnerRecord) 'Installed Copilot controller did not prefer its sibling claude-runner.'
 
     $gitBash = Join-Path (Split-Path -Parent (Split-Path -Parent (Get-Command git).Source)) 'bin\bash.exe'
     if (Test-Path -LiteralPath $gitBash -PathType Leaf) {

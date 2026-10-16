@@ -199,8 +199,8 @@ foreach ($skillName in $declaredSkills) {
     }
 
     # Frontmatter limits follow Anthropic's skill authoring rules. The reserved
-    # words apply only where Claude loads the skill; Codex-only skills may name
-    # the Claude tool they wrap.
+    # words apply only where Claude Code loads the skill; Codex and Copilot
+    # skills may name the Claude tool they wrap.
     try {
         $frontmatter = Get-SkillFrontmatter -Path $skillFile
     } catch {

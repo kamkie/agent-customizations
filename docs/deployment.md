@@ -153,6 +153,8 @@ Codex requires separate review and trust for new or changed personal hook defini
 
 Claude Code applies changed hook definitions when a new session starts. Sessions already running keep the hook snapshot captured at startup.
 
+GitHub Copilot has no managed-jobs hook registrations in the manifest; its installed `managed-jobs` skill runs without automatic startup reconciliation or turn/session cleanup hooks, so Copilot sessions must explicitly stop started jobs and run `reconcile` after an interrupted session.
+
 ## Apply plugin changes
 
 Claude Code loads each plugin installed under `~/.claude/skills/<name>` as `<name>@skills-dir` in new sessions; `claude plugin list` shows its state. A same-named plugin loaded through `CLAUDE_CODE_PLUGIN_DIRS` or `--plugin-dir` takes precedence, so remove that entry to load the reviewed copy. Status ignores the type declarations Claude Code generates under a plugin's `.claude-plugin/types/`.

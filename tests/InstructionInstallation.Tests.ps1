@@ -5,8 +5,10 @@ $ErrorActionPreference = 'Stop'
 $root = Join-Path ([IO.Path]::GetTempPath()) ('instruction-install-test-' + [guid]::NewGuid().ToString('N'))
 $codexRoot = Join-Path $root 'codex'
 $claudeRoot = Join-Path $root 'claude'
+$copilotRoot = Join-Path $root 'copilot'
 $codexFile = Join-Path $codexRoot 'AGENTS.md'
 $claudeFile = Join-Path $claudeRoot 'CLAUDE.md'
+$copilotFile = Join-Path $copilotRoot 'copilot-instructions.md'
 $codexTarget = Get-CustomizationTarget -Name 'codex'
 $modelSource = Join-Path $PSScriptRoot ('../' + [string]$codexTarget.modelInstructions.source)
 $modelInstalled = Join-Path $codexRoot ([string]$codexTarget.modelInstructions.destination)
@@ -18,18 +20,18 @@ function Assert-True($condition, $message) {
 }
 function Install-Expected($hashes, [string]$target = 'All', [switch]$Preview, [hashtable]$ModelHashes) {
     $modelArguments = @{}
-    if ($target -ne 'Claude') {
+    if ($target -in @('All', 'Codex')) {
         if (-not $PSBoundParameters.ContainsKey('ModelHashes')) {
             $ModelHashes = @{ codex = Get-CustomizationInstructionHash $modelInstalled }
         }
         $modelArguments.ExpectedModelInstructionHashes = $ModelHashes
     }
-    & $installer -Target $target -CodexHome $codexRoot -ClaudeHome $claudeRoot `
+    & $installer -Target $target -CodexHome $codexRoot -ClaudeHome $claudeRoot -CopilotHome $copilotRoot `
         -ExpectedInstructionHashes $hashes @modelArguments -AllowDirty -AllowNonMain -WhatIf:$Preview | Out-Null
 }
 try {
     Assert-True ((Get-CustomizationInstructionHash $codexFile) -eq 'missing') 'Missing file hash differs.'
-    Install-Expected @{ codex = 'missing'; claude = 'missing' } -Preview
+    Install-Expected @{ codex = 'missing'; claude = 'missing'; copilot = 'missing' } -Preview
     Assert-True (-not (Test-Path $root)) 'Preview wrote target state.'
     $nonFileHome = Join-Path $root 'nonfile'
     $null = New-Item -ItemType Directory -Path (Join-Path $nonFileHome 'AGENTS.md') -Force
@@ -46,10 +48,15 @@ try {
     $report = ($statusOutput -join "`n") | ConvertFrom-Json
     Assert-True ($report.modelInstructionHashErrors -eq 1 -and $report.instructionHashErrors -eq 0) 'Model hash errors were not counted separately.'
     Assert-True ($null -eq $report.targets[0].modelInstructionHash -and $report.targets[0].modelInstructionHashError -like '*not a file*') 'Unavailable model hash was reported as missing or erased the status report.'
-    $null = New-Item -ItemType Directory -Path $codexRoot, $claudeRoot -Force
+    $null = New-Item -ItemType Directory -Path $codexRoot, $claudeRoot, $copilotRoot -Force
     [IO.File]::WriteAllText($codexFile, 'Reviewed local codex rule')
     [IO.File]::WriteAllText($claudeFile, 'Reviewed local claude rule')
-    $hashes = @{ codex = Get-CustomizationInstructionHash $codexFile; claude = Get-CustomizationInstructionHash $claudeFile }
+    [IO.File]::WriteAllText($copilotFile, 'Reviewed local copilot rule')
+    $hashes = @{
+        codex = Get-CustomizationInstructionHash $codexFile
+        claude = Get-CustomizationInstructionHash $claudeFile
+        copilot = Get-CustomizationInstructionHash $copilotFile
+    }
     [IO.File]::AppendAllText($claudeFile, '. A concurrent new rule.')
     $changedClaude = [IO.File]::ReadAllText($claudeFile)
     $rejected = $false
@@ -59,17 +66,21 @@ try {
     Assert-True ([IO.File]::ReadAllText($claudeFile) -ceq $changedClaude) 'Concurrent instruction was overwritten.'
     Assert-True (-not (Test-Path (Join-Path $codexRoot 'customization-backups'))) 'Rejected precondition created installation artifacts.'
     $rejected = $false
-    try { Install-Expected @{ codex = 'missing'; claude = Get-CustomizationInstructionHash $claudeFile } } catch { $rejected = $_.Exception.Message -like 'Live instructions changed since review*' }
+    try { Install-Expected @{ codex = 'missing'; claude = Get-CustomizationInstructionHash $claudeFile; copilot = $hashes.copilot } } catch { $rejected = $_.Exception.Message -like 'Live instructions changed since review*' }
     Assert-True $rejected 'Previously missing file appearing was not detected.'
-    foreach ($bad in @(@{ codex = $hashes.codex }, @{ codex = $hashes.codex; claude = 'invalid' }, @{ codex = $hashes.codex; claude = $hashes.claude; typo = 'missing' })) {
+    foreach ($bad in @(@{ codex = $hashes.codex }, @{ codex = $hashes.codex; claude = 'invalid'; copilot = $hashes.copilot }, @{ codex = $hashes.codex; claude = $hashes.claude; copilot = $hashes.copilot; typo = 'missing' })) {
         $rejected = $false
         try { Install-Expected $bad } catch { $rejected = $_.Exception.Message -match 'ExpectedInstructionHashes|Invalid expected instruction hash' }
         Assert-True $rejected 'Incomplete or invalid precondition was accepted.'
     }
-    $currentHashes = @{ codex = Get-CustomizationInstructionHash $codexFile; claude = Get-CustomizationInstructionHash $claudeFile }
+    $currentHashes = @{
+        codex = Get-CustomizationInstructionHash $codexFile
+        claude = Get-CustomizationInstructionHash $claudeFile
+        copilot = Get-CustomizationInstructionHash $copilotFile
+    }
     $rejected = $false
     try {
-        & $installer -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot `
+        & $installer -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot -CopilotHome $copilotRoot `
             -ExpectedInstructionHashes $currentHashes -AllowDirty -AllowNonMain | Out-Null
     } catch { $rejected = $_.Exception.Message -like 'ExpectedModelInstructionHashes must*' }
     Assert-True $rejected 'Guarded Codex installation accepted an omitted model snapshot.'
@@ -109,11 +120,15 @@ try {
         $rejected = $_.Exception.Message -like 'Live instructions changed since review*'
     }
     Assert-True $rejected 'Model file removal after review was not detected.'
-    # This fixture deliberately approves replacing both local rules; real use
+    # This fixture deliberately approves replacing all local rules; real use
     # must reconcile their meaning before taking this fresh snapshot.
     $hashes.claude = Get-CustomizationInstructionHash $claudeFile
     Install-Expected $hashes
-    foreach ($entry in @(@{ name = 'codex'; home = $codexRoot; file = $codexFile }, @{ name = 'claude'; home = $claudeRoot; file = $claudeFile })) {
+    foreach ($entry in @(
+        @{ name = 'codex'; home = $codexRoot; file = $codexFile },
+        @{ name = 'claude'; home = $claudeRoot; file = $claudeFile },
+        @{ name = 'copilot'; home = $copilotRoot; file = $copilotFile }
+    )) {
         $expected = Get-CustomizationInstructionContent -Target (Get-CustomizationTarget -Name $entry.name)
         Assert-True ([IO.File]::ReadAllText($entry.file) -ceq $expected) 'Matching snapshot did not install composed content.'
         $backups = @(Get-ChildItem (Join-Path $entry.home 'customization-backups') -Recurse -File | Where-Object Name -eq (Split-Path $entry.file -Leaf))
@@ -133,26 +148,33 @@ try {
     Assert-True ([IO.File]::ReadAllText($modelInstalled) -ceq [IO.File]::ReadAllText($modelSource)) 'Reinstall did not restore the reviewed model instructions.'
     $modelBackups = @(Get-ChildItem (Join-Path $codexRoot 'customization-backups') -Recurse -File | Where-Object Name -eq $codexTarget.modelInstructions.destination)
     Assert-True ($modelBackups.Count -eq 1 -and (Get-CustomizationInstructionHash $modelBackups[0].FullName) -eq $acceptedModelHash) 'Model backup differs from the accepted live snapshot.'
-    $statusOutput = @(& pwsh -NoProfile -File (Join-Path $PSScriptRoot '../scripts/status.ps1') -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot -SummaryOnly)
+    $statusOutput = @(& pwsh -NoProfile -File (Join-Path $PSScriptRoot '../scripts/status.ps1') -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot -CopilotHome $copilotRoot -SummaryOnly)
     Assert-True ($LASTEXITCODE -eq 0) 'Matching installed instructions should pass status.'
     $report = ($statusOutput -join "`n") | ConvertFrom-Json
     $codexSummary = $report.targets | Where-Object target -eq 'codex'
     $claudeSummary = $report.targets | Where-Object target -eq 'claude'
+    $copilotSummary = $report.targets | Where-Object target -eq 'copilot'
     Assert-True ($codexSummary.modelInstructionHash -eq (Get-CustomizationInstructionHash $modelInstalled)) 'Status model hash does not identify the installed content.'
     Assert-True ($null -eq $claudeSummary.modelInstructionHash -and $null -eq $claudeSummary.modelInstructionHashError) 'Target without a model prompt must report the model hash as not applicable.'
+    Assert-True ($null -eq $copilotSummary.modelInstructionHash -and $null -eq $copilotSummary.modelInstructionHashError) 'Copilot target without a model prompt must report the model hash as not applicable.'
     # A single target requires only its own key; another target stays untouched.
     $claudeBefore = Get-CustomizationInstructionHash $claudeFile
+    $copilotBefore = Get-CustomizationInstructionHash $copilotFile
     Install-Expected @{ codex = Get-CustomizationInstructionHash $codexFile } -target Codex
-    Assert-True ((Get-CustomizationInstructionHash $claudeFile) -eq $claudeBefore) 'Single-target install changed the other target.'
+    Assert-True ((Get-CustomizationInstructionHash $claudeFile) -eq $claudeBefore -and (Get-CustomizationInstructionHash $copilotFile) -eq $copilotBefore) 'Single-target install changed another target.'
     # A script-only hook update must not ask for re-trust; a changed definition must.
     function Install-CapturingWarnings($hashes) {
         $warnings = @()
-        & $installer -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot `
+        & $installer -Target All -CodexHome $codexRoot -ClaudeHome $claudeRoot -CopilotHome $copilotRoot `
             -ExpectedInstructionHashes $hashes -ExpectedModelInstructionHashes @{ codex = Get-CustomizationInstructionHash $modelInstalled } `
             -AllowDirty -AllowNonMain -WarningVariable warnings | Out-Null
         return @($warnings | ForEach-Object { [string]$_ })
     }
-    $currentHashes = @{ codex = Get-CustomizationInstructionHash $codexFile; claude = Get-CustomizationInstructionHash $claudeFile }
+    $currentHashes = @{
+        codex = Get-CustomizationInstructionHash $codexFile
+        claude = Get-CustomizationInstructionHash $claudeFile
+        copilot = Get-CustomizationInstructionHash $copilotFile
+    }
     $codexHookEntry = @((Get-CustomizationTarget -Name 'codex').hooks.entries)[0]
     $installedHookScript = Join-Path $codexRoot ([string]$codexHookEntry.script)
     Add-Content -LiteralPath $installedHookScript -Value '# script-only drift' -Encoding utf8

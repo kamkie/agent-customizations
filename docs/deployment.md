@@ -1,6 +1,6 @@
 # Deployment
 
-This guide owns validation, live-drift inspection, and activation of the reviewed sources declared in [`config/manifest.json`](../config/manifest.json) for Codex and Claude Code.
+This guide owns validation, live-drift inspection, and activation of the reviewed sources declared in [`config/manifest.json`](../config/manifest.json) for Codex, Claude Code, and GitHub Copilot.
 
 ## Authorization boundary
 
@@ -12,7 +12,7 @@ Edit the reviewed sources in this repository, not their installed copies. Verifi
 
 - PowerShell 7
 - Git for clean-branch deployment checks
-- A local Codex and/or Claude Code installation
+- A local Codex, Claude Code, and/or GitHub Copilot installation
 
 ## Validate the reviewed source
 
@@ -28,11 +28,11 @@ Run the deployment smoke test:
 pwsh ./scripts/test.ps1
 ```
 
-The smoke test installs into temporary sandboxes. It does not write to the live Codex or Claude Code configuration directories.
+The smoke test installs into temporary sandboxes. It does not write to the live Codex, Claude Code, or GitHub Copilot configuration directories.
 
 ## Inspect live drift
 
-Compare both live installations with the reviewed source:
+Compare live installations with the reviewed source:
 
 ```powershell
 pwsh ./scripts/status.ps1
@@ -43,9 +43,10 @@ Inspect one target:
 ```powershell
 pwsh ./scripts/status.ps1 -Target Codex
 pwsh ./scripts/status.ps1 -Target Claude
+pwsh ./scripts/status.ps1 -Target Copilot
 ```
 
-`CODEX_HOME` and `CLAUDE_CONFIG_DIR` select non-default live directories. For one-off inspection, pass `-CodexHome <path>` or `-ClaudeHome <path>`.
+`CODEX_HOME`, `CLAUDE_CONFIG_DIR`, and `COPILOT_HOME` select non-default live directories. For one-off inspection, pass `-CodexHome <path>`, `-ClaudeHome <path>`, or `-CopilotHome <path>`.
 
 The status command reports managed files as in sync, missing, different, or extra. It exits with status 1 when it detects drift. Drift is evidence to review; it is not permission to install.
 
@@ -91,7 +92,7 @@ foreach ($targetName in Get-CustomizationTargetNames -Target All) {
 
 ## Preview activation
 
-Preview all target changes without writing to either live installation:
+Preview all target changes without writing to any live installation:
 
 ```powershell
 pwsh ./scripts/install.ps1 -WhatIf
@@ -102,6 +103,7 @@ Preview one target or an alternate home:
 ```powershell
 pwsh ./scripts/install.ps1 -Target Codex -WhatIf
 pwsh ./scripts/install.ps1 -Target Claude -ClaudeHome <path> -WhatIf
+pwsh ./scripts/install.ps1 -Target Copilot -CopilotHome <path> -WhatIf
 ```
 
 The installer runs repository verification and its clean-`main` safeguards before producing a preview. `-WhatIf` does not bypass those safeguards, so run previews from a clean, current `main` checkout.
@@ -116,7 +118,7 @@ git pull --ff-only
 git status --short --branch
 ```
 
-Install both targets, keeping the hashes from the content comparison above:
+Install all targets, keeping the hashes from the content comparison above:
 
 ```powershell
 ./scripts/install.ps1 -ExpectedInstructionHashes $reviewedHashes `
@@ -131,6 +133,8 @@ Install only one target:
     -ExpectedModelInstructionHashes @{ codex = $reviewedModelHashes.codex }
 ./scripts/install.ps1 -Target Claude `
     -ExpectedInstructionHashes @{ claude = $reviewedHashes.claude }
+./scripts/install.ps1 -Target Copilot `
+    -ExpectedInstructionHashes @{ copilot = $reviewedHashes.copilot }
 ```
 
 The installer verifies the repository before writing and refuses dirty, detached, or non-`main` checkouts by default. `-AllowDirty` and `-AllowNonMain` are explicit safeguards for exceptional use; they do not grant deployment authorization.

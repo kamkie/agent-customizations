@@ -1,8 +1,9 @@
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
 param(
-    [ValidateSet('All', 'Codex', 'Claude')][string]$Target = 'All',
+    [ValidateSet('All', 'Codex', 'Claude', 'Copilot')][string]$Target = 'All',
     [string]$CodexHome,
     [string]$ClaudeHome,
+    [string]$CopilotHome,
     [hashtable]$ExpectedInstructionHashes,
     [hashtable]$ExpectedModelInstructionHashes,
     [switch]$AllowDirty,
@@ -62,7 +63,11 @@ if ($PSBoundParameters.ContainsKey('ExpectedInstructionHashes')) {
         $expected = [string]$ExpectedInstructionHashes[$targetName]
         if ($expected -cnotmatch '^(missing|[a-fA-F0-9]{64})$') { throw "Invalid expected instruction hash for $targetName." }
         $targetConfig = Get-CustomizationTarget -Name $targetName
-        $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
+        $explicitHome = switch ($targetName) {
+            'codex' { $CodexHome }
+            'claude' { $ClaudeHome }
+            'copilot' { $CopilotHome }
+        }
         $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
         Assert-CustomizationInstructionHash -Path (Join-Path $resolvedHome $targetConfig.instructions.destination) -Expected $expected
         if ($targetName -in $modelTargets) {
@@ -75,7 +80,11 @@ if ($PSBoundParameters.ContainsKey('ExpectedInstructionHashes')) {
 
 foreach ($targetName in $selectedTargets) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
-    $explicitHome = if ($targetName -eq 'codex') { $CodexHome } else { $ClaudeHome }
+    $explicitHome = switch ($targetName) {
+        'codex' { $CodexHome }
+        'claude' { $ClaudeHome }
+        'copilot' { $CopilotHome }
+    }
     $resolvedHome = Resolve-CustomizationHome -TargetName $targetName -HomePath $explicitHome
     $status = @(Get-CustomizationStatus -TargetName $targetName -HomePath $resolvedHome)
     $drift = @($status | Where-Object State -ne 'InSync')

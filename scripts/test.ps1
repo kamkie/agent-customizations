@@ -12,6 +12,7 @@ if (-not $resolvedSandbox.StartsWith($temporaryRoot, [StringComparison]::Ordinal
 }
 $codexSandbox = Join-Path $resolvedSandbox 'codex'
 $claudeSandbox = Join-Path $resolvedSandbox 'claude'
+$copilotSandbox = Join-Path $resolvedSandbox 'copilot'
 
 try {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'verify.ps1')
@@ -124,6 +125,7 @@ try {
         -Target All `
         -CodexHome $codexSandbox `
         -ClaudeHome $claudeSandbox `
+        -CopilotHome $copilotSandbox `
         -AllowDirty `
         -AllowNonMain
     if ($LASTEXITCODE -ne 0) { throw 'Sandbox installation test failed.' }
@@ -132,12 +134,17 @@ try {
         -Target All `
         -CodexHome $codexSandbox `
         -ClaudeHome $claudeSandbox `
+        -CopilotHome $copilotSandbox `
         -SummaryOnly
     if ($LASTEXITCODE -ne 0) { throw 'Installed sandboxes should be in sync.' }
 
-    foreach ($targetName in @('codex', 'claude')) {
+    foreach ($targetName in @('codex', 'claude', 'copilot')) {
         $target = Get-CustomizationTarget -Name $targetName
-        $targetHome = if ($targetName -eq 'codex') { $codexSandbox } else { $claudeSandbox }
+        $targetHome = switch ($targetName) {
+            'codex' { $codexSandbox }
+            'claude' { $claudeSandbox }
+            'copilot' { $copilotSandbox }
+        }
         $installedInstructions = Join-Path $targetHome ([string]$target.instructions.destination)
         $sourceParts = foreach ($source in @($target.instructions.sources)) {
             $sourcePath = Join-Path $PSScriptRoot "..\$source"
@@ -343,6 +350,9 @@ try {
     if (Test-Path -LiteralPath (Join-Path $codexSandbox 'skills\session-cost')) {
         throw 'Codex installation must not deploy Claude plugins.'
     }
+    if (Test-Path -LiteralPath (Join-Path $copilotSandbox 'skills\session-cost')) {
+        throw 'Copilot installation must not deploy Claude plugins.'
+    }
     $generatedTypes = Join-Path $installedPlugin '.claude-plugin\types\claude-code'
     $null = New-Item -ItemType Directory -Path $generatedTypes -Force
     Set-Content -LiteralPath (Join-Path $generatedTypes 'index.d.ts') -Value 'export {}'
@@ -381,6 +391,12 @@ try {
         -CodexHome $codexSandbox `
         -SummaryOnly
     if ($LASTEXITCODE -ne 0) { throw 'Claude drift should not affect Codex status.' }
+
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
+        -Target Copilot `
+        -CopilotHome $copilotSandbox `
+        -SummaryOnly
+    if ($LASTEXITCODE -ne 0) { throw 'Claude drift should not affect Copilot status.' }
 
     Write-Host 'Deployment smoke test: OK'
 } finally {

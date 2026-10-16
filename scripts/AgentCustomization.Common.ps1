@@ -18,9 +18,9 @@ function Get-CustomizationManifest {
 }
 
 function Get-CustomizationTargetNames {
-    param([ValidateSet('All', 'Codex', 'Claude')][string]$Target = 'All')
+    param([ValidateSet('All', 'Codex', 'Claude', 'Copilot')][string]$Target = 'All')
 
-    if ($Target -eq 'All') { return @('codex', 'claude') }
+    if ($Target -eq 'All') { return @('codex', 'claude', 'copilot') }
     return @($Target.ToLowerInvariant())
 }
 

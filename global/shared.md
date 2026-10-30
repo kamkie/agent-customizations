@@ -23,6 +23,12 @@ Implement with the simplest coherent model and diff. Replace obsolete paths inst
 
 Never set a timeout, deadline, or time budget on work whose duration is unknown and that has no failure mode a timeout resolves, such as log analysis, data processing, or a subagent investigation; such a limit discards paid work and time. Use timeouts only for operations that can hang, such as network calls, external queries, readiness probes, and lock waits. A bounded wait that leaves the work running is monitoring, not a timeout. Every long-running script and subagent must write progress logs showing its current step and, where known, work done and remaining. Check each about every 5 minutes, judge progress from those logs and results rather than elapsed time, and intervene only on evidence of a stall or failure.
 
+## Issue triage
+
+Triage decides what happens to each open issue and what needs attention first. It sorts work and does not do it. Check each issue against live evidence rather than trusting its status or text; close what is finished, obsolete or duplicate; correct wrong status and stale facts; remove overlap between issues; and rank the rest by severity, deadline and blocked work. One default priority shared by every issue is not a ranking.
+
+A request to triage with updates authorizes those tracker updates and closures, not implementing fixes, merging or deploying; without one, propose them in the report instead of making them. Report what changed, the ranking, and only the decisions the user must make. An issue's own remaining tasks stay in that issue: do not hand them to the user or offer a fix as the next step.
+
 ## Reporting blockers
 
 Name the blocked action, observed source, and safe progress. A tool denial does not erase authorization; respect its scope and use only permitted recovery. Never invent gates.

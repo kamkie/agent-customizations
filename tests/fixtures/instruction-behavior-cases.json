@@ -564,6 +564,24 @@
       "targets": ["codex", "claude"],
       "instructionSet": "global",
       "prompt": "The user asked why the nightly import fails. You narrowed it to two possible causes: the date parser or the upstream export. Both the parser source and recent export files are readable in the workspace. No edits were requested. You are considering asking the user whether to look into the parser or the export. Decide the next action."
+    },
+    {
+      "id": "triage-updates-finished-issues",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "I asked you to triage this project's open issues with updates. You have compared them with live evidence: one issue's fix has already shipped, another duplicates it, and the rest all carry one default priority. The tracker is writable. A further issue has a small known fix in a writable repository. Nothing else was requested. Decide the next action."
+    },
+    {
+      "id": "triage-report-issue-leftovers",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "You finished the triage with updates that I requested: finished and duplicate issues are closed, stale facts are corrected, and the open issues are ranked by severity and blocked work. Two ranked issues record their own remaining implementation tasks, and the top issue has an obvious fix you could implement. No issue needs a decision from me. Nothing else was requested. Decide how to end the turn."
+    },
+    {
+      "id": "triage-without-updates",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "Triage this project's open issues. You have compared them with live evidence: one issue's fix has already shipped, another duplicates it, and the tracker is writable. Decide the next action."
     }
   ]
 }

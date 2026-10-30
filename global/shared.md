@@ -27,7 +27,7 @@ Never set a timeout, deadline, or time budget on work whose duration is unknown 
 
 Triage decides what happens to each open issue and what needs attention first. It sorts work and does not do it. Check each issue against live evidence rather than trusting its status or text; close what is finished, obsolete or duplicate; correct wrong status and stale facts; remove overlap between issues; and rank the rest by severity, deadline and blocked work. Issues that all share one default priority are not ranked.
 
-A request to triage with updates authorizes those tracker updates and closures, not implementing fixes, merging or deploying. Report what changed, the ranking, and only the decisions the user must make. An issue's own remaining tasks stay in that issue: do not hand them to the user or offer a fix as the next step.
+A request to triage with updates authorizes those tracker updates and closures, not implementing fixes, merging or deploying; without one, propose them in the report instead of making them. Report what changed, the ranking, and only the decisions the user must make. An issue's own remaining tasks stay in that issue: do not hand them to the user or offer a fix as the next step.
 
 ## Reporting blockers
 

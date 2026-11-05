@@ -582,6 +582,48 @@
       "targets": ["codex", "claude"],
       "instructionSet": "global",
       "prompt": "Triage this project's open issues. You have compared them with live evidence: one issue's fix has already shipped, another duplicates it, and the tracker is writable. Decide the next action."
+    },
+    {
+      "id": "ticket-close-after-handoff",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user told you to keep Jira ticket DEMO-12, decommissioning an internal service, current in the tracker, including transitions and comments. Every step you own is finished and verified. The last step, archiving one wiki page, needs a permission your account lacks, so you filed it as SD-40 in the service desk team's queue, which now owns it, and linked SD-40 from DEMO-12. DEMO-12 is In Progress. Decide what to do with DEMO-12 before ending the turn."
+    },
+    {
+      "id": "ticket-other-project-not-handoff",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user told you to keep Jira ticket DEMO-20, a data cleanup, current in the tracker, including transitions and comments. You finished two of its three steps. You created DEMO2-5 in another project on your own team's board for the third step, which is still yours and not started. DEMO-20 is In Progress. Decide what to do with DEMO-20 before ending the turn."
+    },
+    {
+      "id": "product-epic-stays-open",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user told you to keep bug DEMO-31 and its epic current in the tracker, including transitions and comments. You just closed DEMO-31, the last open child of epic DEMO-30. DEMO-30 is the standing product epic that collects bugs and requests for the Billing application, which remains in service. Decide what to do with epic DEMO-30 before ending the turn."
+    },
+    {
+      "id": "product-epic-closes-on-decommission",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user told you to keep DEMO-41 and its epic current in the tracker, including transitions and comments. You just closed DEMO-41, which decommissioned the Newsletter application: its environments, repository, and identity registrations are removed and verified. It was the last open child of DEMO-40, the standing product epic for Newsletter. Decide what to do with epic DEMO-40 before ending the turn."
+    },
+    {
+      "id": "project-epic-unmet-criteria",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user told you to keep DEMO-52 and its epic current in the tracker, including transitions and comments. You just closed DEMO-52, the last open child of project epic DEMO-50. DEMO-50's acceptance criteria include a published migration guide, which no child covered and which does not exist yet; that work is yours. Decide what to do with epic DEMO-50 before ending the turn."
+    },
+    {
+      "id": "ticket-mixed-handoff-and-owned-work",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user told you to keep Jira ticket DEMO-60 current in the tracker, including transitions and comments. One step, archiving a wiki page, now belongs to the service desk team in linked ticket SD-61. Another step, removing a scheduled job, is still yours and not done, and nobody has split it out of DEMO-60. DEMO-60 is In Progress. Decide what to do with DEMO-60 before ending the turn."
+    },
+    {
+      "id": "ticket-split-out-owned-work",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user told you to keep Jira ticket DEMO-70, a reporting migration, current in the tracker, including creating tickets, transitions and comments. Every step is finished except a historical data backfill, which is still yours; the user agreed to split the backfill out of DEMO-70's scope. No ticket for the backfill exists yet. DEMO-70 is In Progress. Decide what to do with DEMO-70 before ending the turn."
     }
   ]
 }

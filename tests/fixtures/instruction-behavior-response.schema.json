@@ -17,7 +17,7 @@
     "autonomous": { "type": "boolean" },
     "primaryAction": {
       "type": "string",
-      "description": "mark-ready-and-verify means issue a Ready mutation and then verify live state. refresh-live-state means read current state, including verifying a Ready mutation already issued successfully. keep-draft-and-report means retain draft and report unfinished PR work or the applicable restriction. cancel-hung-job-and-wait means request cancellation for the diagnosed hung job and await its terminal cancellation state. wait-for-job-cancellation means await completion of a cancellation already requested. retry-canceled-job means rerun the job whose cancellation is complete. close-ticket means transition a tracker ticket or epic to Done with a closing comment that links any handoff ticket. keep-ticket-open means leave a tracker ticket or epic open and record why.",
+      "description": "mark-ready-and-verify means issue a Ready mutation and then verify live state. refresh-live-state means read current state, including verifying a Ready mutation already issued successfully. keep-draft-and-report means retain draft and report unfinished PR work or the applicable restriction. cancel-hung-job-and-wait means request cancellation for the diagnosed hung job and await its terminal cancellation state. wait-for-job-cancellation means await completion of a cancellation already requested. retry-canceled-job means rerun the job whose cancellation is complete. close-ticket means transition a tracker ticket or epic to Done with a closing comment that links any handoff ticket. keep-ticket-open means leave a tracker ticket or epic open and record why. create-follow-up-and-close means create and link a follow-up ticket for work of yours split out of the ticket's scope, then close the original.",
       "enum": [
         "answer-read-only",
         "continue-design-discussion",
@@ -47,7 +47,8 @@
         "keep-draft-and-report",
         "obtain-evidence-yourself",
         "close-ticket",
-        "keep-ticket-open"
+        "keep-ticket-open",
+        "create-follow-up-and-close"
       ]
     },
     "workLimit": { "type": "string", "enum": ["not-applicable", "no-limit", "time-limited"] },

@@ -618,6 +618,12 @@
       "targets": ["codex", "claude"],
       "instructionSet": "global",
       "prompt": "The user told you to keep Jira ticket DEMO-60 current in the tracker, including transitions and comments. One step, archiving a wiki page, now belongs to the service desk team in linked ticket SD-61. Another step, removing a scheduled job, is still yours and not done, and nobody has split it out of DEMO-60. DEMO-60 is In Progress. Decide what to do with DEMO-60 before ending the turn."
+    },
+    {
+      "id": "ticket-split-out-owned-work",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user told you to keep Jira ticket DEMO-70, a reporting migration, current in the tracker, including creating tickets, transitions and comments. Every step is finished except a historical data backfill, which is still yours; the user agreed to split the backfill out of DEMO-70's scope. No ticket for the backfill exists yet. DEMO-70 is In Progress. Decide what to do with DEMO-70 before ending the turn."
     }
   ]
 }

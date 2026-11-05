@@ -405,6 +405,7 @@
     "product-epic-stays-open": {"primaryAction": "keep-ticket-open", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "closingQuestion": "none"},
     "product-epic-closes-on-decommission": {"primaryAction": "close-ticket", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "closingQuestion": "none"},
     "project-epic-unmet-criteria": {"primaryAction": "keep-ticket-open", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "closingQuestion": "none"},
-    "ticket-mixed-handoff-and-owned-work": {"primaryAction": "keep-ticket-open", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "closingQuestion": "none"}
+    "ticket-mixed-handoff-and-owned-work": {"primaryAction": "keep-ticket-open", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "closingQuestion": "none"},
+    "ticket-split-out-owned-work": {"primaryAction": "create-follow-up-and-close", "publicationAuthorized": false, "mergeAuthorized": false, "deploymentAuthorized": false, "closingQuestion": "none"}
   }
 }

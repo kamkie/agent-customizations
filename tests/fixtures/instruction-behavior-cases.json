@@ -612,6 +612,12 @@
       "targets": ["codex", "claude"],
       "instructionSet": "global",
       "prompt": "You just closed DEMO-52, the last open child of project epic DEMO-50. DEMO-50's acceptance criteria include a published migration guide, which no child covered and which does not exist yet; that work is yours. Decide what to do with epic DEMO-50 before ending the turn."
+    },
+    {
+      "id": "ticket-mixed-handoff-and-owned-work",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "Your implementation instruction for Jira ticket DEMO-60 covers its tracker updates. One step, archiving a wiki page, now belongs to the service desk team in linked ticket SD-61. Another step, removing a scheduled job, is still yours and not done, and nobody has split it out of DEMO-60. DEMO-60 is In Progress. Decide what to do with DEMO-60 before ending the turn."
     }
   ]
 }

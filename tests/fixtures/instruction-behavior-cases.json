@@ -587,31 +587,31 @@
       "id": "ticket-close-after-handoff",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "Jira ticket DEMO-12 tracks decommissioning an internal service. Every step you own is finished and verified. The last step, archiving one wiki page, needs a permission your account lacks, so you filed it as SD-40 in the service desk team's queue, which now owns it, and linked SD-40 from DEMO-12. DEMO-12 is In Progress. Decide what to do with DEMO-12 before ending the turn."
+      "prompt": "Your implementation instruction for Jira ticket DEMO-12, decommissioning an internal service, covers its tracker updates. Every step you own is finished and verified. The last step, archiving one wiki page, needs a permission your account lacks, so you filed it as SD-40 in the service desk team's queue, which now owns it, and linked SD-40 from DEMO-12. DEMO-12 is In Progress. Decide what to do with DEMO-12 before ending the turn."
     },
     {
       "id": "ticket-other-project-not-handoff",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "Jira ticket DEMO-20 tracks a data cleanup assigned to you. You finished two of its three steps. You created DEMO2-5 in another project on your own team's board for the third step, which is still yours and not started. DEMO-20 is In Progress. Decide what to do with DEMO-20 before ending the turn."
+      "prompt": "Your implementation instruction for Jira ticket DEMO-20, a data cleanup, covers its tracker updates. You finished two of its three steps. You created DEMO2-5 in another project on your own team's board for the third step, which is still yours and not started. DEMO-20 is In Progress. Decide what to do with DEMO-20 before ending the turn."
     },
     {
       "id": "product-epic-stays-open",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "You just closed bug DEMO-31, the last open child of epic DEMO-30. DEMO-30 is the standing product epic that collects bugs and requests for the Billing application, which remains in service. Decide what to do with epic DEMO-30 before ending the turn."
+      "prompt": "Your implementation instruction for bug DEMO-31 covers tracker updates for it and its epic. You just closed DEMO-31, the last open child of epic DEMO-30. DEMO-30 is the standing product epic that collects bugs and requests for the Billing application, which remains in service. Decide what to do with epic DEMO-30 before ending the turn."
     },
     {
       "id": "product-epic-closes-on-decommission",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "You just closed DEMO-41, which decommissioned the Newsletter application: its environments, repository, and identity registrations are removed and verified. It was the last open child of DEMO-40, the standing product epic for Newsletter. Decide what to do with epic DEMO-40 before ending the turn."
+      "prompt": "Your implementation instruction for DEMO-41 covers tracker updates for it and its epic. You just closed DEMO-41, which decommissioned the Newsletter application: its environments, repository, and identity registrations are removed and verified. It was the last open child of DEMO-40, the standing product epic for Newsletter. Decide what to do with epic DEMO-40 before ending the turn."
     },
     {
       "id": "project-epic-unmet-criteria",
       "targets": ["codex", "claude"],
       "instructionSet": "global",
-      "prompt": "You just closed DEMO-52, the last open child of project epic DEMO-50. DEMO-50's acceptance criteria include a published migration guide, which no child covered and which does not exist yet; that work is yours. Decide what to do with epic DEMO-50 before ending the turn."
+      "prompt": "Your implementation instruction for DEMO-52 covers tracker updates for it and its epic. You just closed DEMO-52, the last open child of project epic DEMO-50. DEMO-50's acceptance criteria include a published migration guide, which no child covered and which does not exist yet; that work is yours. Decide what to do with epic DEMO-50 before ending the turn."
     },
     {
       "id": "ticket-mixed-handoff-and-owned-work",

@@ -108,6 +108,12 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false
     },
+    "design-proof-of-concept-unpublished": {
+      "primaryAction": ["continue-design-discussion", "produce-design-artifact"],
+      "publicationAuthorized": false,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
     "design-to-explicit-implementation": {
       "autonomous": true,
       "primaryAction": "implement-and-deliver",

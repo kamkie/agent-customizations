@@ -115,6 +115,20 @@
       "mergeAuthorized": false,
       "deploymentAuthorized": false
     },
+    "implementation-variant-pick": {
+      "primaryAction": "implement-and-deliver",
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "closingQuestion": "none"
+    },
+    "local-change-publication-pause": {
+      "primaryAction": ["continue-authorized-work", "implement-and-deliver"],
+      "publicationAuthorized": true,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false,
+      "closingQuestion": "none"
+    },
     "authorized-safe-next-step": {
       "autonomous": true,
       "primaryAction": "continue-authorized-work",

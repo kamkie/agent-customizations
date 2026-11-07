@@ -237,6 +237,64 @@ exit [int]$env:FAKE_CLAUDE_EXIT
     Assert-True (-not $reviewAllowlist.Contains("gh pr review")) "PR review silently allowed posting a review."
     Assert-True (-not $reviewAllowlist.Contains("gh api")) "PR review silently allowed unrestricted GitHub API calls."
     Assert-True (-not $reviewAllowlist.Contains("git fetch") -and -not $reviewAllowlist.Contains("git push")) "PR review silently allowed Git ref mutations."
+    Assert-True ($prArgs.Contains('/review 17')) "PR review no longer passes its slash command as an argument."
+
+    # Use an OS process boundary: the .cmd shim invokes a separate pwsh process.
+    # An in-process claude.ps1 mock cannot expose Windows' native argv limit or
+    # prove the bytes written to stdin. No model or network request is made.
+    Remove-Item -LiteralPath (Join-Path $fakeBin 'claude.ps1')
+    $nativeMock = Join-Path $fakeBin 'capture.ps1'
+    @'
+$stream = [IO.File]::Create($env:FAKE_CLAUDE_STDIN)
+try { [Console]::OpenStandardInput().CopyTo($stream) } finally { $stream.Dispose() }
+$args | ConvertTo-Json -Compress | Add-Content -LiteralPath $env:FAKE_CLAUDE_ARGS_LOG
+(Get-Location).Path | Set-Content -LiteralPath $env:FAKE_CLAUDE_CWD
+[Console]::Error.WriteLine('native stderr marker')
+[Console]::Out.WriteLine($env:FAKE_CLAUDE_EVENT)
+exit [int]$env:FAKE_CLAUDE_EXIT
+'@ | Set-Content -LiteralPath $nativeMock -Encoding utf8NoBOM
+    '@echo off', ('"{0}" -NoProfile -File "%~dp0capture.ps1" %*' -f (Get-Command pwsh).Source), 'exit /b %errorlevel%' |
+        Set-Content -LiteralPath (Join-Path $fakeBin 'claude.cmd') -Encoding ascii
+    $env:FAKE_CLAUDE_STDIN = Join-Path $testRoot 'stdin.bin'
+    $env:FAKE_CLAUDE_CWD = Join-Path $testRoot 'native-cwd.txt'
+    $nativeTarget = Join-Path $testRoot 'target [literal] with spaces'
+    New-Item -ItemType Directory -Path $nativeTarget | Out-Null
+    $promptPath = Join-Path $nativeTarget 'prompt [literal] with spaces.txt'
+    $literalLine = 'Synthetic Żółć 日本語 🦊 "quotes" ''single'' `backtick` $(not-code) $variable'
+    $largePrompt = "/synthetic-task`r`n" + (($literalLine + "`r`n" + $literalLine + "`n") * 400)
+    Assert-True ($largePrompt.Length -gt 40KB) 'Native test must exceed 40 KiB even before UTF-8 encoding.'
+    $utf8 = [Text.UTF8Encoding]::new($false)
+    foreach ($ending in @('', "`n", "`r`n")) {
+        $expectedText = $largePrompt + 'final line' + $ending
+        [IO.File]::WriteAllText($promptPath, $expectedText, $utf8)
+        $nativeRun = Invoke-RunnerProcess @(
+            '-PromptFile', (Split-Path -Leaf $promptPath), '-WorkingDirectory', $nativeTarget,
+            '-ClaudeConfigDirectory', $claudeConfig, '-Resume', $session,
+            '-ExactModel', 'claude-opus-4-6', '-Effort', 'medium'
+        )
+        Assert-True ($nativeRun.ExitCode -eq 0) "Native prompt transport failed: $($nativeRun.Output)"
+        $captured = [IO.File]::ReadAllBytes($env:FAKE_CLAUDE_STDIN)
+        Assert-True ([Convert]::ToBase64String($captured) -ceq [Convert]::ToBase64String($utf8.GetBytes($expectedText))) 'Native stdin changed Unicode, line endings, or the trailing newline.'
+        $nativeArgs = (Get-Content -LiteralPath $argsLog | Select-Object -Last 1) | ConvertFrom-Json
+        Assert-True (-not (($nativeArgs -join ' ').Contains('Synthetic'))) 'File prompt leaked into native argv.'
+        Assert-True (-not $nativeRun.Output.Contains('Synthetic')) 'File prompt leaked into the command summary.'
+        Assert-True ($nativeRun.Output.Contains('<stdin-prompt:')) 'Summary did not identify stdin transport.'
+        Assert-True ($nativeRun.Output.Contains('--output-format stream-json')) 'Stdin summary incorrectly redacted a runtime control.'
+        Assert-True ($nativeArgs.Contains('--input-format') -and $nativeArgs.Contains('text')) 'Native prompt did not select text stdin.'
+        Assert-True ($nativeArgs.Contains('--resume') -and $nativeArgs.Contains($session) -and -not $nativeArgs.Contains('--session-id')) 'File prompt lost native resume identity.'
+        Assert-True ($nativeArgs.Contains('claude-opus-4-6') -and $nativeArgs.Contains('medium') -and $nativeArgs.Contains('default')) 'File prompt changed model, effort or permission controls.'
+        Assert-True ($nativeRun.Output.Contains('native stderr marker') -and $nativeRun.Output.Contains('resumed')) "Native stdout/stderr were not rendered: $($nativeRun.Output)"
+        Assert-True ((Get-Content -LiteralPath $env:FAKE_CLAUDE_CWD -Raw).Trim() -eq $nativeTarget) 'Native working directory changed.'
+    }
+    $beforeDryArgs = [IO.File]::ReadAllText($argsLog)
+    $fileDry = Invoke-RunnerProcess @('-PromptFile', $promptPath, '-WorkingDirectory', $nativeTarget, '-ClaudeConfigDirectory', $dryConfig, '-DryRun')
+    Assert-True ($fileDry.ExitCode -eq 0 -and -not (Test-Path -LiteralPath $dryConfig)) 'File DryRun created runtime state.'
+    Assert-True ([IO.File]::ReadAllText($argsLog) -ceq $beforeDryArgs) 'File DryRun launched Claude.'
+    $formatOverride = Invoke-RunnerProcess @('-PromptFile', $promptPath, '-WorkingDirectory', $nativeTarget, '-ClaudeArgs', '--input-format=stream-json', '-DryRun')
+    Assert-True ($formatOverride.ExitCode -ne 0 -and $formatOverride.Output.Contains('Prompt files use text stdin')) 'File prompt accepted an incompatible stdin format.'
+    $env:FAKE_CLAUDE_EXIT = '23'
+    $nativeFailure = Invoke-RunnerProcess @('-PromptFile', $promptPath, '-WorkingDirectory', $nativeTarget, '-ClaudeConfigDirectory', $claudeConfig)
+    Assert-True ($nativeFailure.ExitCode -eq 23 -and $nativeFailure.Output.Contains('native stderr marker')) 'File prompt lost the native exit code or stderr.'
 
     Write-Host "claude-runner regression tests passed"
 } finally {
@@ -245,6 +303,8 @@ exit [int]$env:FAKE_CLAUDE_EXIT
     Remove-Item Env:FAKE_CLAUDE_CONFIG_LOG -ErrorAction SilentlyContinue
     Remove-Item Env:FAKE_CLAUDE_EVENT -ErrorAction SilentlyContinue
     Remove-Item Env:FAKE_CLAUDE_EXIT -ErrorAction SilentlyContinue
+    Remove-Item Env:FAKE_CLAUDE_STDIN -ErrorAction SilentlyContinue
+    Remove-Item Env:FAKE_CLAUDE_CWD -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -Recurse -Force -LiteralPath $testRoot
     }

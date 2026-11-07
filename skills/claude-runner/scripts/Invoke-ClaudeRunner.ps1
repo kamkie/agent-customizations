@@ -133,7 +133,7 @@ function Format-Arg {
 }
 
 function Format-CommandArgsForDisplay {
-    param([string[]]$CommandArgs)
+    param([string[]]$CommandArgs, [bool]$PromptOnStdin = $false)
 
     $displayArgs = New-Object System.Collections.Generic.List[string]
     $redactNext = $false
@@ -145,7 +145,7 @@ function Format-CommandArgsForDisplay {
         }
 
         [void]$displayArgs.Add($arg)
-        if ($arg -eq "-p" -or $arg -eq "--print") {
+        if (-not $PromptOnStdin -and ($arg -eq "-p" -or $arg -eq "--print")) {
             $redactNext = $true
         }
     }
@@ -403,6 +403,7 @@ if (-not (Test-Path -LiteralPath $resolvedWorkingDirectory -PathType Container))
     throw "Working directory does not exist: $resolvedWorkingDirectory"
 }
 
+$promptOnStdin = $false
 if ($ReviewPr -gt 0) {
     if (-not [string]::IsNullOrWhiteSpace($Prompt) -or -not [string]::IsNullOrWhiteSpace($PromptFile)) {
         throw "Use either -ReviewPr, -Prompt, or -PromptFile, not more than one."
@@ -420,6 +421,16 @@ if ($ReviewPr -gt 0) {
         throw "Prompt file does not exist: $resolvedPromptFile"
     }
     $PromptText = Get-Content -Raw -LiteralPath $resolvedPromptFile
+    if ([string]::IsNullOrWhiteSpace($PromptText)) {
+        throw "Prompt file must contain task text."
+    }
+    if ($PSVersionTable.PSVersion -lt [version]'7.4') {
+        throw "-PromptFile requires PowerShell 7.4 or newer for lossless native stdin transport."
+    }
+    if (@($ClaudeArgs | Where-Object { $_ -match '^--input-format(?:=|$)' }).Count -gt 0) {
+        throw "Prompt files use text stdin; do not override --input-format through -ClaudeArgs."
+    }
+    $promptOnStdin = $true
 } elseif (-not [string]::IsNullOrWhiteSpace($Prompt)) {
     $PromptText = $Prompt
 } else {
@@ -478,8 +489,13 @@ if (-not [string]::IsNullOrWhiteSpace($Resume)) {
     $cmdArgs += @("--session-id", $SessionId)
 }
 
+$cmdArgs += "-p"
+if ($promptOnStdin) {
+    $cmdArgs += @("--input-format", "text")
+} else {
+    $cmdArgs += $PromptText
+}
 $cmdArgs += @(
-    "-p", $PromptText,
     "--output-format", "stream-json",
     "--include-partial-messages"
 )
@@ -519,7 +535,10 @@ Write-Host ("[claude-runner] effort: {0}" -f $Effort)
 Write-Host ("[claude-runner] permissions: {0}{1}" -f $displayPermissionMode, $(if ($BypassPermissions) { " (EXPLICIT BYPASS)" } else { "" }))
 Write-Host ("[claude-runner] native sessions: {0} (managed by Claude Code)" -f (Join-Path $resolvedClaudeConfigDirectory "projects"))
 Write-Host ("[claude-runner] diagnostic log: {0}" -f $LogPath)
-$commandSummary = Format-CommandArgsForDisplay $displayArgs
+$commandSummary = Format-CommandArgsForDisplay $displayArgs -PromptOnStdin $promptOnStdin
+if ($promptOnStdin) {
+    $commandSummary += " <stdin-prompt:$($PromptText.Length) chars>"
+}
 if ($effectiveAllowedTools.Count -gt 0) {
     $commandSummary += " <allowed-tools:$($effectiveAllowedTools.Count) rules redacted>"
 }
@@ -547,13 +566,21 @@ $previousClaudeConfigDirectory = $env:CLAUDE_CONFIG_DIR
 
 try {
     $env:CLAUDE_CONFIG_DIR = $resolvedClaudeConfigDirectory
-    Push-Location $resolvedWorkingDirectory
+    Push-Location -LiteralPath $resolvedWorkingDirectory
     try {
-        & claude @cmdArgs 2>&1 | ForEach-Object {
+        $renderLine = {
             $line = [string]$_
             $writer.WriteLine($line)
             $writer.Flush()
             Write-ClaudeStreamLine $line
+        }
+        if ($promptOnStdin) {
+            # A string pipeline appends a newline. Native byte input (PowerShell
+            # 7.4+) preserves decoded text, including its final newline, without
+            # putting the prompt in the process command line.
+            $utf8NoBom.GetBytes($PromptText) | & claude @cmdArgs 2>&1 | ForEach-Object $renderLine
+        } else {
+            & claude @cmdArgs 2>&1 | ForEach-Object $renderLine
         }
         $exitCode = $LASTEXITCODE
     } finally {

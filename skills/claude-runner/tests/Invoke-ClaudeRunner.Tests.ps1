@@ -286,6 +286,20 @@ exit [int]$env:FAKE_CLAUDE_EXIT
         Assert-True ($nativeRun.Output.Contains('native stderr marker') -and $nativeRun.Output.Contains('resumed')) "Native stdout/stderr were not rendered: $($nativeRun.Output)"
         Assert-True ((Get-Content -LiteralPath $env:FAKE_CLAUDE_CWD -Raw).Trim() -eq $nativeTarget) 'Native working directory changed.'
     }
+    # npm-style PowerShell launchers forward $input into a native executable.
+    # Exercise that extra pipeline too, rather than assuming native resolution.
+    @'
+if ($MyInvocation.ExpectingInput) {
+    $input | & (Join-Path $PSScriptRoot 'claude.cmd') @args
+} else {
+    & (Join-Path $PSScriptRoot 'claude.cmd') @args
+}
+exit $LASTEXITCODE
+'@ | Set-Content -LiteralPath (Join-Path $fakeBin 'claude.ps1') -Encoding utf8NoBOM
+    $shimRun = Invoke-RunnerProcess @('-PromptFile', $promptPath, '-WorkingDirectory', $nativeTarget, '-ClaudeConfigDirectory', $claudeConfig)
+    Assert-True ($shimRun.ExitCode -eq 0) "PowerShell forwarding shim failed: $($shimRun.Output)"
+    Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($env:FAKE_CLAUDE_STDIN)) -ceq [Convert]::ToBase64String($utf8.GetBytes($expectedText))) 'PowerShell forwarding shim corrupted stdin bytes.'
+    Remove-Item -LiteralPath (Join-Path $fakeBin 'claude.ps1')
     $beforeDryArgs = [IO.File]::ReadAllText($argsLog)
     $fileDry = Invoke-RunnerProcess @('-PromptFile', $promptPath, '-WorkingDirectory', $nativeTarget, '-ClaudeConfigDirectory', $dryConfig, '-DryRun')
     Assert-True ($fileDry.ExitCode -eq 0 -and -not (Test-Path -LiteralPath $dryConfig)) 'File DryRun created runtime state.'

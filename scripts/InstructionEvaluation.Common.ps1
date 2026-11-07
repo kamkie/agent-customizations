@@ -65,12 +65,12 @@ function Invoke-EvaluationClient {
         # Use only observed native model metadata, never the requested alias.
         $models = foreach ($line in [IO.File]::ReadLines($LogPath)) {
             try {
-                $event = $line | ConvertFrom-Json -ErrorAction Stop
-                $model = Get-ActionProperty $event 'model'
+                $nativeRecord = $line | ConvertFrom-Json -ErrorAction Stop
+                $model = Get-ActionProperty $nativeRecord 'model'
                 if ($model) { [string]$model }
-                $messageModel = Get-ActionProperty (Get-ActionProperty $event 'message') 'model'
+                $messageModel = Get-ActionProperty (Get-ActionProperty $nativeRecord 'message') 'model'
                 if ($messageModel) { [string]$messageModel }
-                $usage = Get-ActionProperty $event 'modelUsage'
+                $usage = Get-ActionProperty $nativeRecord 'modelUsage'
                 if ($usage) { $usage.PSObject.Properties.Name }
             } catch { }
         }
@@ -91,9 +91,9 @@ function Read-EvaluationResponse {
 
 function Read-ClaudeEvaluationResponse {
     param([string]$Path)
-    $events = @(Get-Content -LiteralPath $Path | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_ | ConvertFrom-Json -ErrorAction Stop })
-    if (-not $events.Count -or $null -in $events) { throw 'Claude returned an empty or null envelope.' }
-    $results = @($events | Where-Object { (Get-ActionProperty $_ 'type') -eq 'result' })
+    $nativeRecords = @(Get-Content -LiteralPath $Path | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_ | ConvertFrom-Json -ErrorAction Stop })
+    if (-not $nativeRecords.Count -or $null -in $nativeRecords) { throw 'Claude returned an empty or null envelope.' }
+    $results = @($nativeRecords | Where-Object { (Get-ActionProperty $_ 'type') -eq 'result' })
     if ($results.Count -ne 1) { throw 'Claude returned no unique terminal result envelope.' }
     $envelope = $results[0]
     if ((Get-ActionProperty $envelope 'is_error') -eq $true -or (Get-ActionProperty $envelope 'subtype') -ne 'success') { throw 'Claude returned an unsuccessful result envelope.' }

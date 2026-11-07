@@ -125,12 +125,12 @@ $currentRequest
                     -Model $CodexModel -Effort $CodexReasoningEffort
                 $raw = @(Get-Content -LiteralPath $logPath)
                 foreach ($line in $raw) {
-                    $event = $line | ConvertFrom-Json
-                    if ($event.type -like 'item.*' -and $event.item.type -eq 'error') {
-                        throw "Codex client reported: $($event.item.message)"
+                    $nativeRecord = $line | ConvertFrom-Json
+                    if ($nativeRecord.type -like 'item.*' -and $nativeRecord.item.type -eq 'error') {
+                        throw "Codex client reported: $($nativeRecord.item.message)"
                     }
-                    if ($event.type -like 'item.*' -and $event.item.type -notin @('agent_message','reasoning')) {
-                        throw (New-ActionProtocolException "Native CLI action is outside the controlled protocol: $($event.item.type)")
+                    if ($nativeRecord.type -like 'item.*' -and $nativeRecord.item.type -notin @('agent_message','reasoning')) {
+                        throw (New-ActionProtocolException "Native CLI action is outside the controlled protocol: $($nativeRecord.item.type)")
                     }
                 }
                 return Read-EvaluationResponse $responsePath

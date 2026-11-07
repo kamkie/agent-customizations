@@ -11,6 +11,29 @@ function Assert-True($condition, $message) {
     if (-not $condition) { throw $message }
     $script:assertions++
 }
+function Assert-ExpectationContract($Expectation, [string]$Id) {
+    $arrays = @('requiredTools','checks','requiredReads','readsBeforeMutation','forbiddenWritePaths','forbiddenTools','firstPhaseMessageContains')
+    $booleans = @('unchanged','firstPhaseUnchanged','firstPhaseRequiresProse','mustInterrupt','noToolsAfterStop','mustSteer','nextActionRequired')
+    $strings = @('firstTool','firstPhaseNextWord')
+    foreach ($name in @('requiredTools','checks')) {
+        if (-not $Expectation.PSObject.Properties[$name]) { throw "Expectation '$Id' is missing required array '$name'." }
+    }
+    foreach ($property in $Expectation.PSObject.Properties) {
+        if ($property.Name -in $arrays) {
+            if ($property.Value -isnot [array] -or @($property.Value | Where-Object { $_ -isnot [string] -or [string]::IsNullOrWhiteSpace($_) }).Count) {
+                throw "Expectation '$Id' requires an array of nonempty strings for '$($property.Name)'."
+            }
+        } elseif ($property.Name -in $booleans) {
+            if ($property.Value -isnot [bool]) { throw "Expectation '$Id' requires a boolean for '$($property.Name)'." }
+        } elseif ($property.Name -in $strings) {
+            if ($property.Value -isnot [string] -or [string]::IsNullOrWhiteSpace($property.Value)) { throw "Expectation '$Id' requires a nonempty string for '$($property.Name)'." }
+        } elseif ($property.Name -eq 'files') {
+            if ($property.Value -isnot [pscustomobject] -or @($property.Value.PSObject.Properties | Where-Object { $_.Value -isnot [string] }).Count) {
+                throw "Expectation '$Id' requires a file-to-string object for 'files'."
+            }
+        } else { throw "Expectation '$Id' has unknown property '$($property.Name)'." }
+    }
+}
 function Action($tool, $path = '', $content = '', $check = '') {
     return [pscustomobject]@{tool = $tool; path = $path; content = $content; check = $check; message = "**Done:** Fixture result recorded.`n**Not done:** nothing.`n**Next:** no further action required"}
 }
@@ -33,6 +56,17 @@ function Replay($id, $requests) {
 try {
     Assert-True ($cases.Count -eq @($cases.id | Select-Object -Unique).Count) 'Duplicate action cases.'
     Assert-True (-not (Compare-Object @($cases.id | Sort-Object) @($expected.PSObject.Properties.Name | Sort-Object))) 'Cases and expectations differ.'
+    foreach ($property in $expected.PSObject.Properties) { Assert-ExpectationContract $property.Value $property.Name }
+    foreach ($invalid in @(
+        '{"checks":[]}', '{"requiredTools":[]}', '{"requiredTools":null,"checks":[]}',
+        '{"requiredTools":"read_file","checks":[]}', '{"requiredTools":[],"checks":[false]}',
+        '{"requiredTools":[],"checks":[],"unchanged":"true"}', '{"requiredTools":[],"checks":[],"files":[]}'
+    )) {
+        $rejected = $false
+        try { Assert-ExpectationContract ($invalid | ConvertFrom-Json) 'synthetic-invalid' } catch { $rejected = $true }
+        Assert-True $rejected 'Malformed expectation passed structural validation.'
+    }
+    Assert-ExpectationContract ('{"requiredTools":[],"checks":[]}' | ConvertFrom-Json) 'synthetic-empty-arrays'
     $finish = Action 'finish'
     $write = Action 'write_file' 'greeting.txt' 'hello'
     $format = Action 'run_check' '' '' 'format'

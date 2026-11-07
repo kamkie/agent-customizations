@@ -66,7 +66,7 @@ function Invoke-EvaluationClient {
         $metadata | ConvertTo-Json | Set-Content -LiteralPath $MetadataPath
         Write-Host "END native ${Client}: $($metadata.status); stdout records: $($metadata.stdoutLines); stderr records: $($metadata.stderrLines)"
     }
-    if ($metadata.exitCode -ne 0) { throw "$Client client failed with exit $($metadata.exitCode); diagnostics: $ErrorPath" }
+    if ($metadata.exitCode -ne 0) { throw "$Client client failed with exit $($metadata.exitCode); stdout: $LogPath; stderr: $ErrorPath; metadata: $MetadataPath" }
 }
 
 function Read-EvaluationResponse {

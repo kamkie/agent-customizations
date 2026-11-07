@@ -314,7 +314,20 @@ exit $LASTEXITCODE
         $pending = Get-Content $summaryPath -Raw | ConvertFrom-Json
         if ($pending.status -ne 'running' -or $pending.results[0].status -ne 'running') { throw 'Running process was marked complete.' }
         $nativePid = [int](Get-Content (Join-Path $bin 'started'))
-        New-Item -ItemType File (Join-Path $bin 'released') | Out-Null
+        $reader = if ($IsWindows) { [IO.File]::Open($summaryPath, 'Open', 'Read', 'ReadWrite') } else { $null }
+        try {
+            New-Item -ItemType File (Join-Path $bin 'released') | Out-Null
+            if ($reader) {
+                # Let the runner reach atomic replacement while a normal reader
+                # holds the destination without FILE_SHARE_DELETE.
+                $replaceReady = [DateTime]::UtcNow.AddSeconds(5)
+                while (-not (Test-Path (Join-Path (Split-Path $summaryPath) 'summary.tmp'))) {
+                    if ($process.HasExited -or [DateTime]::UtcNow -gt $replaceReady) { throw 'Summary writer did not reach its replacement gate.' }
+                    Start-Sleep -Milliseconds 20
+                }
+                if ($process.HasExited) { throw 'A monitoring reader aborted the run.' }
+            }
+        } finally { if ($reader) { $reader.Dispose() } }
         $process.WaitForExit()
         if (Get-Process -Id $nativePid -ErrorAction SilentlyContinue) { throw 'Native child survived completion.' }
         $final = Get-Content $summaryPath -Raw | ConvertFrom-Json

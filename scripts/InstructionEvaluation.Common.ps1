@@ -98,5 +98,16 @@ function Write-EvaluationSummary {
     # Readers always see a complete JSON document, even while a run is active.
     $temporary = Join-Path $RunRoot 'summary.tmp'
     $summary | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath $temporary
-    [IO.File]::Move($temporary, (Join-Path $RunRoot 'summary.json'), $true)
+    $destination = Join-Path $RunRoot 'summary.json'
+    $retryUntil = [DateTime]::UtcNow.AddSeconds(5)
+    while ($true) {
+        try { [IO.File]::Move($temporary, $destination, $true); break }
+        catch [IO.IOException] {
+            # Windows readers commonly omit FileShare.Delete. Retry only their
+            # sharing/lock conflicts, with a bounded filesystem lock wait.
+            $code = $_.Exception.HResult -band 0xffff
+            if (-not $IsWindows -or $code -notin @(32, 33) -or [DateTime]::UtcNow -ge $retryUntil) { throw }
+            Start-Sleep -Milliseconds 25
+        }
+    }
 }

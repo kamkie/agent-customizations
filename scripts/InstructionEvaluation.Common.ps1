@@ -94,6 +94,14 @@ function Read-ClaudeEvaluationResponse {
 
 function Write-EvaluationSummary {
     param([string]$RunRoot, [object[]]$Results, [string]$Status, [hashtable]$Configuration)
+    if ($Status -eq 'interrupted') {
+        foreach ($result in @($Results | Where-Object status -eq 'running')) {
+            $result.status = 'interrupted'
+            $result.failureKind = 'interrupted'
+            $detail = 'Evaluation interrupted before a validated case result was available.'
+            if ($result.ContainsKey('errors')) { $result.errors = @($detail) } else { $result.mismatches = @($detail) }
+        }
+    }
     $summary = [ordered]@{status = $Status; artifacts = $RunRoot; configuration = $Configuration; cases = $Results.Count; passed = @($Results | Where-Object passed).Count; failed = @($Results | Where-Object { $_.status -ne 'running' -and -not $_.passed }).Count; results = @($Results)}
     # Readers always see a complete JSON document, even while a run is active.
     $temporary = Join-Path $RunRoot 'summary.tmp'

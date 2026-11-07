@@ -202,6 +202,11 @@ $null = New-Item -ItemType Directory $nativeRoot
 $savedPath = $env:PATH
 try {
     $pwsh = (Get-Command pwsh).Source
+    $interrupted = @{status = 'running'; passed = $false; failureKind = $null; mismatches = @()}
+    Write-EvaluationSummary $nativeRoot @($interrupted) 'interrupted' @{}
+    $interruptedSummary = Get-Content (Join-Path $nativeRoot 'summary.json') -Raw | ConvertFrom-Json
+    if ($interruptedSummary.failed -ne 1 -or $interruptedSummary.results[0].failureKind -ne 'interrupted' -or
+        $interruptedSummary.results[0].status -ne 'interrupted' -or -not $interruptedSummary.results[0].mismatches.Count) { throw 'Interrupted case was not terminalized with a reason.' }
     $bin = Join-Path $nativeRoot 'bin'
     $null = New-Item -ItemType Directory $bin
     @'

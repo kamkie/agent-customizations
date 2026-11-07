@@ -17,6 +17,17 @@ function New-EvaluationRunDirectory {
     return $run
 }
 
+function Save-EvaluationModelInstructions {
+    param([string]$RunRoot, [string]$Source, [string]$Mode)
+    $baseline = @{mode = $Mode; source = $Source; snapshot = $null; sha256 = $null}
+    if ($Mode -ne 'stock') {
+        $baseline.snapshot = Join-Path $RunRoot 'codex-model-instructions.md'
+        [IO.File]::Copy($Source, $baseline.snapshot)
+        $baseline.sha256 = (Get-FileHash -LiteralPath $baseline.snapshot -Algorithm SHA256).Hash
+    }
+    return $baseline
+}
+
 function Invoke-EvaluationClient {
     param([string]$Client, [string[]]$Arguments, [string]$Prompt, [string]$Workspace,
         [string]$LogPath, [string]$ErrorPath, [string]$MetadataPath,

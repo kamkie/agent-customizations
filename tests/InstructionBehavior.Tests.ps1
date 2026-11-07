@@ -202,6 +202,14 @@ $null = New-Item -ItemType Directory $nativeRoot
 $savedPath = $env:PATH
 try {
     $pwsh = (Get-Command pwsh).Source
+    $instructionSource = Join-Path $nativeRoot 'source.md'
+    'synthetic baseline' | Set-Content $instructionSource
+    $baseline = Save-EvaluationModelInstructions -RunRoot $nativeRoot -Source $instructionSource -Mode custom
+    'changed after snapshot' | Set-Content $instructionSource
+    if ($baseline.mode -ne 'custom' -or $baseline.sha256 -ne (Get-FileHash $baseline.snapshot).Hash -or
+        (Get-Content $baseline.snapshot -Raw) -notmatch 'synthetic baseline') { throw 'Instruction snapshot changed with its source.' }
+    $stock = Save-EvaluationModelInstructions -RunRoot $nativeRoot -Mode stock
+    if ($stock.mode -ne 'stock' -or $null -ne $stock.snapshot -or $null -ne $stock.sha256) { throw 'Stock baseline falsely claimed an instruction snapshot.' }
     $interrupted = @{status = 'running'; passed = $false; failureKind = $null; mismatches = @()}
     Write-EvaluationSummary $nativeRoot @($interrupted) 'interrupted' @{}
     $interruptedSummary = Get-Content (Join-Path $nativeRoot 'summary.json') -Raw | ConvertFrom-Json
@@ -259,6 +267,8 @@ exit ([int](Get-Content (Join-Path $PSScriptRoot 'exit')))
         if ($runs.Count -ne $count) { throw 'A repeated run overwrote evidence.' }
         $run = ($runs | Sort-Object CreationTimeUtc | Select-Object -Last 1).FullName
         $summary = Get-Content (Join-Path $run 'summary.json') -Raw | ConvertFrom-Json
+        if ($summary.configuration.codexInstructionBaseline.mode -ne 'reviewed' -or
+            $summary.configuration.codexInstructionBaseline.sha256 -ne (Get-FileHash $summary.configuration.codexInstructionBaseline.snapshot).Hash) { throw 'Run omitted its reviewed instruction baseline.' }
         if ($summary.results[0].failureKind -ne $sample[1]) { throw "Wrong envelope failure kind: $($summary | ConvertTo-Json -Depth 8)" }
         $caseRoot = Join-Path $run 'claude/capability-question'
         $metadata = Get-Content (Join-Path $caseRoot 'client.metadata.json') -Raw | ConvertFrom-Json

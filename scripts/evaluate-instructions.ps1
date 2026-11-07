@@ -82,6 +82,9 @@ if (-not $ResponseDirectory) {
     }
 }
 $resolvedOutputDirectory = New-EvaluationRunDirectory $OutputDirectory
+$modelInstructionMode = if ($StockCodexInstructions) { 'stock' } elseif ($PSBoundParameters.ContainsKey('CodexModelInstructionsFile')) { 'custom' } else { 'reviewed' }
+$baseline = Save-EvaluationModelInstructions -RunRoot $resolvedOutputDirectory -Source $CodexModelInstructionsFile -Mode $modelInstructionMode
+$CodexModelInstructionsFile = $baseline.snapshot
 
 function Write-CompiledInstructions {
     param(
@@ -337,7 +340,7 @@ function Compare-ExpectedBehavior {
 }
 
 $results = [Collections.Generic.List[object]]::new()
-$configuration = @{suite = $Suite; targets = $requestedTargets; claudeModel = $ClaudeModel; claudeEffort = $ClaudeEffort; codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort}
+$configuration = @{codexInstructionBaseline = $baseline; suite = $Suite; targets = $requestedTargets; claudeModel = $ClaudeModel; claudeEffort = $ClaudeEffort; codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort}
 $runStatus = 'interrupted'
 try {
     foreach ($case in $selectedCases) {

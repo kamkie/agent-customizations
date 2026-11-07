@@ -53,8 +53,11 @@ foreach ($client in $targets) {
     }
 }
 $runRoot = New-EvaluationRunDirectory $OutputDirectory
+$modelInstructionMode = if ($StockCodexInstructions) { 'stock' } elseif ($PSBoundParameters.ContainsKey('CodexModelInstructionsFile')) { 'custom' } else { 'reviewed' }
+$baseline = Save-EvaluationModelInstructions -RunRoot $runRoot -Source $CodexModelInstructionsFile -Mode $modelInstructionMode
+$CodexModelInstructionsFile = $baseline.snapshot
 $results = [Collections.Generic.List[object]]::new()
-$configuration = @{targets = $targets; claudeModel = $ClaudeModel; claudeEffort = $ClaudeEffort; codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort}
+$configuration = @{codexInstructionBaseline = $baseline; targets = $targets; claudeModel = $ClaudeModel; claudeEffort = $ClaudeEffort; codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort}
 $runStatus = 'interrupted'
 try {
 foreach ($agentTarget in $targets) {

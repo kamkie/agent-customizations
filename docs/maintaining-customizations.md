@@ -75,7 +75,11 @@ pass. CLI failures and invalid/missing envelopes are execution failures,
 separate from a valid response that fails the behavior or protocol contract.
 A valid empty JSON object still reaches the scorer. Logs and requested/effective
 model metadata remain available after failures; absent effective metadata stays
-unknown. Keep evidence private and remove only your own disposable runs after
+unknown. The Codex instruction baseline records whether
+the run used stock, reviewed, or custom model instructions; non-stock runs pass
+a retained snapshot to the CLI and record its SHA-256, so later source edits do
+not change that run's baseline. Keep the snapshot with its private run evidence.
+Remove only your own disposable runs after
 recording the required evidence. A repeated call never overwrites an earlier run.
 Prompts travel on stdin, not in native command-line arguments. Use `-ClaudeModel`
 for the action suite as well as classification when pinning an evaluation;

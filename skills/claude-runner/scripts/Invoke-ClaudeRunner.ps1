@@ -578,7 +578,8 @@ try {
             # A string pipeline appends a newline. Native byte input (PowerShell
             # 7.4+) preserves decoded text, including its final newline, without
             # putting the prompt in the process command line.
-            $utf8NoBom.GetBytes($PromptText) | & claude @cmdArgs 2>&1 | ForEach-Object $renderLine
+            # Keep the byte array together instead of emitting one object per byte.
+            ,$utf8NoBom.GetBytes($PromptText) | & claude @cmdArgs 2>&1 | ForEach-Object $renderLine
         } else {
             & claude @cmdArgs 2>&1 | ForEach-Object $renderLine
         }

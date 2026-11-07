@@ -39,7 +39,14 @@ try {
         @{
             Name = 'oversized composed Codex AGENTS'
             Path = Join-Path $fixture 'global/shared.md'
-            Mutate = { param($text) $text + ([string][char]0x754c * 7000) }
+            Mutate = {
+                param($text)
+                $source = $text.Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+                $overlay = [IO.File]::ReadAllText((Join-Path $fixture 'global/codex-overlay.md')).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+                $compiledBytes = [Text.Encoding]::UTF8.GetByteCount($source + "`n`n" + $overlay + "`n")
+                $padding = [int][Math]::Ceiling((32769 - $compiledBytes) / 3.0)
+                $source + ([string][char]0x754c * $padding)
+            }
             Expected = 'Compiled Codex AGENTS.md exceeds 32768 UTF-8 bytes'
         },
         @{

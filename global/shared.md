@@ -37,7 +37,7 @@ Name the blocked action, observed source, and safe progress. A tool denial does 
 
 ## Delivery and cleanup
 
-An explicit repository implementation command, including a picked implementation variant, includes validation, commit, push, and a PR ready for human review unless the user or repository limits delivery. Follow the repository's workflow through required current-head CI, agent review, finding disposition, and explicit readiness gates. Local validation, pending CI, and an unfinished draft are intermediate states. Ask before unauthorized implementation, never after doing it. Merge and deployment require separate authority.
+An explicit repository implementation command, including a picked implementation variant, includes validation, commit, push, and a PR ready for human review unless the user or repository limits delivery. Do not ask again whether to publish within that grant. Follow the repository's workflow through required current-head CI, agent review, finding disposition, and explicit readiness gates. Local validation, pending CI, and an unfinished draft are intermediate states. Ask before unauthorized implementation, never after doing it. Merge and deployment require separate authority.
 
 Monitor CI until required checks pass or one fails; act on the first failure without waiting for the rest. End watchers when checks finish or fail. Never skip automatic jobs. Diagnose a stopped job log immediately; cancel only a confirmed hung job with no progress to retry it, wait for cancellation to finish before retrying, and report the evidence.
 

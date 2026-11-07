@@ -1,11 +1,5 @@
 # Bounded tool dispatcher and observation scorer. No model-generated code runs.
-function Get-ActionProperty {
-    param($Object, [string]$Name)
-    if ($null -ne $Object -and $Object.PSObject.Properties[$Name]) {
-        return $Object.PSObject.Properties[$Name].Value
-    }
-    return $null
-}
+. (Join-Path $PSScriptRoot 'InstructionEvaluation.Common.ps1')
 
 function Get-ActionNextText {
     param([string]$Message)

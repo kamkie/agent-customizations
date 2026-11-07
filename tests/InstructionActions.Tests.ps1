@@ -3,7 +3,6 @@ param()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot '../scripts/InstructionActions.Common.ps1')
-. (Join-Path $PSScriptRoot '../scripts/InstructionEvaluation.Common.ps1')
 $cases = (Get-Content (Join-Path $PSScriptRoot 'fixtures/instruction-action-cases.json') -Raw | ConvertFrom-Json).cases
 $expected = Get-Content (Join-Path $PSScriptRoot 'fixtures/instruction-action-expectations.json') -Raw | ConvertFrom-Json
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('instruction-actions-test-' + [guid]::NewGuid().ToString('N'))

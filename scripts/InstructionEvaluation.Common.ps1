@@ -1,7 +1,9 @@
 # Shared evidence transport for the classification and controlled-action evaluators.
-function Get-EvaluationProperty {
-    param($Value, [string]$Name)
-    if ($null -ne $Value -and $Value.PSObject.Properties[$Name]) { return $Value.PSObject.Properties[$Name].Value }
+function Get-ActionProperty {
+    param($Object, [string]$Name)
+    if ($null -ne $Object -and $Object.PSObject.Properties[$Name]) {
+        return $Object.PSObject.Properties[$Name].Value
+    }
     return $null
 }
 
@@ -64,11 +66,11 @@ function Invoke-EvaluationClient {
         $models = foreach ($line in [IO.File]::ReadLines($LogPath)) {
             try {
                 $event = $line | ConvertFrom-Json -ErrorAction Stop
-                $model = Get-EvaluationProperty $event 'model'
+                $model = Get-ActionProperty $event 'model'
                 if ($model) { [string]$model }
-                $messageModel = Get-EvaluationProperty (Get-EvaluationProperty $event 'message') 'model'
+                $messageModel = Get-ActionProperty (Get-ActionProperty $event 'message') 'model'
                 if ($messageModel) { [string]$messageModel }
-                $usage = Get-EvaluationProperty $event 'modelUsage'
+                $usage = Get-ActionProperty $event 'modelUsage'
                 if ($usage) { $usage.PSObject.Properties.Name }
             } catch { }
         }
@@ -91,11 +93,11 @@ function Read-ClaudeEvaluationResponse {
     param([string]$Path)
     $events = @(Get-Content -LiteralPath $Path | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_ | ConvertFrom-Json -ErrorAction Stop })
     if (-not $events.Count -or $null -in $events) { throw 'Claude returned an empty or null envelope.' }
-    $results = @($events | Where-Object { (Get-EvaluationProperty $_ 'type') -eq 'result' })
+    $results = @($events | Where-Object { (Get-ActionProperty $_ 'type') -eq 'result' })
     if ($results.Count -ne 1) { throw 'Claude returned no unique terminal result envelope.' }
     $envelope = $results[0]
-    if ((Get-EvaluationProperty $envelope 'is_error') -eq $true -or (Get-EvaluationProperty $envelope 'subtype') -ne 'success') { throw 'Claude returned an unsuccessful result envelope.' }
-    $structured = Get-EvaluationProperty $envelope 'structured_output'
+    if ((Get-ActionProperty $envelope 'is_error') -eq $true -or (Get-ActionProperty $envelope 'subtype') -ne 'success') { throw 'Claude returned an unsuccessful result envelope.' }
+    $structured = Get-ActionProperty $envelope 'structured_output'
     if ($null -ne $structured) { return $structured }
     if (-not $envelope.PSObject.Properties['result'] -or [string]::IsNullOrWhiteSpace([string]$envelope.result)) { throw 'Claude returned no structured result.' }
     $value = [string]$envelope.result | ConvertFrom-Json -ErrorAction Stop

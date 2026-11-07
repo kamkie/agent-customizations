@@ -30,7 +30,6 @@ if ($CodexModelInstructionsFile) {
 $PSNativeCommandUseErrorActionPreference = $false
 . (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
 . (Join-Path $PSScriptRoot 'InstructionActions.Common.ps1')
-. (Join-Path $PSScriptRoot 'InstructionEvaluation.Common.ps1')
 $repo = Get-CustomizationRepositoryRoot
 $manifest = Get-CustomizationManifest
 if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $null -ne $manifest.targets.codex.PSObject.Properties['modelInstructions']) {

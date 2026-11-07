@@ -102,11 +102,13 @@ function Write-EvaluationSummary {
     $retryUntil = [DateTime]::UtcNow.AddSeconds(5)
     while ($true) {
         try { [IO.File]::Move($temporary, $destination, $true); break }
-        catch [IO.IOException] {
+        catch {
             # Windows readers commonly omit FileShare.Delete. Retry only their
             # sharing/lock conflicts, with a bounded filesystem lock wait.
-            $code = $_.Exception.HResult -band 0xffff
-            if (-not $IsWindows -or $code -notin @(32, 33) -or [DateTime]::UtcNow -ge $retryUntil) { throw }
+            $cause = $_.Exception.GetBaseException()
+            $code = $cause.HResult -band 0xffff
+            if (-not $IsWindows -or ($cause -isnot [IO.IOException] -and $cause -isnot [UnauthorizedAccessException]) -or
+                $code -notin @(5, 32, 33) -or [DateTime]::UtcNow -ge $retryUntil) { throw }
             Start-Sleep -Milliseconds 25
         }
     }

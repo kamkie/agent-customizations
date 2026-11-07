@@ -246,6 +246,34 @@ exit ([int](Get-Content (Join-Path $PSScriptRoot 'exit')))
     $env:PATH = ''
     $output = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId capability-question -OutputDirectory $outputRoot 2>&1)
     if ($LASTEXITCODE -eq 0 -or (Test-Path $outputRoot)) { throw 'Missing client did not fail preflight.' }
+    # With no native clients on PATH, expose only a deterministic Codex mock.
+    # A single-agent case under Target=all must not require the other engine.
+    $selectionDriver = Join-Path $nativeRoot 'selection-driver.ps1'
+    @'
+param($Runner, $Output, $Marker, $CaseName, $SelectionTarget)
+function global:git { $global:LASTEXITCODE = 0 }
+function global:codex {
+    'invoked' | Set-Content -LiteralPath $Marker
+    throw 'selected Codex mock invoked'
+}
+& $Runner -CaseId $CaseName -Target $SelectionTarget -OutputDirectory $Output
+exit $LASTEXITCODE
+'@ | Set-Content $selectionDriver
+    foreach ($selection in @(
+        @('campaign-inventory-only', 'all'),
+        @('capability-question', 'codex')
+    )) {
+        $selectionRoot = Join-Path $nativeRoot ('selection-' + $selection[0])
+        $marker = $selectionRoot + '.invoked'
+        $selected = @(& $pwsh -NoProfile -File $selectionDriver $runner $selectionRoot $marker $selection[0] $selection[1] 2>&1)
+        if (-not (Test-Path $marker) -or ($selected -join ' ') -notmatch 'selected Codex mock invoked' -or
+            ($selected -join ' ') -match 'Required evaluation client is unavailable') { throw 'Preflight required a client outside the selected-case/target intersection.' }
+    }
+    $bothRoot = Join-Path $nativeRoot 'selection-both'
+    $bothMarker = $bothRoot + '.invoked'
+    $both = @(& $pwsh -NoProfile -File $selectionDriver $runner $bothRoot $bothMarker capability-question all 2>&1)
+    if ($LASTEXITCODE -eq 0 -or (Test-Path $bothRoot) -or (Test-Path $bothMarker) -or
+        ($both -join ' ') -notmatch 'Required evaluation client is unavailable: claude') { throw 'A genuinely required missing client did not fail before work.' }
     $env:PATH = $bin + [IO.Path]::PathSeparator + $savedPath
     $samples = @(
         @('null','execution',0), @('not JSON','execution',0),

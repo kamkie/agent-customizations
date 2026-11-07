@@ -77,7 +77,9 @@ if ($CaseId) {
 }
 
 if (-not $ResponseDirectory) {
-    foreach ($client in $requestedTargets) {
+    $requiredClients = @($selectedCases | ForEach-Object { $_.targets } |
+        Where-Object { $_ -in $requestedTargets } | Sort-Object -Unique)
+    foreach ($client in $requiredClients) {
         if (-not (Get-Command $client -ErrorAction SilentlyContinue)) { throw "Required evaluation client is unavailable: $client" }
     }
 }

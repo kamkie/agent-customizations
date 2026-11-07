@@ -3,6 +3,7 @@ param()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot '../scripts/InstructionActions.Common.ps1')
+. (Join-Path $PSScriptRoot '../scripts/InstructionEvaluation.Common.ps1')
 $cases = (Get-Content (Join-Path $PSScriptRoot 'fixtures/instruction-action-cases.json') -Raw | ConvertFrom-Json).cases
 $expected = Get-Content (Join-Path $PSScriptRoot 'fixtures/instruction-action-expectations.json') -Raw | ConvertFrom-Json
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('instruction-actions-test-' + [guid]::NewGuid().ToString('N'))
@@ -400,10 +401,10 @@ exit 0
     Assert-True ((Get-Content (Join-Path $fakeBin 'prompt.txt') -Raw) -match 'controlled tool protocol') 'Action prompt did not travel on stdin.'
     Push-Location $testRoot
     try {
-        $resolvedOutput = Resolve-ActionOutputDirectory 'relative-output'
-        Assert-True ($resolvedOutput -eq (Join-Path $testRoot 'relative-output')) 'Relative output did not use the PowerShell location.'
+        $resolvedOutput = New-EvaluationRunDirectory 'relative-output'
+        Assert-True ($resolvedOutput.StartsWith((Join-Path $testRoot 'relative-output') + [IO.Path]::DirectorySeparatorChar)) 'Relative output did not use the PowerShell location.'
         $rejected = $false
-        try { Resolve-ActionOutputDirectory 'Env:ACTION_TEST_OUTPUT' | Out-Null } catch { $rejected = $true }
+        try { New-EvaluationRunDirectory 'Env:ACTION_TEST_OUTPUT' | Out-Null } catch { $rejected = $true }
         Assert-True $rejected 'Non-filesystem output provider was accepted.'
     } finally { Pop-Location }
     Write-Host "Instruction action dispatcher and observation tests: OK ($assertions assertions)"

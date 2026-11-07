@@ -22,15 +22,6 @@ function New-ActionProtocolException {
     return $exception
 }
 
-function Resolve-ActionOutputDirectory {
-    param([Parameter(Mandatory)][string]$Path)
-    $provider = $null
-    $drive = $null
-    $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path, [ref]$provider, [ref]$drive)
-    if ($provider.Name -ne 'FileSystem') { throw [ArgumentException]::new('Action output requires a filesystem path.') }
-    return [IO.Path]::GetFullPath($resolved)
-}
-
 function Get-ActionFiles {
     param([string]$Workspace)
     $files = @{}

@@ -64,6 +64,7 @@ foreach ($agentTarget in $targets) {
         $results.Add($result)
         Write-EvaluationSummary $runRoot $results.ToArray() 'running' $configuration
         Write-Host "START $agentTarget/$($case.id)"
+        try {
         $workspace = Join-Path $caseRoot 'workspace'
         $null = New-Item -ItemType Directory -Path $workspace -Force
         & git -C $workspace init --quiet
@@ -144,7 +145,6 @@ $currentRequest
             $response | ConvertTo-Json | Set-Content $responsePath
             return $response
         }
-        try {
             $actual = Invoke-InstructionActionCase -Case $case -Workspace $workspace -Responder $responder
             $actual | ConvertTo-Json -Depth 15 | Set-Content (Join-Path $caseRoot 'observations.json')
             $score = Test-InstructionActionResult -Actual $actual -Expected $expectations.($case.id)

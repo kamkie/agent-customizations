@@ -341,6 +341,16 @@ $args | ConvertTo-Json | Set-Content (Join-Path $PSScriptRoot 'argv.json')
 exit 0
 '@ | Set-Content (Join-Path $fakeBin 'native-client.ps1')
     $claudeOutput = Join-Path $testRoot 'claude-model'
+    $setupOutput = Join-Path $testRoot 'setup-failure'
+    try {
+        # The requested client exists, but git is deliberately unavailable.
+        $env:PATH = $fakeBin
+        $setupFailure = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId design-agreement -OutputDirectory $setupOutput 2>&1)
+        $setupExit = $LASTEXITCODE
+    } finally { $env:PATH = $savedPath }
+    $setupRun = @(Get-ChildItem $setupOutput -Directory)[0].FullName
+    $setupSummary = Get-Content (Join-Path $setupRun 'summary.json') -Raw | ConvertFrom-Json
+    Assert-True ($setupExit -ne 0 -and $setupSummary.failed -eq 1 -and $setupSummary.results[0].failureKind -eq 'execution' -and $setupSummary.results[0].status -eq 'failed') 'Setup failure was not retained as a failed case.'
     try {
         $env:PATH = $fakeBin + [IO.Path]::PathSeparator + $savedPath
         $claudeResult = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId design-agreement -ClaudeModel requested-action-model -ClaudeEffort medium -OutputDirectory $claudeOutput 2>&1)

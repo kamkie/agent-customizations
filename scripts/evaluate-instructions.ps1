@@ -25,6 +25,8 @@ param(
     [string]$CodexReasoningEffort,
     # Claude model alias or ID, such as haiku, sonnet, or opus.
     [string]$ClaudeModel,
+    [ValidateSet('low', 'medium', 'high', 'xhigh', 'max')]
+    [string]$ClaudeEffort,
 
     # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
     [switch]$StockCodexInstructions
@@ -39,6 +41,7 @@ if ($CodexModelInstructionsFile) {
     $CodexModelInstructionsFile = $resolvedModelFile.ProviderPath
 }
 . (Join-Path $PSScriptRoot 'AgentCustomization.Common.ps1')
+. (Join-Path $PSScriptRoot 'InstructionEvaluation.Common.ps1')
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $manifest = Get-CustomizationManifest
 if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $null -ne $manifest.targets.codex.PSObject.Properties['modelInstructions']) {
@@ -56,6 +59,7 @@ $expectationDocument = Get-Content -LiteralPath $expectationsPath -Raw | Convert
 $schema = Get-Content -LiteralPath $schemaPath -Raw
 $schemaDocument = $schema | ConvertFrom-Json
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+if ($PSBoundParameters.ContainsKey('CaseId') -and -not $CaseId.Count) { throw 'CaseId was supplied but contains no case names.' }
 $requestedTargets = if ($Target -eq 'all') { @('codex', 'claude') } else { @($Target) }
 $selectedCases = @($caseDocument.cases | Where-Object {
     (-not $CaseId -or $_.id -in $CaseId) -and
@@ -72,17 +76,12 @@ if ($CaseId) {
     }
 }
 
-$temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
-$ownsOutputDirectory = [string]::IsNullOrWhiteSpace($OutputDirectory)
-if ($ownsOutputDirectory) {
-    $OutputDirectory = Join-Path $temporaryRoot ('agent-instruction-eval-' + [guid]::NewGuid().ToString('N'))
+if (-not $ResponseDirectory) {
+    foreach ($client in $requestedTargets) {
+        if (-not (Get-Command $client -ErrorAction SilentlyContinue)) { throw "Required evaluation client is unavailable: $client" }
+    }
 }
-$resolvedOutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
-if ($ownsOutputDirectory -and
-    -not $resolvedOutputDirectory.StartsWith($temporaryRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing to use an automatic evaluation path outside the system temporary directory: $resolvedOutputDirectory"
-}
-$null = New-Item -ItemType Directory -Path $resolvedOutputDirectory -Force
+$resolvedOutputDirectory = New-EvaluationRunDirectory $OutputDirectory
 
 function Write-CompiledInstructions {
     param(
@@ -215,6 +214,7 @@ function Read-AgentResponse {
     Write-CompiledInstructions -AgentTarget $AgentTarget -InstructionSet $Case.instructionSet -Destination $instructionsPath
     $prompt = Get-EvaluationPrompt -Case $Case
     $responsePath = Join-Path $CaseOutputRoot 'response.json'
+    $prompt | Set-Content -LiteralPath (Join-Path $CaseOutputRoot 'prompt.txt')
 
     switch ($AgentTarget) {
         'codex' {
@@ -223,7 +223,7 @@ function Read-AgentResponse {
             }
             $arguments = @(
                 'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config',
-                '--sandbox', 'read-only', '--color', 'never', '--cd', $workspace,
+                '--sandbox', 'read-only', '--color', 'never', '--json', '--cd', $workspace,
                 '--output-schema', $schemaPath, '--output-last-message', $responsePath
             )
             if ($CodexModel) { $arguments += @('--model', $CodexModel) }
@@ -232,41 +232,28 @@ function Read-AgentResponse {
             $arguments += '-'
             # --ignore-rules disables execpolicy .rules files; AGENTS.md remains
             # the project instruction channel under evaluation.
-            $prompt | & codex @arguments | Out-Host
-            if ($LASTEXITCODE -ne 0) {
-                throw "Codex evaluation failed for case '$($Case.id)' with exit code $LASTEXITCODE."
-            }
-            return (Get-Content -LiteralPath $responsePath -Raw | ConvertFrom-Json)
+            Invoke-EvaluationClient -Client codex -Arguments $arguments -Prompt $prompt -Workspace $workspace `
+                -LogPath (Join-Path $CaseOutputRoot 'client.jsonl') -ErrorPath (Join-Path $CaseOutputRoot 'client.stderr.txt') `
+                -MetadataPath (Join-Path $CaseOutputRoot 'client.metadata.json') -Model $CodexModel -Effort $CodexReasoningEffort
+            return Read-EvaluationResponse $responsePath
         }
         'claude' {
             if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
                 throw 'Claude CLI is unavailable.'
             }
-            Push-Location $workspace
-            try {
-                # Claude accepts inline JSON for --json-schema; --tools ''
-                # disables built-in tools. Empty setting sources also prevent
-                # user or repository hooks from contaminating the fresh run.
-                $modelArguments = if ($ClaudeModel) { @('--model', $ClaudeModel) } else { @() }
-                $raw = & claude --print --no-session-persistence --permission-mode dontAsk `
-                    --setting-sources '' --disable-slash-commands --tools '' `
-                    --system-prompt-file $instructionsPath --json-schema $schema `
-                    --output-format json @modelArguments $prompt
-                $claudeExit = $LASTEXITCODE
-            } finally {
-                Pop-Location
-            }
-            if ($claudeExit -ne 0) {
-                throw "Claude evaluation failed for case '$($Case.id)' with exit code $claudeExit."
-            }
-            $envelope = ($raw -join [Environment]::NewLine) | ConvertFrom-Json
-            if ($envelope.PSObject.Properties.Name -contains 'structured_output' -and $envelope.structured_output) {
-                return $envelope.structured_output
-            }
-            if ($envelope.PSObject.Properties.Name -contains 'result') {
-                return ([string]$envelope.result | ConvertFrom-Json)
-            }
-            throw "Claude returned no structured output for case '$($Case.id)'."
+            $arguments = @('--print', '--no-session-persistence', '--permission-mode', 'dontAsk',
+                '--setting-sources', '', '--disable-slash-commands', '--tools', '',
+                '--system-prompt-file', $instructionsPath, '--json-schema', $schema,
+                '--output-format', 'stream-json', '--verbose')
+            if ($ClaudeModel) { $arguments += @('--model', $ClaudeModel) }
+            if ($ClaudeEffort) { $arguments += @('--effort', $ClaudeEffort) }
+            $logPath = Join-Path $CaseOutputRoot 'client.jsonl'
+            Invoke-EvaluationClient -Client claude -Arguments $arguments -Prompt $prompt -Workspace $workspace `
+                -LogPath $logPath -ErrorPath (Join-Path $CaseOutputRoot 'client.stderr.txt') `
+                -MetadataPath (Join-Path $CaseOutputRoot 'client.metadata.json') -Model $ClaudeModel -Effort $ClaudeEffort
+            $value = Read-ClaudeEvaluationResponse $logPath
+            $value | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath $responsePath
+            return $value
         }
     }
 }
@@ -350,35 +337,40 @@ function Compare-ExpectedBehavior {
 }
 
 $results = [Collections.Generic.List[object]]::new()
+$configuration = @{suite = $Suite; targets = $requestedTargets; claudeModel = $ClaudeModel; claudeEffort = $ClaudeEffort; codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort}
+$runStatus = 'interrupted'
 try {
     foreach ($case in $selectedCases) {
         foreach ($agentTarget in @($case.targets | Where-Object { $_ -in $requestedTargets })) {
             $caseOutputRoot = Join-Path (Join-Path $resolvedOutputDirectory $agentTarget) $case.id
             $null = New-Item -ItemType Directory -Path $caseOutputRoot -Force
-            $actual = Read-AgentResponse -AgentTarget $agentTarget -Case $case -CaseOutputRoot $caseOutputRoot
-            $result = Compare-ExpectedBehavior -AgentTarget $agentTarget -Case $case -Actual $actual
+            $result = @{target = $agentTarget; case = $case.id; status = 'running'; passed = $false; failureKind = $null; mismatches = @()}
             $results.Add($result)
+            Write-EvaluationSummary $resolvedOutputDirectory $results.ToArray() 'running' $configuration
+            Write-Host "START $agentTarget/$($case.id)"
+            try {
+                $actual = Read-AgentResponse -AgentTarget $agentTarget -Case $case -CaseOutputRoot $caseOutputRoot
+                if ($null -eq $actual) { throw 'Client returned an empty or null response.' }
+                $score = Compare-ExpectedBehavior -AgentTarget $agentTarget -Case $case -Actual $actual
+                $result.passed = $score.passed
+                $result.mismatches = $score.mismatches
+                $result.actual = $actual
+                $result.failureKind = if ($score.passed) { 'none' } else { 'behavior' }
+                $result.status = 'completed'
+            } catch {
+                $result.failureKind = 'execution'
+                $result.mismatches = @($_.Exception.Message)
+                $result.status = 'failed'
+            }
+            Write-EvaluationSummary $resolvedOutputDirectory $results.ToArray() 'running' $configuration
             $state = if ($result.passed) { 'PASS' } else { 'FAIL' }
             Write-Host "$state $agentTarget/$($case.id)"
             foreach ($mismatch in $result.mismatches) { Write-Host "  $mismatch" }
         }
     }
-
-    $failed = @($results | Where-Object { -not $_.passed })
-    [pscustomobject]@{
-        suite = $Suite
-        targets = $requestedTargets
-        claudeModel = $ClaudeModel
-        codexModel = $CodexModel
-        codexReasoningEffort = $CodexReasoningEffort
-        cases = $results.Count
-        passed = $results.Count - $failed.Count
-        failed = $failed.Count
-        results = @($results)
-    } | ConvertTo-Json -Depth 8
-    if ($failed.Count -gt 0) { exit 1 }
+    $runStatus = 'completed'
 } finally {
-    if ($ownsOutputDirectory -and (Test-Path -LiteralPath $resolvedOutputDirectory -PathType Container)) {
-        Remove-Item -LiteralPath $resolvedOutputDirectory -Recurse -Force
-    }
+    Write-EvaluationSummary $resolvedOutputDirectory $results.ToArray() $runStatus $configuration
 }
+Get-Content -LiteralPath (Join-Path $resolvedOutputDirectory 'summary.json') -Raw
+if (@($results | Where-Object { -not $_.passed }).Count) { exit 1 }

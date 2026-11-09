@@ -314,6 +314,7 @@ try {
         "`$note = 'Start-Process is denied'",
         "cat > notes.md <<'EOF'`nRun the UI with:`nnpm run dev`nEOF",
         "git commit -m @'`nDocument the dev server`n`nIt's started with:`nnpm run dev`n'@",
+        "cat > review.sh <<'EOF' && bash -n review.sh`nclaude -p hello`nEOF",
         'npx tsc --noEmit'
     )) {
         $launchMentionPayload = [ordered]@{

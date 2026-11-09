@@ -126,8 +126,19 @@ function Get-SegmentCommand {
 # True when a command on the line is a shell or an evaluator, so text the line
 # feeds it (a here-document or here-string body) runs as commands.
 function Test-ShellRecipient {
-    param([string]$Line)
-    foreach ($segment in Get-ShellSegments -Text $Line) {
+    param([string]$Line, [int]$Index)
+    # Only the pipeline that receives the text counts: a shell elsewhere on the
+    # line, such as a syntax check after `&&`, does not run it.
+    $before = $Line.Substring(0, $Index)
+    $after = $Line.Substring($Index)
+    $boundaries = [regex]::Matches($before, ';|&&|\|\|')
+    if ($boundaries.Count -gt 0) {
+        $last = $boundaries[$boundaries.Count - 1]
+        $before = $before.Substring($last.Index + $last.Length)
+    }
+    $next = [regex]::Match($after, ';|&&|\|\|')
+    if ($next.Success) { $after = $after.Substring(0, $next.Index) }
+    foreach ($segment in Get-ShellSegments -Text ($before + $after)) {
         $segmentCommand = Get-SegmentCommand -Segment $segment
         if ($segmentCommand -and ($segmentCommand.stem -imatch $shellNames -or $segmentCommand.stem -imatch $evaluatorNames)) { return $true }
     }
@@ -153,8 +164,9 @@ function Get-InspectableText {
                 # Rejoin the text around the body and examine that line again: it
                 # may open another here-string.
                 $joined = $line.Substring(0, $hereString.Index) + "'here-string'" + $lines[$end].Substring(2)
-                if (Test-ShellRecipient -Line $joined) {
-                    $shellBodies.Add((@($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"))
+                $body = @($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"
+                if (Test-ShellRecipient -Line $joined -Index $hereString.Index) {
+                    $shellBodies.Add($body)
                 }
                 $lines[$end] = $joined
                 $i = $end - 1
@@ -162,16 +174,15 @@ function Get-InspectableText {
             }
         }
         $kept.Add($line)
-        $feedsShell = $null
         foreach ($hereDocument in [regex]::Matches($line, '(?<!<)<<(?!<)[-~]?\s*([''"]?)([A-Za-z_]\w*)\1')) {
             $delimiter = $hereDocument.Groups[2].Value
             $end = $i + 1
             while ($end -lt $lines.Count -and $lines[$end].Trim() -cne $delimiter) { $end++ }
             # Without its terminator this is not a here-document: keep the lines.
             if ($end -ge $lines.Count) { break }
-            if ($null -eq $feedsShell) { $feedsShell = Test-ShellRecipient -Line $line }
-            if ($feedsShell) {
-                $shellBodies.Add((@($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"))
+            $body = @($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"
+            if (Test-ShellRecipient -Line $line -Index $hereDocument.Index) {
+                $shellBodies.Add($body)
             }
             $i = $end
         }

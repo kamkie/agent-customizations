@@ -21,6 +21,7 @@ $pr = [int]'<requested-pr-number>'
 ```
 
 - Resolve `$claudeRunnerSkillDirectory` to this `SKILL.md` file's directory.
+- For large or multiline tasks, use `-PromptFile <path>` with PowerShell 7.4 or newer; file text travels through UTF-8 stdin instead of the native command line. `-ReviewPr` keeps its `/review` argument transport.
 - To continue, append `-Resume "<session-id>"`; if that id is unavailable for the same PR, append `-FromPr $pr`.
 - Keep normal permissions; bypass only with explicit authorization. `-ReviewPr` is read-only.
 - Never pass `-MaxBudgetUsd` or `-MaxTurns`. The calling agent must not estimate or impose budget or turn caps on Claude runs.

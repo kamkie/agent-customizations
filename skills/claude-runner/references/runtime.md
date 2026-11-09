@@ -25,10 +25,11 @@
 - Use `--output-format stream-json --verbose --include-partial-messages` with `-p`; the wrapper supplies these controls.
 - Avoid short timeouts for paid runs. Use the `managed-jobs` progress contract: process liveness, native tool events and completed result artifacts are separate evidence. Keep required child work awaited and inspect the native interruption timeline before deciding which layer caused a failure.
 - Never pass `-MaxBudgetUsd` or `-MaxTurns`. Codex must not estimate or impose budget or turn caps on Claude runs.
-- Use `-PromptFile` for multiline, XML, or shell-hostile prompts. Keep temporary prompt files outside the repository.
+- Use `-PromptFile` for large, multiline, XML, or shell-hostile prompts (PowerShell 7.4+). The wrapper sends decoded file text as UTF-8 stdin with no added newline; mixed line endings and any existing trailing newline are preserved. The file must contain task text. Keep temporary prompt files outside the repository.
 - Do not use `-Bare` for cross-reviews or runs that need `CLAUDE.md`, skills, plugins, hooks, or project settings.
 - Pass model, effort, resume source, prompt file, and PR number as typed runtime controls, not task prose or `-ClaudeArgs`.
 - Preserve task text except routing controls. Text beginning with `/` remains Claude task text.
+- File prompts use Claude's `--input-format text`; do not override that through `-ClaudeArgs`. `-Prompt` and `-ReviewPr` retain positional prompt arguments, including `/review`, so existing slash-command invocation stays unchanged. For a built-in PR review use `-ReviewPr`, not a prompt file.
 - If Claude fails, report the failure and resume command or diagnostic-log path; do not silently replace the delegated run with Codex work.
 
 ## Permissions
@@ -125,4 +126,4 @@ The deterministic mock harness performs no paid work:
 pwsh ./skills/claude-runner/tests/Invoke-ClaudeRunner.Tests.ps1
 ```
 
-It covers default and bypass permissions, the read-only review profile, rejection of bare or cross-PR recovery reviews, diagnostic placement, mutation-free dry-run/self-test, typed model and effort controls, streaming, budgets, interrupted resume, and PR-linked recovery.
+It covers default and bypass permissions, the read-only review profile, rejection of bare or cross-PR recovery reviews, diagnostic placement, mutation-free dry-run/self-test, typed model and effort controls, streaming, budgets, interrupted resume, and PR-linked recovery. On Windows, a native-process mock separately captures stdin and arguments for synthetic Unicode prompts larger than 40 KiB, checking exact text, mixed line endings, trailing newlines, literal paths, summary redaction, stderr, and exit status. This proves wrapper transport, not how a model interprets the task.

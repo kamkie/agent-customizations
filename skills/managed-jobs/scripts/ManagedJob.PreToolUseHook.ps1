@@ -36,10 +36,11 @@ function Get-SubstitutionEnd {
 # Quotes group a token; `;`, `|`, `&`, `(`, `{`, and newlines end a segment.
 # Each token records whether it was quoted so a shell command string can be
 # inspected as a nested command line, and whether any part was double-quoted,
-# where a shell still runs `$(...)` substitutions. -LiteralHash reads `#` as
-# plain text, for cmd.exe, which has no `#` comments.
+# where a shell still runs `$(...)` substitutions. -CmdSyntax reads `#` and
+# `$(` as plain text, for cmd.exe, which has neither comments nor substitutions
+# of that form.
 function Get-ShellSegments {
-    param([string]$Text, [switch]$LiteralHash)
+    param([string]$Text, [switch]$CmdSyntax)
     $segments = [Collections.Generic.List[object]]::new()
     $tokens = [Collections.Generic.List[object]]::new()
     $buffer = [Text.StringBuilder]::new()
@@ -57,7 +58,7 @@ function Get-ShellSegments {
         if (-not $atEnd -and $quote -ne [char]0) {
             if ($ch -eq $quote) {
                 $quote = [char]0
-            } elseif ($quote -eq '"' -and $ch -eq '$' -and $i + 1 -lt $chars.Length -and $chars[$i + 1] -eq '(') {
+            } elseif ($expandable -and $quote -eq '"' -and $ch -eq '$' -and $i + 1 -lt $chars.Length -and $chars[$i + 1] -eq '(') {
                 # Keep a substitution whole, with its own quotes: they do not
                 # close the word's quote.
                 $close = [math]::Min((Get-SubstitutionEnd -Text $Text -Start ($i + 2)), $chars.Length - 1)
@@ -77,7 +78,7 @@ function Get-ShellSegments {
         }
         # A `#` that starts a word begins a comment: skip to the end of the line so
         # an apostrophe in the comment cannot open a quote over the next command.
-        if (-not $atEnd -and -not $LiteralHash -and $ch -eq '#' -and $buffer.Length -eq 0 -and -not $quoted) {
+        if (-not $atEnd -and -not $CmdSyntax -and $ch -eq '#' -and $buffer.Length -eq 0 -and -not $quoted) {
             while ($i + 1 -lt $chars.Length -and $chars[$i + 1] -ne "`n" -and $chars[$i + 1] -ne "`r") { $i++ }
             continue
         }
@@ -85,7 +86,7 @@ function Get-ShellSegments {
             $quote = $ch
             if (-not $quoted) { $unquotedPrefix = $buffer.ToString() }
             $quoted = $true
-            if ($ch -eq '"') { $expandable = $true }
+            if ($ch -eq '"' -and -not $CmdSyntax) { $expandable = $true }
             continue
         }
         $isSeparator = $atEnd -or ";|&(){}`r`n".IndexOf($ch) -ge 0
@@ -203,7 +204,7 @@ function Get-PipelineText {
 # True when the word is the flag after which a shell takes a command string.
 function Test-CommandFlag {
     param([string]$Stem, [string]$Word)
-    return ($Word -imatch '^(?:-c|-Command|/c|/k)$' -or ($Stem -imatch '^(?:bash|sh|zsh)$' -and $Word -cmatch '^-[A-Za-z]*c$'))
+    return ($Word -imatch '^(?:-c|-Command|/c|/k)$' -or ($Stem -imatch '^(?:bash|sh|zsh)$' -and $Word -cmatch '^-[A-Za-z]*c[A-Za-z]*$'))
 }
 
 # True when a shell or evaluator takes its program from standard input or the
@@ -222,8 +223,9 @@ function Test-ReadsProgramFromInput {
             if ($word -match '^\d*[<>]+$') { $i++ }
             continue
         }
-        # A script file or a command string: input is data.
-        if ($Arguments[$i].quoted -or $word -notmatch '^[-+]') { return $false }
+        # A script file or a command string: input is data, unless the file
+        # named is standard input itself.
+        if ($Arguments[$i].quoted -or $word -notmatch '^[-+]') { return ($word -match '^/(?:dev/stdin|dev/fd/0|proc/self/fd/0)$') }
         if ($posix) {
             if ($word -cmatch '^-[A-Za-z]*c[A-Za-z]*$') { return $false }
             if ($word -cmatch '^-[A-Za-z]*s[A-Za-z]*$') { return $true }
@@ -415,7 +417,7 @@ function Get-CommandTrigger {
     }
     foreach ($commandText in $nested) {
         # cmd.exe has no `#` comments, so `#` must not hide the rest of its line.
-        $inner = Get-LaunchTrigger -Text $commandText -Depth ($Depth + 1) -LiteralHash:($Stem -ieq 'cmd')
+        $inner = Get-LaunchTrigger -Text $commandText -Depth ($Depth + 1) -CmdSyntax:($Stem -ieq 'cmd')
         if ($inner) { return $inner }
     }
     # A background flag counts as an argument of a command, not as text handed
@@ -434,10 +436,10 @@ function Get-CommandTrigger {
 # double-quoted word. Text that only mentions a launch (a search pattern, a
 # commit message, a file body, a path) is not one.
 function Get-LaunchTrigger {
-    param([string]$Text, [int]$Depth = 0, [switch]$LiteralHash)
+    param([string]$Text, [int]$Depth = 0, [switch]$CmdSyntax)
     if ($Depth -gt 3 -or [string]::IsNullOrWhiteSpace($Text)) { return $null }
     $source = Get-InspectableText -Text $Text
-    foreach ($segment in Get-ShellSegments -Text $source.text -LiteralHash:$LiteralHash) {
+    foreach ($segment in Get-ShellSegments -Text $source.text -CmdSyntax:$CmdSyntax) {
         $segmentCommand = Get-SegmentCommand -Segment $segment
         if ($segmentCommand) {
             $trigger = Get-CommandTrigger -Stem $segmentCommand.stem -Arguments $segmentCommand.arguments -Depth $Depth

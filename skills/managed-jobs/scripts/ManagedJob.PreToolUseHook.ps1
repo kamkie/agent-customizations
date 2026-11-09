@@ -168,22 +168,38 @@ function Get-SegmentCommand {
     }
 }
 
+# The pipeline around position $Index of a line: the text between the nearest
+# `;`, `&&`, or `||` on each side, ignoring those inside quotes.
+function Get-PipelineText {
+    param([string]$Line, [int]$Index)
+    $start = 0
+    $end = $Line.Length
+    $quote = [char]0
+    for ($i = 0; $i -lt $Line.Length; $i++) {
+        $ch = $Line[$i]
+        if ($quote -ne [char]0) {
+            if ($ch -eq $quote) { $quote = [char]0 }
+            continue
+        }
+        if ($ch -eq '"' -or $ch -eq "'") { $quote = $ch; continue }
+        $width = if ($ch -eq ';') { 1 }
+            elseif (($ch -eq '&' -or $ch -eq '|') -and $i + 1 -lt $Line.Length -and $Line[$i + 1] -eq $ch) { 2 }
+            else { 0 }
+        if ($width -eq 0) { continue }
+        if ($i -ge $Index) { $end = $i; break }
+        $start = $i + $width
+        $i += $width - 1
+    }
+    return $Line.Substring($start, $end - $start)
+}
+
 # True when a command on the line is a shell or an evaluator, so text the line
 # feeds it (a here-document or here-string body) runs as commands.
 function Test-ShellRecipient {
     param([string]$Line, [int]$Index)
     # Only the pipeline that receives the text counts: a shell elsewhere on the
     # line, such as a syntax check after `&&`, does not run it.
-    $before = $Line.Substring(0, $Index)
-    $after = $Line.Substring($Index)
-    $boundaries = [regex]::Matches($before, ';|&&|\|\|')
-    if ($boundaries.Count -gt 0) {
-        $last = $boundaries[$boundaries.Count - 1]
-        $before = $before.Substring($last.Index + $last.Length)
-    }
-    $next = [regex]::Match($after, ';|&&|\|\|')
-    if ($next.Success) { $after = $after.Substring(0, $next.Index) }
-    foreach ($segment in Get-ShellSegments -Text ($before + $after)) {
+    foreach ($segment in Get-ShellSegments -Text (Get-PipelineText -Line $Line -Index $Index)) {
         $segmentCommand = Get-SegmentCommand -Segment $segment
         if ($segmentCommand -and ($segmentCommand.stem -imatch $shellNames -or $segmentCommand.stem -imatch $evaluatorNames)) { return $true }
     }

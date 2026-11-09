@@ -342,6 +342,7 @@ try {
         @{ command = 'wt.exe -w 0 new-tab pwsh'; trigger = 'wt new-tab' },
         @{ command = 'node cli.mjs task --background'; trigger = '--background' },
         @{ command = "bash <<'EOF'`nnpm run dev`nEOF"; trigger = 'npm run dev' },
+        @{ command = "bash -s -- 'a;b' 'c&&d' <<'EOF'`nnpm run dev`nEOF"; trigger = 'npm run dev' },
         @{ command = "cat > notes.md <<'EOF'`ntext`nEOF`nnpm run dev"; trigger = 'npm run dev' },
         @{ command = "# don't wait for it`nStart-Process notepad"; trigger = 'Start-Process' },
         @{ command = 'cmd /c "echo # starting review & claude -p hello"'; trigger = 'claude -p' },

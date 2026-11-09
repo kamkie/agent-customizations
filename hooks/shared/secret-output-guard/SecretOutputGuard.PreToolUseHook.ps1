@@ -980,7 +980,10 @@ function Get-CommandFinding {
             $finding = Get-TextFinding -Text $invocation.command -Dialect $dialect -Depth ($Depth + 1)
             if ($finding) { return $finding }
         }
-        # A shell also takes its script from a here-document or a here-string.
+        # A shell with no command string and no script file reads its program
+        # from standard input: a here-document or a here-string. Otherwise that
+        # input is data for the program.
+        if (-not $invocation.readsStdin) { return $null }
         $scripts = [Collections.Generic.List[string]]::new()
         $scripts.AddRange([string[]]@($command.heredocs))
         for ($i = 0; $i -lt $command.words.Count; $i++) {

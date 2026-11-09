@@ -156,6 +156,8 @@ Test-Cases -Tool 'Bash' -Expected 'kubectl' -Commands @(
     "kubectl get secret app \`n  -o yaml",
     "kubectl get secret app -o yaml |`n  cat",
     "bash <<'EOF'`nkubectl get secret app -o yaml`nEOF",
+    "bash -s -- arg <<'EOF'`nkubectl get secret app -o yaml`nEOF",
+    "bash -x <<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "cat <<EOF`nnote`nEOF`nkubectl get secret app -o yaml",
     # PowerShell text reaching a shell tool that is not named PowerShell.
     "kubectl get secret app ```n  -o yaml"
@@ -301,6 +303,8 @@ watch -n 5 "kubectl get secret app"
 watch -n 5 "kubectl get secret app -o json | sha256sum"
 sudo "/opt/company tools/kubectl" get secret app
 cat <<< "kubectl get secret app -o yaml"
+bash -c 'cat' <<< 'kubectl get secret app -o yaml'
+bash notes.sh <<< 'kubectl get secret app -o yaml'
 sudo --user root kubectl get secret app
 sudo --user root grep -rn "kubectl get secret app -o yaml" docs/
 echo ${NOTE:-kubectl get secret app -o yaml}
@@ -352,6 +356,8 @@ Test-Cases -Tool 'Bash' -Expected $null -Commands @(
     "gh pr create --title guard --body `"`$(cat <<'EOF'`naz keyvault secret show --name x`nglab api projects/1/variables`nEOF`n)`"",
     "cat > notes.md <<EOF`nkubectl get secret app -o yaml`nEOF",
     "cat <<EOF | grep kubectl`nkubectl get secret app -o yaml`nEOF",
+    "bash -c 'cat' <<EOF`nkubectl get secret app -o yaml`nEOF",
+    "bash notes.sh <<EOF`nkubectl get secret app -o yaml`nEOF",
     "# note`n# kubectl get secret app -o yaml`ngit status"
 )
 Test-Cases -Tool 'PowerShell' -Expected $null -Commands (Split-Cases @'

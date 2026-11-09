@@ -257,13 +257,14 @@ function Get-CommandTrigger {
                 if ($words[$i] -ieq 'run' -and $words[$i + 1] -match '^dev\b') { return "$Stem run $($words[$i + 1])" }
             }
         }
-        # A package runner runs the tool named in its arguments. Inspect the first
-        # tool that can launch, once, so a long argument list stays linear.
-        for ($i = 0; $i -lt $Arguments.Count; $i++) {
+        # A package runner runs the tool named in its arguments, which may be
+        # another package runner. Inspect the first tool that can launch, once,
+        # so a long argument list stays linear.
+        for ($i = 0; $i -lt $Arguments.Count -and $Depth -lt 3; $i++) {
             if ($Arguments[$i].quoted) { continue }
             $tool = $words[$i] -replace '(?i)\.(?:exe|cmd|bat|ps1)$', ''
-            if ($tool -inotmatch '^(?:vite|webpack|tsc|claude|dotnet|gradlew|wt)$' -and $tool -inotmatch $shellNames) { continue }
-            $inner = Get-CommandTrigger -Stem $tool -Arguments @($Arguments | Select-Object -Skip ($i + 1)) -Depth $Depth
+            if ($tool -inotmatch '^(?:vite|webpack|tsc|claude|dotnet|gradlew|wt|npm|pnpm|yarn|npx|bunx|corepack)$' -and $tool -inotmatch $shellNames) { continue }
+            $inner = Get-CommandTrigger -Stem $tool -Arguments @($Arguments | Select-Object -Skip ($i + 1)) -Depth ($Depth + 1)
             if ($inner) { return $inner }
             break
         }

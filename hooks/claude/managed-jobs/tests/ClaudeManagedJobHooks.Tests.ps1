@@ -337,6 +337,8 @@ try {
         @{ command = 'while true; do dotnet watch run; done'; trigger = 'dotnet watch' },
         @{ command = './gradlew bootRun'; trigger = 'gradlew bootRun' },
         @{ command = 'npx tsc --watch'; trigger = 'tsc --watch' },
+        @{ command = 'corepack pnpm dev'; trigger = 'pnpm dev' },
+        @{ command = 'npx npm run dev'; trigger = 'npm run dev' },
         @{ command = 'wt.exe -w 0 new-tab pwsh'; trigger = 'wt new-tab' },
         @{ command = 'node cli.mjs task --background'; trigger = '--background' },
         @{ command = "bash <<'EOF'`nnpm run dev`nEOF"; trigger = 'npm run dev' },

@@ -31,6 +31,59 @@ try {
     $pluginManifestPath = Join-Path $fixture 'plugins/claude/session-cost/.claude-plugin/plugin.json'
     $cases = @(
         @{
+            Name = 'multibyte oversized Codex AGENTS source'
+            Path = Join-Path $fixture 'AGENTS.md'
+            Mutate = { param($text) [string][char]0x754c * 11000 }
+            Expected = 'Codex AGENTS source exceeds 32768 UTF-8 bytes: AGENTS.md'
+        },
+        @{
+            Name = 'oversized composed Codex AGENTS'
+            Path = Join-Path $fixture 'global/shared.md'
+            Mutate = {
+                param($text)
+                $source = $text.Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+                $overlay = [IO.File]::ReadAllText((Join-Path $fixture 'global/codex-overlay.md')).Replace("`r`n", "`n").TrimEnd([char[]]"`r`n")
+                $compiledBytes = [Text.Encoding]::UTF8.GetByteCount($source + "`n`n" + $overlay + "`n")
+                $padding = [int][Math]::Ceiling((32769 - $compiledBytes) / 3.0)
+                $source + ([string][char]0x754c * $padding)
+            }
+            Expected = 'Compiled Codex AGENTS.md exceeds 32768 UTF-8 bytes'
+        },
+        @{
+            Name = 'missing instruction source'
+            Path = $manifestPath
+            Mutate = {
+                param($text)
+                $manifest = $text | ConvertFrom-Json
+                $manifest.targets.codex.instructions.sources = @('global/absent.md', 'global/codex-overlay.md')
+                $manifest | ConvertTo-Json -Depth 20
+            }
+            Expected = "Target 'codex' instruction source does not exist: global/absent.md"
+        },
+        @{
+            Name = 'missing final composed section'
+            Path = $manifestPath
+            Mutate = {
+                param($text)
+                $manifest = $text | ConvertFrom-Json
+                $manifest.targets.codex.instructions.sources = @('global/shared.md')
+                $manifest | ConvertTo-Json -Depth 20
+            }
+            Expected = 'Compiled Codex AGENTS.md is missing its complete final Subagents section'
+        },
+        @{
+            Name = 'truncated final source section'
+            Path = Join-Path $fixture 'global/codex-overlay.md'
+            Mutate = { param($text) $text -replace '(?s)## Subagents.*', '## Subagents' }
+            Expected = 'Compiled Codex AGENTS.md is missing its complete final Subagents section'
+        },
+        @{
+            Name = 'noncanonical root Claude import'
+            Path = Join-Path $fixture 'CLAUDE.md'
+            Mutate = { param($text) '@README.md' }
+            Expected = 'Root CLAUDE.md must contain only @AGENTS.md so AGENTS.md remains canonical'
+        },
+        @{
             Name = 'plugin manifest name mismatch'
             Path = $pluginManifestPath
             Mutate = { param($text) $text -replace '"name": "session-cost"', '"name": "other-name"' }

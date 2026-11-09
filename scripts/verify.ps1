@@ -66,7 +66,7 @@ foreach ($targetName in $targetNames) {
             $errors.Add("Target '$targetName' instructions have no destination")
         }
         $sourcesProperty = $instructions.PSObject.Properties['sources']
-        $instructionSources = if ($sourcesProperty) { @($sourcesProperty.Value) } else { @() }
+        $instructionSources = @(if ($sourcesProperty) { $sourcesProperty.Value })
         if ($instructionSources.Count -eq 0) {
             $errors.Add("Target '$targetName' instructions have no sources")
         }
@@ -182,6 +182,35 @@ foreach ($targetName in $targetNames) {
             }
         }
     }
+}
+
+$codexDiscoveryLimit = 32768
+$codexInstructionBytes = $null
+# Codex's default discovery budget applies to AGENTS.md, not Claude imports or
+# model instructions. Check UTF-8 bytes, including multibyte text, before use.
+foreach ($source in @('AGENTS.md') + @($manifest.targets.codex.instructions.sources)) {
+    $path = Join-Path $repositoryRoot $source
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        if ([IO.File]::ReadAllBytes($path).Length -gt $codexDiscoveryLimit) {
+            $errors.Add("Codex AGENTS source exceeds $codexDiscoveryLimit UTF-8 bytes: $source")
+        }
+    }
+}
+try {
+    $compiled = Get-CustomizationInstructionContent -Target $manifest.targets.codex
+    $codexInstructionBytes = [Text.Encoding]::UTF8.GetByteCount($compiled)
+    if ($codexInstructionBytes -gt $codexDiscoveryLimit) {
+        $errors.Add("Compiled Codex AGENTS.md exceeds $codexDiscoveryLimit UTF-8 bytes: $codexInstructionBytes")
+    }
+    # This tail belongs to the final Codex overlay. Detect missing/reordered
+    # source entries and truncated source/output rather than counting keywords.
+    $finalSource = [IO.File]::ReadAllText((Join-Path $repositoryRoot 'global/codex-overlay.md')).Replace("`r`n", "`n").TrimEnd()
+    if ($finalSource -notmatch '(?s)\n## Subagents\n\n.+inherit the conversation\.$' -or
+        -not $compiled.TrimEnd().EndsWith($finalSource, [StringComparison]::Ordinal)) {
+        $errors.Add('Compiled Codex AGENTS.md is missing its complete final Subagents section')
+    }
+} catch {
+    $errors.Add("Cannot compile Codex AGENTS.md: $($_.Exception.Message)")
 }
 
 $actualSkills = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'skills') -Directory -Force |
@@ -318,5 +347,6 @@ if ($errors.Count -gt 0) {
     skills = $declaredSkills.Count
     plugins = $declaredPlugins.Count
     managedSourceFiles = $managedFiles.Count
+    codexInstructionBytes = $codexInstructionBytes
     result = 'Valid'
 } | ConvertTo-Json -Depth 4

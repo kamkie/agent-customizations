@@ -347,7 +347,10 @@ try {
         @{ command = 'cmd /c "echo # starting review & claude -p hello"'; trigger = 'claude -p' },
         @{ command = "bash <<< 'claude -p hello'"; trigger = 'claude -p' },
         @{ command = 'echo "$(claude -p hello)"'; trigger = 'claude -p' },
-        @{ command = "cat > review.txt <<EOF`n`$(claude -p hello)`nEOF"; trigger = 'claude -p' }
+        @{ command = "cat > review.txt <<EOF`n`$(claude -p hello)`nEOF"; trigger = 'claude -p' },
+        @{ command = "echo `"`$(printf ')'; claude -p hello)`""; trigger = 'claude -p' },
+        @{ command = "echo `"`$(printf `")`"; claude -p hello)`""; trigger = 'claude -p' },
+        @{ command = "cat > review.txt <<EOF`n`$(printf ')'; claude -p hello)`nEOF"; trigger = 'claude -p' }
     )) {
         $launchPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

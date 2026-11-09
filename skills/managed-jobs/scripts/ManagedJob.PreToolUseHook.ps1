@@ -2,6 +2,36 @@ param([string]$ManagedHookId)
 
 $ErrorActionPreference = 'Stop'
 
+# The index of the `)` that closes a `$(` whose content starts at $Start, or
+# the text length when it is not closed. Parentheses inside quotes or after a
+# backslash do not count.
+function Get-SubstitutionEnd {
+    param([string]$Text, [int]$Start)
+    $depth = 1
+    $quote = [char]0
+    for ($i = $Start; $i -lt $Text.Length; $i++) {
+        $ch = $Text[$i]
+        if ($quote -ne [char]0) {
+            if ($ch -eq $quote) {
+                $quote = [char]0
+            } elseif ($quote -eq '"' -and $ch -eq '\') {
+                $i++
+            } elseif ($quote -eq '"' -and $ch -eq '$' -and $i + 1 -lt $Text.Length -and $Text[$i + 1] -eq '(') {
+                $i = Get-SubstitutionEnd -Text $Text -Start ($i + 2)
+            }
+            continue
+        }
+        if ($ch -eq '\') { $i++; continue }
+        if ($ch -eq '"' -or $ch -eq "'") { $quote = $ch; continue }
+        if ($ch -eq '(') { $depth++ }
+        elseif ($ch -eq ')') {
+            $depth--
+            if ($depth -eq 0) { return $i }
+        }
+    }
+    return $Text.Length
+}
+
 # Split a command line into shell segments and each segment into tokens.
 # Quotes group a token; `;`, `|`, `&`, `(`, `{`, and newlines end a segment.
 # Each token records whether it was quoted so a shell command string can be
@@ -25,7 +55,17 @@ function Get-ShellSegments {
         $atEnd = $i -eq $chars.Length
         $ch = if ($atEnd) { [char]0 } else { $chars[$i] }
         if (-not $atEnd -and $quote -ne [char]0) {
-            if ($ch -eq $quote) { $quote = [char]0 } else { $null = $buffer.Append($ch) }
+            if ($ch -eq $quote) {
+                $quote = [char]0
+            } elseif ($quote -eq '"' -and $ch -eq '$' -and $i + 1 -lt $chars.Length -and $chars[$i + 1] -eq '(') {
+                # Keep a substitution whole, with its own quotes: they do not
+                # close the word's quote.
+                $close = [math]::Min((Get-SubstitutionEnd -Text $Text -Start ($i + 2)), $chars.Length - 1)
+                $null = $buffer.Append($Text, $i, $close - $i + 1)
+                $i = $close
+            } else {
+                $null = $buffer.Append($ch)
+            }
             continue
         }
         # A backslash (Bash) or backtick (PowerShell) before a line break continues
@@ -157,16 +197,9 @@ function Get-Substitutions {
     $found = [Collections.Generic.List[string]]::new()
     $start = $Text.IndexOf('$(')
     while ($start -ge 0) {
-        $depth = 1
-        $end = $start + 2
-        while ($end -lt $Text.Length -and $depth -gt 0) {
-            if ($Text[$end] -eq '(') { $depth++ } elseif ($Text[$end] -eq ')') { $depth-- }
-            $end++
-        }
-        $length = $end - $start - 2
-        if ($depth -eq 0) { $length-- }
-        $found.Add($Text.Substring($start + 2, $length))
-        $start = if ($end -lt $Text.Length) { $Text.IndexOf('$(', $end) } else { -1 }
+        $end = Get-SubstitutionEnd -Text $Text -Start ($start + 2)
+        $found.Add($Text.Substring($start + 2, $end - $start - 2))
+        $start = if ($end + 1 -lt $Text.Length) { $Text.IndexOf('$(', $end + 1) } else { -1 }
     }
     if ($Backticks) {
         foreach ($pair in [regex]::Matches($Text, '`([^`]+)`')) { $found.Add($pair.Groups[1].Value) }

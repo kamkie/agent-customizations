@@ -119,6 +119,10 @@ timeout --signal KILL 30 kubectl get secret app -o yaml
 time -p kubectl get secret app -o yaml
 watch -n 5 "kubectl get secret app -o yaml"
 watch sudo "kubectl get secret app -o yaml"
+watch -x bash -c 'kubectl get secret app -o yaml'
+watch --exec kubectl get secret app -o yaml
+watch -n 5 -x sh -c 'kubectl get secret app -o yaml'
+watch -xn 5 bash -c 'kubectl get secret app -o yaml'
 watch -n 5 kubectl get secret app -o jsonpath='{.data.password}'
 busybox sh -c 'kubectl get secret app -o yaml'
 cmd //c "kubectl get secret app -o yaml"
@@ -311,6 +315,8 @@ time kubectl get secret app
 watch -n 5 "kubectl get secret app"
 watch -n 5 "kubectl get secret app -o json | sha256sum"
 watch -n 5 kubectl get secret app
+watch -x bash -c 'kubectl get secret app'
+watch -x bash -c 'kubectl get secret app -o json | sha256sum'
 echo $'kubectl get secret app -o yaml'
 sudo "/opt/company tools/kubectl" get secret app
 cat <<< "kubectl get secret app -o yaml"

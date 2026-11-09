@@ -861,11 +861,12 @@ function Test-PipedIntoKeysFilter {
 
 # Index of the word that is the executable: after leading assignments, shell
 # keywords, and wrapper commands with their options. Sets
-# $script:ExecutableWrapper to the wrapper command that runs it, if any.
+# $script:ExecutableShellLine when the words from that index on are handed to a
+# shell as one command line.
 function Get-ExecutableIndex {
     param([object[]]$Words)
     $index = 0
-    $script:ExecutableWrapper = $null
+    $script:ExecutableShellLine = $false
     while ($index -lt $Words.Count) {
         $word = $Words[$index]
         $text = [string]$word.text
@@ -885,22 +886,27 @@ function Get-ExecutableIndex {
         $name = Get-CommandBaseName -Text $text
         if ($script:WrapperCommands.ContainsKey($name)) {
             $valueFlags = $script:WrapperCommands[$name]
-            $script:ExecutableWrapper = $name
+            $watchExec = $false
             $index++
             while ($index -lt $Words.Count) {
                 $argument = [string]$Words[$index].text
+                if ($name -eq 'watch' -and $argument -cmatch '^(?:--exec|-[A-Za-z]*x[A-Za-z]*)$') { $watchExec = $true }
                 if ($argument -ceq '--') { $index++; break }
                 if ($argument -cmatch '^-') {
                     $index += if ($valueFlags -ccontains $argument) { 2 } else { 1 }
                     continue
                 }
                 if ([string]$Words[$index].bare -cmatch '^[A-Za-z_][A-Za-z0-9_]*=') { $index++; continue }
-                if ($name -in @('timeout', 'nice') -and $argument -cmatch '^\d+(?:\.\d+)?[smhd]?$') { $index++; continue }
+                if ($name -in @('timeout', 'nice', 'watch') -and $argument -cmatch '^\d+(?:\.\d+)?[smhd]?$') { $index++; continue }
                 break
             }
             # watch joins its remaining words and hands them to a shell, so they
-            # are read as one command line rather than as an argument vector.
-            if ($name -eq 'watch') { return $index }
+            # are read as one command line. With -x or --exec it runs them as an
+            # argument vector, like the other wrappers.
+            if ($name -eq 'watch' -and -not $watchExec) {
+                $script:ExecutableShellLine = $true
+                return $index
+            }
             continue
         }
         break
@@ -982,9 +988,9 @@ function Get-CommandFinding {
     $command = $Line[$Index]
     $words = Get-ArgumentWords -Words $command.words
     $start = Get-ExecutableIndex -Words $words
-    $wrapper = $script:ExecutableWrapper
+    $shellLine = $script:ExecutableShellLine
     if ($start -ge $words.Count) { return $null }
-    if ($wrapper -eq 'watch') {
+    if ($shellLine) {
         # Other wrappers run an argument vector, where a quoted word is a path.
         $joined = (@($words | Select-Object -Skip $start) | ForEach-Object { [string]$_.text }) -join ' '
         return Get-TextFinding -Text $joined -Dialect 'posix' -Depth ($Depth + 1)

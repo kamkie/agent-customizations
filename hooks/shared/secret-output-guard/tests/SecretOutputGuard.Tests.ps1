@@ -44,6 +44,8 @@ kubectl -n prod get secret app -ojson
 kubectl --context dev get secret app --output=yaml
 kubectl get secret/app -o yaml
 kubectl get secrets,configmaps -o yaml
+kubectl get configmap/app secret/app -o yaml
+kubectl get pod/web Secret/app -o json
 kubectl get secret app -o name --output yaml
 kubectl get secret app --output name -o yaml
 kubectl get secret app -o jsonpath='{.data.password}'
@@ -207,6 +209,8 @@ kubectl get secrets -o go-template='{{range .items}}{{.metadata.name}}{{"\n"}}{{
 kubectl get configmap app -o yaml
 kubectl get pods -o json
 kubectl get pod secret -o yaml
+kubectl get configmap app secret -o yaml
+kubectl get configmap/app pod/secret -o yaml
 kubectl delete secret app
 kubectl create secret generic app --from-literal=key=dummy --dry-run=client -o yaml
 kubectl get secret app -o json | sha256sum

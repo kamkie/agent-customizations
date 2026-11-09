@@ -559,10 +559,15 @@ function Test-KubectlSecretRead {
         if ($script:KubectlVerbs -ccontains $positionals[$i]) { $verbIndex = $i; break }
     }
     if ($verbIndex -lt 0 -or $positionals[$verbIndex] -cne 'get' -or $verbIndex + 1 -ge $positionals.Count) { return $false }
+    # The first operand is a resource type list or TYPE/NAME. Later operands are
+    # names, unless they are TYPE/NAME too.
     $readsSecret = $false
-    foreach ($resource in $positionals[$verbIndex + 1] -split ',') {
-        $type = (($resource -split '/')[0] -split '\.')[0]
-        if ($type -in @('secret', 'secrets')) { $readsSecret = $true }
+    for ($i = $verbIndex + 1; $i -lt $positionals.Count; $i++) {
+        if ($i -gt $verbIndex + 1 -and -not $positionals[$i].Contains('/')) { continue }
+        foreach ($resource in $positionals[$i] -split ',') {
+            $type = (($resource -split '/')[0] -split '\.')[0]
+            if ($type -in @('secret', 'secrets')) { $readsSecret = $true }
+        }
     }
     if (-not $readsSecret) { return $false }
 

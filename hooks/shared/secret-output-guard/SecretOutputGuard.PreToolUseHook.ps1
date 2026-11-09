@@ -329,7 +329,7 @@ function Read-ShellLevel {
         }
         if ($ch -eq '`') {
             if ($script:ParseDialect -eq 'powershell') {
-                $script:ParsePosition += 2
+                $script:ParsePosition = [Math]::Min($position + 2, $length)
                 if ($next -eq "`n" -or $next -eq "`r") {
                     if ($next -eq "`r" -and $script:ParsePosition -lt $length -and $text[$script:ParsePosition] -eq "`n") {
                         $script:ParsePosition++

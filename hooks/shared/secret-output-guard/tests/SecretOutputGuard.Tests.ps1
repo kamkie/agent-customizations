@@ -167,6 +167,8 @@ wsl bash -c "kubectl get secret app -o yaml"
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'kubectl' -Commands @(
     "kubectl get secret app ```n  -o yaml",
+    # An escape character at the very end of the text must not stop the parse.
+    "kubectl get secret app -o yaml; Write-Output x{``",
     "`$body = @`"`nvalue `$(kubectl get secret app -o jsonpath='{.data.password}')`n`"@"
 )
 

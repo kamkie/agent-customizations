@@ -115,21 +115,30 @@ greeting.txt contains `helo`; the correction is `hello`.
     $badFinish.message = 'Done.'
     $result = Replay 'complete-without-extra-work' @($badFinish)
     Assert-True (-not $result.score.passed) 'Missing closing block passed.'
-    $result = Replay 'design-agreement' @($badFinish)
-    Assert-True $result.score.passed 'A discussion turn without closing lines was rejected.'
-    $result = Replay 'capability-question-readonly' @((Action 'read_file' 'greeting.txt'), $badFinish)
-    Assert-True $result.score.passed 'A short answer without closing lines was rejected.'
-    foreach ($partial in @(
-        '', "  `n", '**Next:** no further action required', "Agreed.`n`n**Done:** Agreed.`n**Next:** implement it",
-        '**Next**: implement it', "Agreed.`n- **Next:** implement it", "Agreed.`n> __Not done__ : implementation"
-    )) {
-        $badFinish.message = $partial
-        $result = Replay 'design-agreement' @($badFinish)
-        Assert-True ($result.score.errors -contains 'Final response lacks the required three-line closing block.') "An empty reply or partial closing block passed where the block is optional: '$partial'"
+    $optionalClosing = @{
+        'design-agreement' = @()
+        'capability-question-readonly' = @((Action 'read_file' 'greeting.txt'))
     }
-    $badFinish.message = 'Done. Next, say so when you want it implemented: nothing changed yet.'
-    $result = Replay 'design-agreement' @($badFinish)
-    Assert-True $result.score.passed 'Prose that merely uses a closing word was mistaken for a partial closing block.'
+    foreach ($id in $optionalClosing.Keys) {
+        foreach ($prose in @(
+            'Done.', 'Done. Next, say so when you want it implemented: nothing changed yet.',
+            "The correction is hello.`nNext steps: tell me when to apply it."
+        )) {
+            $badFinish.message = $prose
+            $result = Replay $id ($optionalClosing[$id] + $badFinish)
+            Assert-True $result.score.passed "A reply without closing lines was rejected for $id : '$prose'"
+        }
+        foreach ($partial in @(
+            '', "  `n", '**Next:** no further action required', "Agreed.`n`n**Done:** Agreed.`n**Next:** implement it",
+            '**Next**: implement it', "Agreed.`n- **Next:** implement it", "Agreed.`n> __Not done__ : implementation",
+            '1. **Next:** implement it', "Agreed.`n> 2) next: implement it", 'Agreed. **Next:** implement it',
+            'Agreed. <b>Next</b>: implement it', "Agreed.`n| Not done: | implementation |", "Agreed.`nNext`u{FF1A} implement it"
+        )) {
+            $badFinish.message = $partial
+            $result = Replay $id ($optionalClosing[$id] + $badFinish)
+            Assert-True ($result.score.errors -contains 'Final response lacks the required three-line closing block.') "An empty reply or partial closing block passed for $id : '$partial'"
+        }
+    }
     $badFinish.message = "**Done:** Complete.`n**Not done:** nothing.`n**Next:** Action required: say publish."
     $result = Replay 'complete-without-extra-work' @($badFinish)
     Assert-True (-not $result.score.passed) 'Invented action after completion passed.'

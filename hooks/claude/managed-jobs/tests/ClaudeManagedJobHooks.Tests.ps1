@@ -342,6 +342,8 @@ try {
         @{ command = 'npx -c "npm run dev"'; trigger = 'npm run dev' },
         @{ command = 'eval "npm run dev"'; trigger = 'npm run dev' },
         @{ command = 'cmd /c start "" /b npm run dev'; trigger = 'npm run dev' },
+        @{ command = 'cmd /c start /b "" npm run dev'; trigger = 'npm run dev' },
+        @{ command = 'cmd /c start /d "C:\repo" /min npm run dev'; trigger = 'npm run dev' },
         @{ command = "bash -euo pipefail <<'EOF'`nnpm run dev`nEOF"; trigger = 'npm run dev' },
         @{ command = "bash -euo pipefail <<< 'npm run dev'"; trigger = 'npm run dev' },
         @{ command = 'corepack pnpm dev'; trigger = 'pnpm dev' },

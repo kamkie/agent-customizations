@@ -149,10 +149,23 @@ function Get-SegmentCommand {
                 continue
             }
             if ($token.text -ieq 'start') {
-                # cmd's start runs the command after its /flags and quoted title.
+                # cmd's start runs the command after its /switches, the directory
+                # that /d takes, and one quoted title, in any order.
                 $index++
-                if ($index -lt $Segment.Count -and $Segment[$index].quoted) { $index++ }
-                while ($index -lt $Segment.Count -and -not $Segment[$index].quoted -and $Segment[$index].text -match '^/[A-Za-z]+$') { $index++ }
+                $titled = $false
+                while ($index -lt $Segment.Count) {
+                    if ($Segment[$index].quoted) {
+                        if ($titled) { break }
+                        $titled = $true
+                        $index++
+                    } elseif ($Segment[$index].text -imatch '^/d$') {
+                        $index += 2
+                    } elseif ($Segment[$index].text.StartsWith('/')) {
+                        $index++
+                    } else {
+                        break
+                    }
+                }
                 continue
             }
             if ($token.text -match ($variable + '$') -and $index + 1 -lt $Segment.Count -and

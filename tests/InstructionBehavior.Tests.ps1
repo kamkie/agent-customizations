@@ -112,7 +112,7 @@ try {
         }
     }
 
-    $passOutput = @(& pwsh -NoProfile -File $runner -Target all -ResponseDirectory $responseRoot 2>&1)
+    $passOutput = @(& pwsh -NoProfile -File $runner -Target all -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     if ($LASTEXITCODE -ne 0) {
         throw 'The instruction behavior scorer rejected matching responses: ' + ($passOutput -join ' ')
     }
@@ -121,17 +121,17 @@ try {
     $monitoring = Get-Content -LiteralPath $monitoringResponse -Raw | ConvertFrom-Json
     $monitoring.primaryAction = 'refresh-live-state'
     $monitoring | ConvertTo-Json | Set-Content -LiteralPath $monitoringResponse
-    $alternativeOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot 2>&1)
+    $alternativeOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     if ($LASTEXITCODE -ne 0) { throw 'The scorer rejected an allowed monitoring alternative.' }
     $monitoring.primaryAction = 'cancel-hung-job-and-wait'
     $monitoring | ConvertTo-Json | Set-Content -LiteralPath $monitoringResponse
-    $cancelOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot 2>&1)
+    $cancelOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     if ($LASTEXITCODE -eq 0 -or ($cancelOutput -join ' ') -notmatch 'expected one of') {
         throw 'The scorer accepted cancellation of a progressing job.'
     }
     $monitoring.primaryAction = @('continue-authorized-work', 'refresh-live-state')
     $monitoring | ConvertTo-Json | Set-Content -LiteralPath $monitoringResponse
-    $arrayOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot 2>&1)
+    $arrayOutput = @(& pwsh -NoProfile -File $runner -Target codex -CaseId delivery-quiet-progressing-job -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     if ($LASTEXITCODE -eq 0 -or ($arrayOutput -join ' ') -notmatch 'primaryAction must be string') {
         throw 'The scorer accepted an array instead of a scalar response.'
     }
@@ -140,7 +140,7 @@ try {
     $closing = Get-Content -LiteralPath $closingResponse -Raw | ConvertFrom-Json
     $closing.closingQuestion = 'next-step'
     $closing | ConvertTo-Json | Set-Content -LiteralPath $closingResponse
-    $closingOutput = @(& pwsh -NoProfile -File $runner -Target claude -CaseId readonly-summary-next-step -ResponseDirectory $responseRoot 2>&1)
+    $closingOutput = @(& pwsh -NoProfile -File $runner -Target claude -CaseId readonly-summary-next-step -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     if ($LASTEXITCODE -eq 0 -or ($closingOutput -join ' ') -notmatch "closingQuestion: expected 'none', got 'next-step'") {
         throw 'The scorer accepted a closing next-step question after a finished read-only answer.'
     }
@@ -149,7 +149,7 @@ try {
     $investigate = Get-Content -LiteralPath $investigateResponse -Raw | ConvertFrom-Json
     $investigate.primaryAction = 'answer-read-only'
     $investigate | ConvertTo-Json | Set-Content -LiteralPath $investigateResponse
-    $investigateOutput = @(& pwsh -NoProfile -File $runner -Target claude -CaseId investigate-option-question -ResponseDirectory $responseRoot 2>&1)
+    $investigateOutput = @(& pwsh -NoProfile -File $runner -Target claude -CaseId investigate-option-question -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     if ($LASTEXITCODE -eq 0 -or ($investigateOutput -join ' ') -notmatch 'primaryAction: expected one of') {
         throw 'The scorer accepted an answer that skips available investigation.'
     }
@@ -163,7 +163,7 @@ try {
     $mutated.publicationAuthorized = [string]$negativeExpectation.publicationAuthorized
     $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeResponse -Encoding utf8
 
-    $failOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot 2>&1)
+    $failOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     if ($LASTEXITCODE -eq 0) {
         throw 'The instruction behavior scorer accepted a deliberately incorrect response.'
     }
@@ -174,7 +174,7 @@ try {
     $mutated.publicationAuthorized = $negativeExpectation.publicationAuthorized
     $mutated.autonomous = $null
     $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeResponse -Encoding utf8
-    $nullOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot 2>&1)
+    $nullOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     if ($LASTEXITCODE -eq 0 -or ($nullOutput -join ' ') -notmatch 'autonomous must be boolean, got null') {
         throw 'The instruction behavior scorer did not report a null response value as a contract violation.'
     }
@@ -183,7 +183,7 @@ try {
     $wrongPublication = -not [bool]$negativeExpectation.publicationAuthorized
     $mutated.publicationAuthorized = $wrongPublication
     $mutated | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeResponse -Encoding utf8
-    $valueOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot 2>&1)
+    $valueOutput = @(& pwsh -NoProfile -File $runner -Target $negativeTarget -CaseId $negativeCase.id -ResponseDirectory $responseRoot -OutputDirectory (Join-Path $responseRoot "runs") 2>&1)
     $valueMismatch = "publicationAuthorized: expected '$($negativeExpectation.publicationAuthorized)', got '$wrongPublication'"
     if ($LASTEXITCODE -eq 0 -or
         ($valueOutput -join ' ') -notmatch [regex]::Escape($valueMismatch)) {
@@ -195,5 +195,196 @@ try {
     }
 }
 
+# Native process checks share the production transport used by both evaluators.
+. (Join-Path $repositoryRoot 'scripts/InstructionEvaluation.Common.ps1')
+$nativeRoot = Join-Path $temporaryRoot ('evaluation-native-test-' + [guid]::NewGuid().ToString('N'))
+$null = New-Item -ItemType Directory $nativeRoot
+$savedPath = $env:PATH
+try {
+    $pwsh = (Get-Command pwsh).Source
+    $instructionSource = Join-Path $nativeRoot 'source.md'
+    'synthetic baseline' | Set-Content $instructionSource
+    $baseline = Save-EvaluationModelInstructions -RunRoot $nativeRoot -Source $instructionSource -Mode custom
+    'changed after snapshot' | Set-Content $instructionSource
+    if ($baseline.mode -ne 'custom' -or $baseline.sha256 -ne (Get-FileHash $baseline.snapshot).Hash -or
+        (Get-Content $baseline.snapshot -Raw) -notmatch 'synthetic baseline') { throw 'Instruction snapshot changed with its source.' }
+    $stock = Save-EvaluationModelInstructions -RunRoot $nativeRoot -Mode stock
+    if ($stock.mode -ne 'stock' -or $null -ne $stock.snapshot -or $null -ne $stock.sha256) { throw 'Stock baseline falsely claimed an instruction snapshot.' }
+    $interrupted = @{status = 'running'; passed = $false; failureKind = $null; mismatches = @()}
+    Write-EvaluationSummary $nativeRoot @($interrupted) 'interrupted' @{}
+    $interruptedSummary = Get-Content (Join-Path $nativeRoot 'summary.json') -Raw | ConvertFrom-Json
+    if ($interruptedSummary.failed -ne 1 -or $interruptedSummary.results[0].failureKind -ne 'interrupted' -or
+        $interruptedSummary.results[0].status -ne 'interrupted' -or -not $interruptedSummary.results[0].mismatches.Count) { throw 'Interrupted case was not terminalized with a reason.' }
+    $bin = Join-Path $nativeRoot 'bin'
+    $null = New-Item -ItemType Directory $bin
+    @'
+$prompt = [Console]::In.ReadToEnd()
+[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'stdin.txt'), $prompt)
+[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'argv.json'), ($args | ConvertTo-Json))
+[Console]::Out.WriteLine('{"type":"system","model":"observed-model"}')
+[Console]::Out.Flush()
+[Console]::Error.WriteLine('synthetic diagnostic')
+if (Test-Path (Join-Path $PSScriptRoot 'gate-enabled')) {
+    [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'started'), [string]$PID)
+    while (-not (Test-Path (Join-Path $PSScriptRoot 'released'))) { Start-Sleep -Milliseconds 20 }
+}
+[Console]::Out.WriteLine([IO.File]::ReadAllText((Join-Path $PSScriptRoot 'envelope')))
+exit ([int](Get-Content (Join-Path $PSScriptRoot 'exit')))
+'@ | Set-Content (Join-Path $bin 'client.ps1')
+    $shim = '$input | & pwsh -NoProfile -File (Join-Path $PSScriptRoot "client.ps1") @args; exit $LASTEXITCODE'
+    if ($IsWindows) { $shim | Set-Content (Join-Path $bin 'claude.ps1') }
+    else {
+        "#!/usr/bin/env pwsh`n$shim" | Set-Content (Join-Path $bin 'claude')
+        & chmod +x (Join-Path $bin 'claude')
+    }
+    $env:PATH = $bin + [IO.Path]::PathSeparator + $savedPath
+    $outputRoot = Join-Path $nativeRoot 'runs'
+    foreach ($filter in @(',', ' ', 'unknown-synthetic-case')) {
+        $output = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId $filter -OutputDirectory $outputRoot 2>&1)
+        if ($LASTEXITCODE -eq 0 -or (Test-Path $outputRoot) -or (Test-Path (Join-Path $bin 'argv.json'))) { throw 'Invalid classification filter launched a client or created artifacts.' }
+    }
+    $env:PATH = ''
+    $output = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId capability-question -OutputDirectory $outputRoot 2>&1)
+    if ($LASTEXITCODE -eq 0 -or (Test-Path $outputRoot)) { throw 'Missing client did not fail preflight.' }
+    # With no native clients on PATH, expose only a deterministic Codex mock.
+    # A single-agent case under Target=all must not require the other engine.
+    $selectionDriver = Join-Path $nativeRoot 'selection-driver.ps1'
+    @'
+param($Runner, $Output, $Marker, $CaseName, $SelectionTarget)
+function global:git { $global:LASTEXITCODE = 0 }
+function global:codex {
+    'invoked' | Set-Content -LiteralPath $Marker
+    throw 'selected Codex mock invoked'
+}
+& $Runner -CaseId $CaseName -Target $SelectionTarget -OutputDirectory $Output
+exit $LASTEXITCODE
+'@ | Set-Content $selectionDriver
+    foreach ($selection in @(
+        @('campaign-inventory-only', 'all'),
+        @('capability-question', 'codex')
+    )) {
+        $selectionRoot = Join-Path $nativeRoot ('selection-' + $selection[0])
+        $marker = $selectionRoot + '.invoked'
+        $selected = @(& $pwsh -NoProfile -File $selectionDriver $runner $selectionRoot $marker $selection[0] $selection[1] 2>&1)
+        if (-not (Test-Path $marker) -or ($selected -join ' ') -notmatch 'selected Codex mock invoked' -or
+            ($selected -join ' ') -match 'Required evaluation client is unavailable') { throw 'Preflight required a client outside the selected-case/target intersection.' }
+    }
+    $bothRoot = Join-Path $nativeRoot 'selection-both'
+    $bothMarker = $bothRoot + '.invoked'
+    $both = @(& $pwsh -NoProfile -File $selectionDriver $runner $bothRoot $bothMarker capability-question all 2>&1)
+    if ($LASTEXITCODE -eq 0 -or (Test-Path $bothRoot) -or (Test-Path $bothMarker) -or
+        ($both -join ' ') -notmatch 'Required evaluation client is unavailable: claude') { throw 'A genuinely required missing client did not fail before work.' }
+    $env:PATH = $bin + [IO.Path]::PathSeparator + $savedPath
+    $samples = @(
+        @('null','execution',0), @('not JSON','execution',0),
+        @('{"type":"result","subtype":"success"}','execution',0),
+        @('{"type":"result","subtype":"success","result":""}','execution',0),
+        @('{"type":"result","subtype":"success","result":"null"}','execution',0),
+        @('{"type":"result","subtype":"error_during_execution","is_error":true,"structured_output":{}}','execution',0),
+        @('{"type":"result","subtype":"success","structured_output":{}}','behavior',0),
+        @('{"type":"result","subtype":"success","structured_output":{}}','execution',17)
+    )
+    $count = 0
+    foreach ($sample in $samples) {
+        $sample[0] | Set-Content (Join-Path $bin 'envelope')
+        $sample[2] | Set-Content (Join-Path $bin 'exit')
+        $output = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId capability-question -ClaudeModel requested-model -OutputDirectory $outputRoot 2>&1)
+        if ($LASTEXITCODE -eq 0) { throw 'Invalid or incomplete response passed.' }
+        $runs = @(Get-ChildItem $outputRoot -Directory)
+        $count++
+        if ($runs.Count -ne $count) { throw 'A repeated run overwrote evidence.' }
+        $run = ($runs | Sort-Object CreationTimeUtc | Select-Object -Last 1).FullName
+        $summary = Get-Content (Join-Path $run 'summary.json') -Raw | ConvertFrom-Json
+        if ($summary.configuration.codexInstructionBaseline.mode -ne 'reviewed' -or
+            $summary.configuration.codexInstructionBaseline.sha256 -ne (Get-FileHash $summary.configuration.codexInstructionBaseline.snapshot).Hash) { throw 'Run omitted its reviewed instruction baseline.' }
+        if ($summary.results[0].failureKind -ne $sample[1]) { throw "Wrong envelope failure kind: $($summary | ConvertTo-Json -Depth 8)" }
+        $caseRoot = Join-Path $run 'claude/capability-question'
+        $metadata = Get-Content (Join-Path $caseRoot 'client.metadata.json') -Raw | ConvertFrom-Json
+        if ($metadata.requestedModel -ne 'requested-model' -or $metadata.effectiveModels -notcontains 'observed-model') { throw 'Requested/observed identity was lost.' }
+        if ((Get-Content (Join-Path $caseRoot 'client.stderr.txt') -Raw) -notmatch 'synthetic diagnostic') { throw 'Native stderr was lost.' }
+        if ((Get-Content (Join-Path $caseRoot 'client.jsonl') -Raw) -notmatch [regex]::Escape($sample[0])) { throw 'Native envelope was lost.' }
+        $argv = @(Get-Content (Join-Path $bin 'argv.json') -Raw | ConvertFrom-Json)
+        if ($argv -notcontains 'requested-model' -or $argv -contains (Get-Content (Join-Path $bin 'stdin.txt') -Raw)) { throw 'Model argv or stdin prompt transport failed.' }
+    }
+    0 | Set-Content (Join-Path $bin 'exit')
+    $largePrompt = ('Synthetic Unicode Ω 漢字 "quotes" $literal `backtick`' + "`n") * 1600 + 'end'
+    Invoke-EvaluationClient -Client claude -Arguments @('--model','requested-model') -Prompt $largePrompt -Workspace $nativeRoot `
+        -LogPath (Join-Path $nativeRoot 'large.jsonl') -ErrorPath (Join-Path $nativeRoot 'large.stderr.txt') `
+        -MetadataPath (Join-Path $nativeRoot 'large.metadata.json') -Model requested-model
+    $captured = [IO.File]::ReadAllText((Join-Path $bin 'stdin.txt'))
+    if ($captured -cne ($largePrompt + [Environment]::NewLine)) { throw 'Large Unicode stdin prompt changed (apart from the documented pipeline newline).' }
+    $argv = @(Get-Content (Join-Path $bin 'argv.json') -Raw | ConvertFrom-Json)
+    if ($argv.Count -ne 2 -or $argv[1] -ne 'requested-model') { throw 'Large prompt appeared in native argv.' }
+    Push-Location $nativeRoot
+    try {
+        $relative = New-EvaluationRunDirectory relative
+        if (-not $relative.StartsWith((Join-Path $nativeRoot 'relative'))) { throw 'Output ignored PowerShell location.' }
+    } finally { Pop-Location }
+    $output = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId capability-question 2>&1)
+    $automaticRun = ([string]($output | Where-Object { [string]$_ -like 'Artifacts: *' } | Select-Object -First 1)).Substring(11)
+    if (-not (Test-Path (Join-Path $automaticRun 'summary.json'))) { throw 'Automatic failed evidence was deleted.' }
+    $prefix = (Join-Path ([IO.Path]::GetTempPath()) 'instruction-evaluations') + [IO.Path]::DirectorySeparatorChar
+    if (-not ([IO.Path]::GetFullPath($automaticRun)).StartsWith($prefix)) { throw 'Unsafe automatic test cleanup.' }
+    Get-ChildItem -LiteralPath $automaticRun -Recurse -Force | ForEach-Object { $_.Attributes = $_.Attributes -band (-bnot ([IO.FileAttributes]::Hidden -bor [IO.FileAttributes]::ReadOnly)) }
+    Remove-Item -LiteralPath $automaticRun -Recurse
+
+    0 | Set-Content (Join-Path $bin 'exit')
+    New-Item -ItemType File (Join-Path $bin 'gate-enabled') | Out-Null
+    $driver = Join-Path $nativeRoot 'driver.ps1'
+    @'
+param($Runner, $Output, $Log)
+& $Runner -Target claude -CaseId capability-question -OutputDirectory $Output *> $Log
+exit $LASTEXITCODE
+'@ | Set-Content $driver
+    $gateRoot = Join-Path $nativeRoot 'gate-run'
+    $driverLog = Join-Path $nativeRoot 'driver.log'
+    $start = [Diagnostics.ProcessStartInfo]::new($pwsh)
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    foreach ($argument in @('-NoProfile','-File',$driver,$runner,$gateRoot,$driverLog)) { $start.ArgumentList.Add($argument) }
+    $process = [Diagnostics.Process]::Start($start)
+    try {
+        $deadline = [DateTime]::UtcNow.AddSeconds(30) # bounded native readiness probe
+        do {
+            if ($process.HasExited) { throw 'Gate process exited before readiness.' }
+            $logs = @(Get-ChildItem $gateRoot -Filter client.jsonl -Recurse -ErrorAction SilentlyContinue)
+            if ($logs.Count -eq 1 -and (Get-Content $logs[0].FullName -Raw) -match 'observed-model' -and (Test-Path (Join-Path $bin 'started'))) { break }
+            if ([DateTime]::UtcNow -gt $deadline) { throw 'Native gate readiness failed.' }
+            Start-Sleep -Milliseconds 20
+        } while ($true)
+        if ((Get-Content $driverLog -Raw) -notmatch 'START claude/capability-question') { throw 'START was buffered.' }
+        $summaryPath = Join-Path $logs[0].Directory.Parent.Parent.FullName 'summary.json'
+        $pending = Get-Content $summaryPath -Raw | ConvertFrom-Json
+        if ($pending.status -ne 'running' -or $pending.results[0].status -ne 'running') { throw 'Running process was marked complete.' }
+        $nativePid = [int](Get-Content (Join-Path $bin 'started'))
+        $reader = if ($IsWindows) { [IO.File]::Open($summaryPath, 'Open', 'Read', 'ReadWrite') } else { $null }
+        try {
+            New-Item -ItemType File (Join-Path $bin 'released') | Out-Null
+            if ($reader) {
+                # Let the runner reach atomic replacement while a normal reader
+                # holds the destination without FILE_SHARE_DELETE.
+                $replaceReady = [DateTime]::UtcNow.AddSeconds(5)
+                while (-not (Test-Path (Join-Path (Split-Path $summaryPath) 'summary.tmp'))) {
+                    if ($process.HasExited -or [DateTime]::UtcNow -gt $replaceReady) { throw 'Summary writer did not reach its replacement gate.' }
+                    Start-Sleep -Milliseconds 20
+                }
+                if ($process.HasExited) { throw 'A monitoring reader aborted the run.' }
+            }
+        } finally { if ($reader) { $reader.Dispose() } }
+        $process.WaitForExit()
+        if (Get-Process -Id $nativePid -ErrorAction SilentlyContinue) { throw 'Native child survived completion.' }
+        $final = Get-Content $summaryPath -Raw | ConvertFrom-Json
+        if ($final.status -ne 'completed' -or $final.results[0].failureKind -ne 'behavior') { throw 'Gate completion lost final result.' }
+    } finally {
+        if (-not (Test-Path (Join-Path $bin 'released'))) { New-Item -ItemType File (Join-Path $bin 'released') | Out-Null }
+        if (-not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }
+        $process.Dispose()
+    }
+} finally {
+    $env:PATH = $savedPath
+    if (-not ([IO.Path]::GetFullPath($nativeRoot)).StartsWith($temporaryRoot)) { throw 'Unsafe native test cleanup.' }
+    Get-ChildItem -LiteralPath $nativeRoot -Recurse -Force | ForEach-Object { $_.Attributes = $_.Attributes -band (-bnot ([IO.FileAttributes]::Hidden -bor [IO.FileAttributes]::ReadOnly)) }
+    Remove-Item -LiteralPath $nativeRoot -Recurse
+}
 Write-Host 'Instruction behavior evaluation contract tests: OK'
 exit 0

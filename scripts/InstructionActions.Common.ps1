@@ -1,11 +1,5 @@
 # Bounded tool dispatcher and observation scorer. No model-generated code runs.
-function Get-ActionProperty {
-    param($Object, [string]$Name)
-    if ($null -ne $Object -and $Object.PSObject.Properties[$Name]) {
-        return $Object.PSObject.Properties[$Name].Value
-    }
-    return $null
-}
+. (Join-Path $PSScriptRoot 'InstructionEvaluation.Common.ps1')
 
 function Get-ActionNextText {
     param([string]$Message)
@@ -20,15 +14,6 @@ function New-ActionProtocolException {
     $exception = [ArgumentException]::new($Message)
     $exception.Data['failureKind'] = 'protocol'
     return $exception
-}
-
-function Resolve-ActionOutputDirectory {
-    param([Parameter(Mandatory)][string]$Path)
-    $provider = $null
-    $drive = $null
-    $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path, [ref]$provider, [ref]$drive)
-    if ($provider.Name -ne 'FileSystem') { throw [ArgumentException]::new('Action output requires a filesystem path.') }
-    return [IO.Path]::GetFullPath($resolved)
 }
 
 function Get-ActionFiles {

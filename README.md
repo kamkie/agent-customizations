@@ -136,7 +136,16 @@ pwsh ./scripts/evaluate-instruction-actions.ps1 -Target all
 ```
 
 Both live suites consume CLI usage and should run under `managed-jobs` when
-launched by an agent. The action suite uses a controlled JSON tool protocol:
+launched by an agent. Select a bounded case set with `-CaseId` and explicit
+identities with `-CodexModel` / `-ClaudeModel` (and optional
+`-CodexReasoningEffort` / `-ClaudeEffort`); empty or unknown case filters
+fail before any client launches. Each invocation creates a unique run beneath
+`-OutputDirectory` (or the printed temporary parent). Runs retain private raw
+stdout/stderr, prompts, responses, per-invocation identity metadata, and an
+incremental `summary.json`, including on failure. Do not commit these artifacts.
+Native output is flushed to logs as it arrives; START means invocation began,
+not that useful output or a validated response exists. Requested model aliases
+and observed effective models are separate; missing native identity is unknown. The action suite uses a controlled JSON tool protocol:
 requests execute real bounded file edits and local checks; publication always
 returns unavailable without contacting a remote. User messages are injected
 between tool requests to test authorization and stop boundaries. It retains

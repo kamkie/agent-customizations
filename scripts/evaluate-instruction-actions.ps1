@@ -11,6 +11,9 @@ param(
     [string]$CodexModel,
     [ValidateSet('none', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
     [string]$CodexReasoningEffort,
+    [string]$ClaudeModel,
+    [ValidateSet('low', 'medium', 'high', 'xhigh', 'max')]
+    [string]$ClaudeEffort,
     # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
     [switch]$StockCodexInstructions
 )
@@ -48,15 +51,22 @@ foreach ($client in $targets) {
         throw "Required action client is unavailable: $client"
     }
 }
-if (-not $OutputDirectory) { $OutputDirectory = Join-Path ([IO.Path]::GetTempPath()) ('instruction-actions-' + [guid]::NewGuid().ToString('N')) }
-$OutputDirectory = Resolve-ActionOutputDirectory $OutputDirectory
-$null = New-Item -ItemType Directory -Path $OutputDirectory -Force
-# Each run uses its own child so an existing output directory is never a workspace.
-$runRoot = Join-Path $OutputDirectory ([guid]::NewGuid().ToString('N'))
+$runRoot = New-EvaluationRunDirectory $OutputDirectory
+$modelInstructionMode = if ($StockCodexInstructions) { 'stock' } elseif ($PSBoundParameters.ContainsKey('CodexModelInstructionsFile')) { 'custom' } else { 'reviewed' }
+$baseline = Save-EvaluationModelInstructions -RunRoot $runRoot -Source $CodexModelInstructionsFile -Mode $modelInstructionMode
+$CodexModelInstructionsFile = $baseline.snapshot
 $results = [Collections.Generic.List[object]]::new()
+$configuration = @{codexInstructionBaseline = $baseline; targets = $targets; claudeModel = $ClaudeModel; claudeEffort = $ClaudeEffort; codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort}
+$runStatus = 'interrupted'
+try {
 foreach ($agentTarget in $targets) {
     foreach ($case in $cases) {
         $caseRoot = Join-Path $runRoot "$agentTarget/$($case.id)"
+        $result = @{target = $agentTarget; case = $case.id; status = 'running'; passed = $false; failureKind = $null; errors = @()}
+        $results.Add($result)
+        Write-EvaluationSummary $runRoot $results.ToArray() 'running' $configuration
+        Write-Host "START $agentTarget/$($case.id)"
+        try {
         $workspace = Join-Path $caseRoot 'workspace'
         $null = New-Item -ItemType Directory -Path $workspace -Force
         & git -C $workspace init --quiet
@@ -108,49 +118,55 @@ $currentRequest
                 if ($CodexModel) { $arguments += @('--model', $CodexModel) }
                 if ($CodexReasoningEffort) { $arguments += @('-c', ('model_reasoning_effort="' + $CodexReasoningEffort + '"')) }
                 if ($CodexModelInstructionsFile) { $arguments += @('-c', ('model_instructions_file="' + ($CodexModelInstructionsFile -replace '\\', '/') + '"')) }
-                $raw = @($prompt | & codex @arguments '-' 2> $stderrPath)
-                $clientExit = $LASTEXITCODE
-                $raw | Set-Content (Join-Path $caseRoot "client-$step.jsonl")
-                if ($clientExit -ne 0) { throw "Codex action client failed with exit $clientExit; diagnostics: $stderrPath" }
+                $arguments += '-'
+                $logPath = Join-Path $caseRoot "client-$step.jsonl"
+                Invoke-EvaluationClient -Client codex -Arguments $arguments -Prompt $prompt -Workspace $workspace `
+                    -LogPath $logPath -ErrorPath $stderrPath -MetadataPath (Join-Path $caseRoot "client-$step.metadata.json") `
+                    -Model $CodexModel -Effort $CodexReasoningEffort
+                $raw = @(Get-Content -LiteralPath $logPath)
                 foreach ($line in $raw) {
-                    $event = $line | ConvertFrom-Json
-                    if ($event.type -like 'item.*' -and $event.item.type -eq 'error') {
-                        throw "Codex client reported: $($event.item.message)"
+                    $nativeRecord = $line | ConvertFrom-Json
+                    if ($nativeRecord.type -like 'item.*' -and $nativeRecord.item.type -eq 'error') {
+                        throw "Codex client reported: $($nativeRecord.item.message)"
                     }
-                    if ($event.type -like 'item.*' -and $event.item.type -notin @('agent_message','reasoning')) {
-                        throw (New-ActionProtocolException "Native CLI action is outside the controlled protocol: $($event.item.type)")
+                    if ($nativeRecord.type -like 'item.*' -and $nativeRecord.item.type -notin @('agent_message','reasoning')) {
+                        throw (New-ActionProtocolException "Native CLI action is outside the controlled protocol: $($nativeRecord.item.type)")
                     }
                 }
-                return Get-Content $responsePath -Raw | ConvertFrom-Json
+                return Read-EvaluationResponse $responsePath
             }
-            Push-Location $workspace
-            try {
-                $raw = @(& claude --print --no-session-persistence --permission-mode dontAsk --setting-sources '' `
-                    --disable-slash-commands --tools '' --strict-mcp-config --mcp-config $mcpConfig `
-                    --system-prompt-file $instructionsPath --json-schema $schema --output-format json $prompt 2> $stderrPath)
-                $clientExit = $LASTEXITCODE
-            } finally { Pop-Location }
-            $raw | Set-Content (Join-Path $caseRoot "client-$step.json")
-            if ($clientExit -ne 0) { throw "Claude action client failed with exit $clientExit; diagnostics: $stderrPath" }
-            $envelope = ($raw -join "`n") | ConvertFrom-Json
-            $structured = Get-ActionProperty $envelope 'structured_output'
-            $response = if ($structured) { $structured } else { $envelope.result | ConvertFrom-Json }
+            $arguments = @('--print', '--no-session-persistence', '--permission-mode', 'dontAsk', '--setting-sources', '',
+                '--disable-slash-commands', '--tools', '', '--strict-mcp-config', '--mcp-config', $mcpConfig,
+                '--system-prompt-file', $instructionsPath, '--json-schema', $schema, '--output-format', 'stream-json', '--verbose')
+            if ($ClaudeModel) { $arguments += @('--model', $ClaudeModel) }
+            if ($ClaudeEffort) { $arguments += @('--effort', $ClaudeEffort) }
+            $logPath = Join-Path $caseRoot "client-$step.jsonl"
+            Invoke-EvaluationClient -Client claude -Arguments $arguments -Prompt $prompt -Workspace $workspace `
+                -LogPath $logPath -ErrorPath $stderrPath -MetadataPath (Join-Path $caseRoot "client-$step.metadata.json") -Model $ClaudeModel -Effort $ClaudeEffort
+            $response = Read-ClaudeEvaluationResponse $logPath
             $response | ConvertTo-Json | Set-Content $responsePath
             return $response
         }
-        try {
             $actual = Invoke-InstructionActionCase -Case $case -Workspace $workspace -Responder $responder
             $actual | ConvertTo-Json -Depth 15 | Set-Content (Join-Path $caseRoot 'observations.json')
             $score = Test-InstructionActionResult -Actual $actual -Expected $expectations.($case.id)
-            $results.Add(@{target = $agentTarget; case = $case.id; passed = $score.passed; failureKind = $(if ($score.passed) { 'none' } else { 'behavior' }); errors = $score.errors})
+            $result.passed = $score.passed
+            $result.failureKind = if ($score.passed) { 'none' } else { 'behavior' }
+            $result.errors = $score.errors
+            $result.status = 'completed'
         } catch {
             $kind = if ($_.Exception.Data['failureKind'] -eq 'protocol') { 'protocol' } else { 'execution' }
-            $results.Add(@{target = $agentTarget; case = $case.id; passed = $false; failureKind = $kind; errors = @($_.Exception.Message)})
+            $result.failureKind = $kind
+            $result.errors = @($_.Exception.Message)
+            $result.status = 'failed'
         }
+        Write-EvaluationSummary $runRoot $results.ToArray() 'running' $configuration
         Write-Host "$agentTarget/$($case.id): $($results[$results.Count - 1] | ConvertTo-Json -Compress)"
     }
 }
-$summary = @{codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort; results = $results.ToArray(); passed = @($results | Where-Object passed).Count; failed = @($results | Where-Object { -not $_.passed }).Count; artifacts = $runRoot}
-$summary | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $runRoot 'summary.json')
-$summary | ConvertTo-Json -Depth 8
-if ($summary.failed) { exit 1 }
+$runStatus = 'completed'
+} finally {
+    Write-EvaluationSummary $runRoot $results.ToArray() $runStatus $configuration
+}
+Get-Content -LiteralPath (Join-Path $runRoot 'summary.json') -Raw
+if (@($results | Where-Object { -not $_.passed }).Count) { exit 1 }

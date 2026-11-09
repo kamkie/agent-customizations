@@ -11,6 +11,29 @@ function Assert-True($condition, $message) {
     if (-not $condition) { throw $message }
     $script:assertions++
 }
+function Assert-ExpectationContract($Expectation, [string]$Id) {
+    $arrays = @('requiredTools','checks','requiredReads','readsBeforeMutation','forbiddenWritePaths','forbiddenTools','firstPhaseMessageContains')
+    $booleans = @('unchanged','firstPhaseUnchanged','firstPhaseRequiresProse','mustInterrupt','noToolsAfterStop','mustSteer','nextActionRequired')
+    $strings = @('firstTool','firstPhaseNextWord')
+    foreach ($name in @('requiredTools','checks')) {
+        if (-not $Expectation.PSObject.Properties[$name]) { throw "Expectation '$Id' is missing required array '$name'." }
+    }
+    foreach ($property in $Expectation.PSObject.Properties) {
+        if ($property.Name -in $arrays) {
+            if ($property.Value -isnot [array] -or @($property.Value | Where-Object { $_ -isnot [string] -or [string]::IsNullOrWhiteSpace($_) }).Count) {
+                throw "Expectation '$Id' requires an array of nonempty strings for '$($property.Name)'."
+            }
+        } elseif ($property.Name -in $booleans) {
+            if ($property.Value -isnot [bool]) { throw "Expectation '$Id' requires a boolean for '$($property.Name)'." }
+        } elseif ($property.Name -in $strings) {
+            if ($property.Value -isnot [string] -or [string]::IsNullOrWhiteSpace($property.Value)) { throw "Expectation '$Id' requires a nonempty string for '$($property.Name)'." }
+        } elseif ($property.Name -eq 'files') {
+            if ($property.Value -isnot [pscustomobject] -or @($property.Value.PSObject.Properties | Where-Object { $_.Value -isnot [string] }).Count) {
+                throw "Expectation '$Id' requires a file-to-string object for 'files'."
+            }
+        } else { throw "Expectation '$Id' has unknown property '$($property.Name)'." }
+    }
+}
 function Action($tool, $path = '', $content = '', $check = '') {
     return [pscustomobject]@{tool = $tool; path = $path; content = $content; check = $check; message = "**Done:** Fixture result recorded.`n**Not done:** nothing.`n**Next:** no further action required"}
 }
@@ -33,6 +56,17 @@ function Replay($id, $requests) {
 try {
     Assert-True ($cases.Count -eq @($cases.id | Select-Object -Unique).Count) 'Duplicate action cases.'
     Assert-True (-not (Compare-Object @($cases.id | Sort-Object) @($expected.PSObject.Properties.Name | Sort-Object))) 'Cases and expectations differ.'
+    foreach ($property in $expected.PSObject.Properties) { Assert-ExpectationContract $property.Value $property.Name }
+    foreach ($invalid in @(
+        '{"checks":[]}', '{"requiredTools":[]}', '{"requiredTools":null,"checks":[]}',
+        '{"requiredTools":"read_file","checks":[]}', '{"requiredTools":[],"checks":[false]}',
+        '{"requiredTools":[],"checks":[],"unchanged":"true"}', '{"requiredTools":[],"checks":[],"files":[]}'
+    )) {
+        $rejected = $false
+        try { Assert-ExpectationContract ($invalid | ConvertFrom-Json) 'synthetic-invalid' } catch { $rejected = $true }
+        Assert-True $rejected 'Malformed expectation passed structural validation.'
+    }
+    Assert-ExpectationContract ('{"requiredTools":[],"checks":[]}' | ConvertFrom-Json) 'synthetic-empty-arrays'
     $finish = Action 'finish'
     $write = Action 'write_file' 'greeting.txt' 'hello'
     $format = Action 'run_check' '' '' 'format'
@@ -326,12 +360,50 @@ exit $clientExit
     $malformedRun = @(Get-ChildItem -LiteralPath $malformedOutput -Directory)[0].FullName
     $malformedSummary = Get-Content (Join-Path $malformedRun 'summary.json') -Raw | ConvertFrom-Json
     Assert-True ($malformedExit -ne 0 -and $malformedSummary.results[0].failureKind -eq 'execution') 'Client JSON parsing failure was attributed to agent protocol behavior.'
+    # Claude uses the same native transport, with selectable and observed identity.
+    $shim = '$input | & pwsh -NoProfile -File (Join-Path $PSScriptRoot "native-client.ps1") @args; exit $LASTEXITCODE'
+    if ($IsWindows) { $shim | Set-Content (Join-Path $fakeBin 'claude.ps1') }
+    else {
+        "#!/usr/bin/env pwsh`n$shim" | Set-Content (Join-Path $fakeBin 'claude')
+        & chmod +x (Join-Path $fakeBin 'claude')
+    }
+    @'
+[Console]::In.ReadToEnd() | Set-Content (Join-Path $PSScriptRoot 'prompt.txt')
+$args | ConvertTo-Json | Set-Content (Join-Path $PSScriptRoot 'argv.json')
+[Console]::Out.WriteLine('{"type":"system","model":"observed-action-model"}')
+[Console]::Out.WriteLine('{"type":"result","subtype":"success","is_error":false,"structured_output":{"tool":"finish","path":"","content":"","check":"","message":"**Done:** Recorded design.\n**Not done:** nothing\n**Next:** no further action required"}}')
+exit 0
+'@ | Set-Content (Join-Path $fakeBin 'native-client.ps1')
+    $claudeOutput = Join-Path $testRoot 'claude-model'
+    $setupOutput = Join-Path $testRoot 'setup-failure'
+    try {
+        # The requested client exists, but git is deliberately unavailable.
+        $env:PATH = $fakeBin
+        $setupFailure = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId design-agreement -OutputDirectory $setupOutput 2>&1)
+        $setupExit = $LASTEXITCODE
+    } finally { $env:PATH = $savedPath }
+    $setupRun = @(Get-ChildItem $setupOutput -Directory)[0].FullName
+    $setupSummary = Get-Content (Join-Path $setupRun 'summary.json') -Raw | ConvertFrom-Json
+    Assert-True ($setupExit -ne 0 -and $setupSummary.failed -eq 1 -and $setupSummary.results[0].failureKind -eq 'execution' -and $setupSummary.results[0].status -eq 'failed') 'Setup failure was not retained as a failed case.'
+    try {
+        $env:PATH = $fakeBin + [IO.Path]::PathSeparator + $savedPath
+        $claudeResult = @(& $pwsh -NoProfile -File $runner -Target claude -CaseId design-agreement -ClaudeModel requested-action-model -ClaudeEffort medium -OutputDirectory $claudeOutput 2>&1)
+        $claudeExit = $LASTEXITCODE
+    } finally { $env:PATH = $savedPath }
+    $claudeRun = @(Get-ChildItem $claudeOutput -Directory)[0].FullName
+    $claudeSummary = Get-Content (Join-Path $claudeRun 'summary.json') -Raw | ConvertFrom-Json
+    $identity = Get-Content (Join-Path $claudeRun 'claude/design-agreement/client-0.metadata.json') -Raw | ConvertFrom-Json
+    $argv = @(Get-Content (Join-Path $fakeBin 'argv.json') -Raw | ConvertFrom-Json)
+    Assert-True ($claudeExit -eq 0 -and $claudeSummary.passed -eq 1) "Claude mock action failed: $($claudeResult -join ' ')"
+    Assert-True ($argv -contains 'requested-action-model' -and $argv -contains '--strict-mcp-config' -and $argv -contains '--tools') 'Claude action invocation lost model or native-tool controls.'
+    Assert-True ($identity.requestedEffort -eq 'medium' -and $identity.requestedModel -eq 'requested-action-model' -and $identity.effectiveModels -contains 'observed-action-model') 'Claude action identity was not retained.'
+    Assert-True ((Get-Content (Join-Path $fakeBin 'prompt.txt') -Raw) -match 'controlled tool protocol') 'Action prompt did not travel on stdin.'
     Push-Location $testRoot
     try {
-        $resolvedOutput = Resolve-ActionOutputDirectory 'relative-output'
-        Assert-True ($resolvedOutput -eq (Join-Path $testRoot 'relative-output')) 'Relative output did not use the PowerShell location.'
+        $resolvedOutput = New-EvaluationRunDirectory 'relative-output'
+        Assert-True ($resolvedOutput.StartsWith((Join-Path $testRoot 'relative-output') + [IO.Path]::DirectorySeparatorChar)) 'Relative output did not use the PowerShell location.'
         $rejected = $false
-        try { Resolve-ActionOutputDirectory 'Env:ACTION_TEST_OUTPUT' | Out-Null } catch { $rejected = $true }
+        try { New-EvaluationRunDirectory 'Env:ACTION_TEST_OUTPUT' | Out-Null } catch { $rejected = $true }
         Assert-True $rejected 'Non-filesystem output provider was accepted.'
     } finally { Pop-Location }
     Write-Host "Instruction action dispatcher and observation tests: OK ($assertions assertions)"

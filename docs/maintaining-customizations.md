@@ -68,6 +68,23 @@ Record what each forward test could and could not prove. A test that opened a re
 
 Keep forward-test prompts separate from their expected behavior so the agent cannot read its rubric. Use `scripts/evaluate-instructions.ps1` to run each case in a fresh, read-only classification session and score the structured result. These live evaluations use the selected agent CLI and are intentionally separate from the deterministic `verify.ps1` and `test.ps1` checks; run the affected target and case set when instruction behavior changes, then report the exact cases, targets, and results.
 
+For both evaluators, record the printed unique run directory and inspect its
+`summary.json` plus per-case native logs. The summary is written before each
+case and updated after scoring; an interrupted or still-running case is not a
+pass. CLI failures and invalid/missing envelopes are execution failures,
+separate from a valid response that fails the behavior or protocol contract.
+A valid empty JSON object still reaches the scorer. Logs and requested/effective
+model metadata remain available after failures; absent effective metadata stays
+unknown. The Codex instruction baseline records whether
+the run used stock, reviewed, or custom model instructions; non-stock runs pass
+a retained snapshot to the CLI and record its SHA-256, so later source edits do
+not change that run's baseline. Keep the snapshot with its private run evidence.
+Remove only your own disposable runs after
+recording the required evidence. A repeated call never overwrites an earlier run.
+Prompts travel on stdin, not in native command-line arguments. Use `-ClaudeModel`
+for the action suite as well as classification when pinning an evaluation;
+`-ClaudeEffort` selects the supported CLI effort independently.
+
 Validate routing separately. `scripts/evaluate-instructions.ps1 -Suite skill-routing` gives a fresh session each target's compiled guidance plus the names and descriptions of that target's skills, then scores which skill it would load first. Each deployed skill keeps at least three positive cases per target, and each target keeps at least three near-miss requests that must load no skill; `tests/SkillRouting.Tests.ps1` enforces that coverage. Run the suite when a skill is added or removed or its description changes. Use `-ClaudeModel` for each Claude model expected to load the skill, such as `haiku`, `sonnet`, and `opus`, and `-CodexModel` for Codex models.
 
 For consequential changes to authorization, continuation, or stop behavior, also run the applicable cases in `scripts/evaluate-instruction-actions.ps1`. This small suite dispatches actual bounded file/tool requests in disposable repositories and scores effects and ordering against separate expectations. Use the faster classification cases for routine wording checks. Action cases use a controlled JSON tool protocol with user-message injection between requests; they do not establish native-tool integration or in-flight cancellation behavior. Record the exact targets, cases, observed results, and retained trace location.

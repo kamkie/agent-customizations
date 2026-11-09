@@ -106,6 +106,13 @@ sudo --user root kubectl get secret app -o yaml
 sudo --user=root kubectl get secret app -o yaml
 env --unset HTTPS_PROXY kubectl get secret app -o yaml
 timeout --signal KILL 30 kubectl get secret app -o yaml
+time -p kubectl get secret app -o yaml
+watch -n 5 "kubectl get secret app -o yaml"
+su - deploy -c 'kubectl get secret app -o yaml'
+wsl kubectl get secret app -o yaml
+wsl -d Ubuntu -- kubectl get secret app -o yaml
+bash <<< "kubectl get secret app -o yaml"
+sh <<<'kubectl get secret app -o yaml'
 pwsh -Command "kubectl get secret app -o yaml"
 eval "kubectl get secret app -o yaml"
 PASS=$(kubectl get secret app -o jsonpath='{.data.password}' | base64 -d)
@@ -155,6 +162,8 @@ Write-Output "value: $(kubectl get secret app -o jsonpath='{.data.password}')"
 if ($true) { kubectl get secret app -o yaml }
 $env:KUBECONFIG = 'kube.yaml'; kubectl get secret app -o yaml
 cmd /c "kubectl get secret app -o yaml"
+foreach ($s in kubectl get secrets -o json | ConvertFrom-Json) { $s }
+wsl bash -c "kubectl get secret app -o yaml"
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'kubectl' -Commands @(
     "kubectl get secret app ```n  -o yaml",
@@ -263,6 +272,9 @@ kubectl get secret app -o yaml 2> /dev/null | sha256sum
 2>/dev/null kubectl get secret app
 kubectl get secret ${NAME:-app}
 bash -cx 'kubectl get secret app'
+time kubectl get secret app
+watch -n 5 "kubectl get secret app"
+cat <<< "kubectl get secret app -o yaml"
 sudo --user root kubectl get secret app
 sudo --user root grep -rn "kubectl get secret app -o yaml" docs/
 echo ${NOTE:-kubectl get secret app -o yaml}
@@ -320,6 +332,9 @@ kubectl get secret app -o jsonpath='{.metadata.name}'
 kubectl get secret app -o json | sha256sum
 Write-Output 'az keyvault secret show --name x'
 Write-Output "kubectl get secret app -o yaml"
+"kubectl get secret app -o yaml" | Set-Content notes.txt
+$cmd = "kubectl get secret app -o yaml"
+foreach ($s in kubectl get secrets -o name) { $s }
 Select-String -Pattern "glab api projects/1/variables" -Path docs/guide.md
 git commit -m "Deny `kubectl get secret app -o yaml` in the guard"
 Get-ChildItem secrets; Get-Content docs/variables.md

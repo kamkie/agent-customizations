@@ -69,7 +69,7 @@ $script:HashCommands = @(
     'sha1sum', 'sha224sum', 'sha256sum', 'sha384sum', 'sha512sum', 'md5sum', 'b2sum', 'b3sum', 'shasum', 'md5'
 )
 $script:PassThroughCommands = @('base64', 'tr')
-$script:ShellKeywords = @('if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', 'time', 'return', 'try', 'finally')
+$script:ShellKeywords = @('if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', 'return', 'try', 'finally')
 # Wrapper commands that run another command, with their value-taking options.
 $script:WrapperCommands = @{
     env = @('-u', '--unset', '-C', '--chdir', '-S', '--split-string')
@@ -81,6 +81,7 @@ $script:WrapperCommands = @{
     nice = @('-n', '--adjustment'); winpty = @()
     stdbuf = @('-i', '--input', '-o', '--output', '-e', '--error')
     timeout = @('-s', '--signal', '-k', '--kill-after'); watch = @('-n', '--interval')
+    time = @('-f', '--format', '-o', '--output'); wsl = @('-d', '--distribution', '-u', '--user', '--cd')
     xargs = @(
         '-I', '-n', '--max-args', '-P', '--max-procs', '-L', '--max-lines', '-s', '--max-chars',
         '-d', '--delimiter', '-E', '-a', '--arg-file'
@@ -793,10 +794,12 @@ function Test-PipedIntoKeysFilter {
 }
 
 # Index of the word that is the executable: after leading assignments, shell
-# keywords, and wrapper commands with their options.
+# keywords, and wrapper commands with their options. Sets
+# $script:ExecutableWrapped when a wrapper command runs it.
 function Get-ExecutableIndex {
     param([object[]]$Words)
     $index = 0
+    $script:ExecutableWrapped = $false
     while ($index -lt $Words.Count) {
         $word = $Words[$index]
         $text = [string]$word.text
@@ -806,10 +809,17 @@ function Get-ExecutableIndex {
             $index += 2
             continue
         }
+        # PowerShell: foreach ($item in command ...)
+        if ($text -cmatch '^\$' -and $index + 1 -lt $Words.Count -and -not $Words[$index + 1].quoted -and
+            [string]$Words[$index + 1].text -ceq 'in') {
+            $index += 2
+            continue
+        }
         if (-not $word.quoted -and $script:ShellKeywords -ccontains $text) { $index++; continue }
         $name = Get-CommandBaseName -Text $text
         if ($script:WrapperCommands.ContainsKey($name)) {
             $valueFlags = $script:WrapperCommands[$name]
+            $script:ExecutableWrapped = $true
             $index++
             while ($index -lt $Words.Count) {
                 $argument = [string]$Words[$index].text
@@ -834,11 +844,16 @@ function Get-CommandFinding {
     $command = $Line[$Index]
     $words = Get-ArgumentWords -Words $command.words
     $start = Get-ExecutableIndex -Words $words
+    $wrapped = $script:ExecutableWrapped
     if ($start -ge $words.Count) { return $null }
+    if ($wrapped -and $words[$start].quoted -and [string]$words[$start].text -match '\s') {
+        # A wrapper such as watch takes its command as one quoted string.
+        return Get-TextFinding -Text ([string]$words[$start].text) -Dialect 'posix' -Depth ($Depth + 1)
+    }
     $name = Get-CommandBaseName -Text $words[$start].text
     $arguments = @($words | Select-Object -Skip ($start + 1))
 
-    if ($name -in @('bash', 'sh', 'zsh', 'dash', 'ksh', 'pwsh', 'powershell', 'cmd')) {
+    if ($name -in @('bash', 'sh', 'zsh', 'dash', 'ksh', 'su', 'pwsh', 'powershell', 'cmd')) {
         $dialect = if ($name -in @('pwsh', 'powershell')) { 'powershell' } else { 'posix' }
         for ($i = 0; $i -lt $arguments.Count - 1; $i++) {
             $flag = [string]$arguments[$i].text
@@ -848,7 +863,7 @@ function Get-CommandFinding {
                 $flag -imatch '^/[ck]$'
             } else {
                 # The c may stand anywhere in a short-option cluster, as in -cx.
-                $flag -cmatch '^-[A-Za-z]*c[A-Za-z]*$'
+                $flag -cmatch '^(?:-[A-Za-z]*c[A-Za-z]*|--command)$'
             }
             if (-not $isCommandFlag) { continue }
             $inner = if ($dialect -eq 'powershell' -or $name -eq 'cmd') {
@@ -863,7 +878,16 @@ function Get-CommandFinding {
             if ($finding) { return $finding }
             break
         }
-        foreach ($body in $command.heredocs) {
+        # A shell also takes its script from a here-document or a here-string.
+        $scripts = [Collections.Generic.List[string]]::new()
+        $scripts.AddRange([string[]]@($command.heredocs))
+        for ($i = 0; $i -lt $command.words.Count; $i++) {
+            $text = [string]$command.words[$i].text
+            if (-not $command.words[$i].input -or $text -cnotmatch '^<<<') { continue }
+            if ($text.Length -gt 3) { $scripts.Add($text.Substring(3)) }
+            elseif ($i + 1 -lt $command.words.Count) { $scripts.Add([string]$command.words[$i + 1].text) }
+        }
+        foreach ($body in $scripts) {
             $finding = Get-TextFinding -Text $body -Dialect $dialect -Depth ($Depth + 1)
             if ($finding) { return $finding }
         }

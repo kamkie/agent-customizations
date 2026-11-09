@@ -128,6 +128,9 @@ echo "${unused:-$(kubectl get secret app -o yaml)}"
 echo ${unused:-`kubectl get secret app -o yaml`}
 echo ${#NAME}; kubectl get secret app -o yaml
 echo ${NAME/ #x/y}; kubectl get secret app -o yaml
+echo ${A:-${B:-$(kubectl get secret app -o yaml)}}
+echo ${A:-"$(kubectl get secret app -o yaml)"}
+echo ${NOTE:-x}; kubectl get secret app -o yaml
 kubectl get secret $(cat name.txt) -o yaml
 xargs -I {} kubectl get secret {} -o yaml
 (kubectl get secret app -o yaml)
@@ -280,6 +283,9 @@ cat <<< "kubectl get secret app -o yaml"
 sudo --user root kubectl get secret app
 sudo --user root grep -rn "kubectl get secret app -o yaml" docs/
 echo ${NOTE:-kubectl get secret app -o yaml}
+printf '%s\n' ${NOTE:-example; kubectl get secret app -o yaml}
+echo ${NOTE:-a | kubectl get secret app -o yaml}
+echo "${NOTE:-a; kubectl get secret app -o yaml}"
 kubectl get secret app -o jsonpath='{.data.password}' | base64 --decode | tr -d '\n' | openssl dgst -sha256
 a=$(kubectl get secret app -o jsonpath='{.data.password}' | base64 -d | sha256sum); echo "$a"
 git commit -m "Deny kubectl get secret -o yaml in the guard"

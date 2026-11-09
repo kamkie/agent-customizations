@@ -239,8 +239,59 @@ function Read-DoubleQuoted {
     }
 }
 
+# Reads a parameter expansion body through its closing brace. The body is data:
+# separators and comment characters in it mean nothing. Only the command
+# substitutions inside it are parsed as command lines.
+function Read-ParameterExpansion {
+    $text = $script:ParseText
+    $length = $text.Length
+    $script:ParseDepth++
+    $scratch = New-ParseFrame
+    while ($script:ParsePosition -lt $length) {
+        $ch = $text[$script:ParsePosition]
+        $next = if ($script:ParsePosition + 1 -lt $length) { $text[$script:ParsePosition + 1] } else { [char]0 }
+        if ($ch -eq '}') {
+            $script:ParsePosition++
+            break
+        }
+        if ($ch -eq "'") {
+            $end = $text.IndexOf("'", $script:ParsePosition + 1)
+            $script:ParsePosition = if ($end -lt 0) { $length } else { $end + 1 }
+            continue
+        }
+        if ($ch -eq '"') {
+            $script:ParsePosition++
+            Read-DoubleQuoted -Frame $scratch -HereString $false
+            continue
+        }
+        if ($script:ParseDialect -eq 'posix' -and $ch -eq '\') {
+            $script:ParsePosition = [Math]::Min($script:ParsePosition + 2, $length)
+            continue
+        }
+        if ($script:ParseDepth -lt 40) {
+            if ($ch -eq '$' -and $next -eq '(') {
+                $script:ParsePosition += 2
+                Read-ShellLevel -Close ')'
+                continue
+            }
+            if ($ch -eq '$' -and $next -eq '{') {
+                $script:ParsePosition += 2
+                Read-ParameterExpansion
+                continue
+            }
+            if ($script:ParseDialect -eq 'posix' -and $ch -eq '`') {
+                $script:ParsePosition++
+                Read-ShellLevel -Close '`'
+                continue
+            }
+        }
+        $script:ParsePosition++
+    }
+    $script:ParseDepth--
+}
+
 function Read-ShellLevel {
-    param([char]$Close = [char]0, [switch]$NoComments)
+    param([char]$Close = [char]0)
     $script:ParseDepth++
     $frame = New-ParseFrame
     $text = $script:ParseText
@@ -268,7 +319,7 @@ function Read-ShellLevel {
             $script:ParsePosition++
             continue
         }
-        if ($ch -eq '<' -and $next -eq '#' -and -not $frame.inWord -and -not $NoComments) {
+        if ($ch -eq '<' -and $next -eq '#' -and -not $frame.inWord) {
             # PowerShell block comment. Read in both quoting styles, because the
             # shell behind a tool that is not named PowerShell is not known.
             $commentEnd = $text.IndexOf('#>', $position + 2)
@@ -277,7 +328,7 @@ function Read-ShellLevel {
                 continue
             }
         }
-        if ($ch -eq '#' -and -not $frame.inWord -and -not $NoComments) {
+        if ($ch -eq '#' -and -not $frame.inWord) {
             $lineEnd = $text.IndexOf("`n", $position)
             $script:ParsePosition = if ($lineEnd -lt 0) { $length } else { $lineEnd }
             continue
@@ -357,11 +408,10 @@ function Read-ShellLevel {
             continue
         }
         if ($ch -eq '$' -and $next -eq '{' -and $canNest) {
-            # A parameter expansion stays in its word, and a substitution inside
-            # it, as in ${name:-$(command)}, is parsed like any other. A # there
-            # is an operator, as in ${#name}, never a comment.
+            # A parameter expansion stays in its word. Only a substitution inside
+            # it, as in ${name:-$(command)}, runs a command.
             $script:ParsePosition += 2
-            Read-ShellLevel -Close '}' -NoComments
+            Read-ParameterExpansion
             $null = $frame.buffer.Append($text, $position, $script:ParsePosition - $position)
             $frame.inWord = $true
             continue

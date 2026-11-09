@@ -75,6 +75,8 @@ timeout 30 kubectl get secret app -o yaml
 /usr/local/bin/kubectl get secret app -o yaml
 kubectl.exe get secret app -o yaml
 "kubectl" get secret app -o yaml
+kubectl get sec""ret app -o yaml
+kubectl get sec\ret app -o yaml
 cd repo && kubectl get secret app -o yaml
 echo start; kubectl get secret app -o yaml
 kubectl get pods; kubectl get secret app -o yaml
@@ -141,6 +143,7 @@ az keyvault secret show --vault-name kv -n db-password --query value -o tsv | cl
 az keyvault secret show --vault-name kv -n db-password --query value -o tsv > value.txt
 VALUE=$(az keyvault secret show --vault-name kv -n db-password --query value -o tsv)
 az.cmd keyvault secret show --vault-name kv -n db-password
+az keyvault sec""ret show --vault-name kv -n db-password
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'az' -Commands (Split-Cases @'
 $v = az keyvault secret show --vault-name kv -n db-password --query value -o tsv
@@ -168,6 +171,7 @@ glab variable list --jq '.[] | .value'
 glab variable export
 glab variable export --output env > vars.env
 glab.exe variable get DEPLOY_TOKEN
+gl''ab var get DEPLOY_TOKEN
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'glab' -Commands (Split-Cases @'
 glab api projects/123/variables | ConvertFrom-Json

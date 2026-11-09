@@ -828,7 +828,9 @@ function Get-TextFinding {
 # not known, and is denied when either reading finds a secret-printing command.
 function Get-SecretOutputFinding {
     param([string]$Command, [string]$ToolName)
-    if ($Command -notmatch '(?i)secret|variable|glab') { return $null }
+    # Cheap exit for unrelated commands. Quote and escape characters are removed
+    # first, because a shell joins fragments such as sec""ret into one word.
+    if (($Command -replace '[''"\\`]|\r?\n', '') -notmatch '(?i)secret|variable|glab') { return $null }
     $dialects = if ($ToolName -eq 'PowerShell') { @('powershell') } else { @('posix', 'powershell') }
     foreach ($dialect in $dialects) {
         $finding = Get-TextFinding -Text $Command -Dialect $dialect

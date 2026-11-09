@@ -340,7 +340,8 @@ try {
         @{ command = "bash <<'EOF'`nnpm run dev`nEOF"; trigger = 'npm run dev' },
         @{ command = "cat > notes.md <<'EOF'`ntext`nEOF`nnpm run dev"; trigger = 'npm run dev' },
         @{ command = "# don't wait for it`nStart-Process notepad"; trigger = 'Start-Process' },
-        @{ command = 'cmd /c "echo # starting review & claude -p hello"'; trigger = 'claude -p' }
+        @{ command = 'cmd /c "echo # starting review & claude -p hello"'; trigger = 'claude -p' },
+        @{ command = "bash <<< 'claude -p hello'"; trigger = 'claude -p' }
     )) {
         $launchPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

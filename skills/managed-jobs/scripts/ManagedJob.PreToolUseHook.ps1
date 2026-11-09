@@ -222,21 +222,29 @@ function Get-CommandTrigger {
             break
         }
     }
-    $nested = $null
+    $nested = [Collections.Generic.List[string]]::new()
     if ($Stem -imatch $shellNames) {
-        for ($i = 0; $i -lt $Arguments.Count - 1 -and $null -eq $nested; $i++) {
-            if ($Arguments[$i].quoted) { continue }
+        $commandFound = $false
+        for ($i = 0; $i -lt $Arguments.Count; $i++) {
+            # A Bash here-string is the shell's standard input: `<<< script`.
+            if ($Arguments[$i].unquotedPrefix -like '<<<*') {
+                if ($words[$i].Length -gt 3) { $nested.Add($words[$i].Substring(3)) }
+                elseif ($i + 1 -lt $Arguments.Count) { $nested.Add($words[$i + 1]) }
+                continue
+            }
+            if ($commandFound -or $Arguments[$i].quoted -or $i + 1 -ge $Arguments.Count) { continue }
             if ($words[$i] -imatch '^(?:-c|-Command|/c|/k)$' -or ($Stem -imatch '^(?:bash|sh|zsh)$' -and $words[$i] -cmatch '^-[A-Za-z]*c$')) {
-                $nested = Get-NestedCommandText -Tokens @($Arguments | Select-Object -Skip ($i + 1))
+                $nested.Add((Get-NestedCommandText -Tokens @($Arguments | Select-Object -Skip ($i + 1))))
+                $commandFound = $true
             }
         }
     } elseif ($Stem -imatch $evaluatorNames) {
         $skip = if ($words.Count -gt 0 -and -not $Arguments[0].quoted -and $words[0] -imatch '^-Command$') { 1 } else { 0 }
-        $nested = Get-NestedCommandText -Tokens @($Arguments | Select-Object -Skip $skip)
+        $nested.Add((Get-NestedCommandText -Tokens @($Arguments | Select-Object -Skip $skip)))
     }
-    if ($nested) {
+    foreach ($commandText in $nested) {
         # cmd.exe has no `#` comments, so `#` must not hide the rest of its line.
-        $inner = Get-LaunchTrigger -Text $nested -Depth ($Depth + 1) -LiteralHash:($Stem -ieq 'cmd')
+        $inner = Get-LaunchTrigger -Text $commandText -Depth ($Depth + 1) -LiteralHash:($Stem -ieq 'cmd')
         if ($inner) { return $inner }
     }
     # A background flag counts as an argument of a command, not as text handed

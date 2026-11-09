@@ -13,12 +13,12 @@ Use these bindings with the connected Teams app in Codex. Tool names below are a
 | Read channel posts and replies | `list_channel_messages(team_id, channel_id, include_replies, sent_after, top)` |
 | Search | `search(query, chat_id, team_id, channel_id, sent_after, topn)` with known container filters |
 
-Only supply optional parameters needed for the request. `sent_after` is an ISO 8601 lower bound on sent time. `top` is the maximum returned after automatic pagination, not a page cursor. These list actions expose no cursor parameter; never invent one. Search also accepts sender/recipient names and `include_channel_threads`; inspect its schema for the exact filter form.
+Only supply optional parameters needed for the request. `sent_after` is an ISO 8601 lower bound on sent time. `top` is the maximum returned after automatic pagination, not a page cursor. Read its maximum from the schema (100 where observed) and never pass more: a larger value is rejected, not clamped. These list actions expose no cursor parameter; never invent one. Search also accepts sender/recipient names and `include_channel_threads`; inspect its schema for the exact filter form.
 
 ## History and channels
 
 - `fetch` of a chat link expands recent messages; it does not promise the complete chat. Prefer `list_chat_messages` with the known chat ID for a requested period, using `sent_after` and a suitable `top`.
-- If a response reaches the requested cap or reports truncation, completeness is unproven. Increase `top` only within the current schema/service limits when useful. If the connector cannot expose the remainder, report the gap; do not treat automatic pagination as a guarantee of unlimited history.
+- If a response reaches the requested cap or reports truncation, completeness is unproven. Raise `top` only up to its schema maximum. `sent_after` is only a lower bound, so it cannot split a period into separate windows. If a capped response holds the oldest messages of the period, continue with the newest returned timestamp as the next `sent_after`, one call at a time. If it holds the newest, no `sent_after` value exposes the older remainder. If the connector cannot expose the remainder, report the gap; do not treat automatic pagination as a guarantee of unlimited history.
 - For keyword questions, scope `search` to the known `chat_id`, or to `team_id`/`channel_id`, and fetch relevant hits using their canonical `path`. The filters narrow search results; they do not turn search into a transcript.
 - Resolve a named channel in its known team, then call `list_channel_messages` with `include_replies=true` when thread content is relevant. Inspect the result for reply truncation as well as post limits. Fetch returned message paths when fuller content is needed; report any replies the available actions cannot expose.
 

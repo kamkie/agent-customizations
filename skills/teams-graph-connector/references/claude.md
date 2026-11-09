@@ -29,7 +29,7 @@ The [entrypoint's read steps](../SKILL.md#read-and-summarize) own the completene
 - Pages can contain fewer than 25 items. Follow `nextOffset` while `moreResults` indicates more results; a short page is not an end marker. If the offset cap blocks continuation, narrow the window and report any residual gap. Do not invent an offset beyond the supported limit.
 - A prefix like "searched N of M chats" indicates the slow per-chat scan fallback observed when `ChannelMessage.Read.All` was missing. Coverage is partial and 429s are likely; stop and report the limited coverage.
 
-Work backwards window by window from the recent-read completeness boundary, or from now if none was established. Apply the shared deduplication and stop rules. A creation event or a returned chat `createdDateTime` can establish the chat's start; an empty search window cannot.
+Work backwards window by window from the recent-read completeness boundary, or from now if none was established. Run one search at a time in one agent; never hand windows or participants to parallel subagents. Apply the shared deduplication and stop rules. A creation event or a returned chat `createdDateTime` can establish the chat's start; an empty search window cannot.
 
 ## Channels
 

@@ -38,7 +38,8 @@ param(
     [string]$StateRoot,
     [ValidateSet('starting', 'running', 'completed', 'failed', 'stopped', 'orphaned', 'invalid')]
     [string[]]$Status,
-    [switch]$Json
+    [switch]$Json,
+    [switch]$Table
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,6 +65,9 @@ if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
 }
 if ($Action -ne 'wait' -and $PSBoundParameters.ContainsKey('TimeoutSeconds')) {
     throw '-TimeoutSeconds is valid only for wait.'
+}
+if ($Table -and ($Action -notin @('list', 'status') -or $Id -or $Json)) {
+    throw '-Table is valid only for list, or status without -Id, and cannot be combined with -Json.'
 }
 . (Join-Path $PSScriptRoot 'ManagedJob.Common.ps1')
 $automaticCleanupRoot = Get-ManagedJobAutomaticCleanupRoot
@@ -187,6 +191,24 @@ function Get-ManagedJobsWithActiveReconciliation {
     }
 }
 
+function Get-ReconciledActiveManagedJobs {
+    # Reads only records that may be active; terminal history stays unopened.
+    param([switch]$UpdateCache)
+    Get-ManagedJobActiveRecords -UpdateCache:$UpdateCache | ForEach-Object { Update-ReconciledJob -Job $_ }
+}
+
+function Get-ManagedJobCollection {
+    # `list`, and `status` without -Id: newest first, narrowed by -Status and -Name.
+    $activeOnly = $Status -and @($Status | Where-Object { $_ -notin @('starting', 'running') }).Count -eq 0
+    $jobs = if ($activeOnly) { @(Get-ReconciledActiveManagedJobs) } else { @(Get-ManagedJobsWithActiveReconciliation) }
+    $jobs = Select-ManagedJobs -Jobs @($jobs | Sort-Object createdAtUtc -Descending)
+    if ($Name) {
+        $pattern = if ([WildcardPattern]::ContainsWildcardCharacters($Name)) { $Name } else { "*$Name*" }
+        $jobs = @($jobs | Where-Object { $_.PSObject.Properties.Name -contains 'name' -and [string]$_.name -like $pattern })
+    }
+    return @($jobs)
+}
+
 function Enter-ManagedJobMaintenanceLock {
     $lockPath = Join-Path (Get-ManagedJobRoot) '.maintenance.lock'
     try {
@@ -226,6 +248,16 @@ function Add-ManagedJobIdentity {
     return [pscustomobject]$copy
 }
 
+function Add-ManagedJobWaitOutcome {
+    param(
+        [Parameter(Mandatory)]$Job,
+        [Parameter(Mandatory)][bool]$TimedOut
+    )
+    $outcome = Add-ManagedJobIdentity -Job $Job
+    $outcome | Add-Member -NotePropertyName timedOut -NotePropertyValue $TimedOut
+    return $outcome
+}
+
 function Wait-ManagedJobCompletion {
     param(
         [Parameter(Mandatory)][string]$JobId,
@@ -243,13 +275,15 @@ function Wait-ManagedJobCompletion {
             # wait is still covered by the bounded reconciliation wakeup.
             $job = Update-ReconciledJob -Job (Read-ManagedJob -Path $path)
             if ($job.status -notin @('starting', 'running')) {
-                return Add-ManagedJobIdentity -Job $job
+                return Add-ManagedJobWaitOutcome -Job $job -TimedOut $false
             }
             $waitMilliseconds = 1000
             if ($null -ne $TimeoutSeconds) {
                 $remainingMilliseconds = ($TimeoutSeconds * 1000) - $elapsed.Elapsed.TotalMilliseconds
                 if ($remainingMilliseconds -le 0) {
-                    throw "Managed job $JobId did not complete within $TimeoutSeconds seconds; last status was '$($job.status)'."
+                    # Expiry is an expected outcome of a bounded wait, not an
+                    # error: the job is still running and the caller decides.
+                    return Add-ManagedJobWaitOutcome -Job $job -TimedOut $true
                 }
                 $waitMilliseconds = [Math]::Max(1, [Math]::Min(1000, [int][Math]::Ceiling($remainingMilliseconds)))
             }
@@ -540,10 +574,12 @@ function Write-JobCollection {
     $output = @(foreach ($job in @($Jobs)) {
         if ($null -ne $job) { Add-ManagedJobIdentity -Job $job }
     })
-    if ($Json) {
-        ConvertTo-Json -InputObject $output -Depth 12
-    } else {
+    # JSON is the default, like every other action, so the output can be piped
+    # to ConvertFrom-Json; -Table is the view for a person reading a terminal.
+    if ($Table) {
         $output | Select-Object id, name, kind, status, lifetime, visible, hostPid, createdAtUtc, finishedAtUtc, logPath | Format-Table -AutoSize
+    } else {
+        ConvertTo-Json -InputObject $output -Depth 12
     }
 }
 
@@ -758,7 +794,7 @@ switch ($Action) {
                 }
             } until ($lock)
 
-            $active = @(Get-ManagedJobsWithActiveReconciliation | Where-Object status -in @('starting', 'running'))
+            $active = @(Get-ReconciledActiveManagedJobs -UpdateCache | Where-Object status -in @('starting', 'running'))
             $duplicate = $active | Where-Object {
                 $_.PSObject.Properties.Name -contains 'invocationFingerprint' -and $_.invocationFingerprint -eq $fingerprint
             } | Select-Object -First 1
@@ -1068,16 +1104,14 @@ switch ($Action) {
         $jobOutput | ConvertTo-Json -Depth 12
     }
     'list' {
-        $jobs = @(Get-ManagedJobsWithActiveReconciliation | Sort-Object createdAtUtc -Descending)
-        Write-JobCollection -Jobs (Select-ManagedJobs -Jobs $jobs)
+        Write-JobCollection -Jobs (Get-ManagedJobCollection)
     }
     'status' {
         if ($Id) {
             $job = Read-ManagedJob -Path (Get-ManagedJobFile -Id $Id)
             Add-ManagedJobIdentity -Job (Update-ReconciledJob -Job $job) | ConvertTo-Json -Depth 12
         } else {
-            $jobs = @(Get-ManagedJobsWithActiveReconciliation | Sort-Object createdAtUtc -Descending)
-            Write-JobCollection -Jobs (Select-ManagedJobs -Jobs $jobs)
+            Write-JobCollection -Jobs (Get-ManagedJobCollection)
         }
     }
     'wait' {
@@ -1159,9 +1193,8 @@ switch ($Action) {
         if (-not $Id) { throw '-Id is required for stop.' }
         $path = Get-ManagedJobFile -Id $Id
         $job = Read-ManagedJob -Path $path
-        if ($job.status -notin @('starting', 'running')) {
-            throw "Job $Id is not running; current status is $($job.status)."
-        }
+        # A job that already ended has nothing to stop: its record comes back
+        # unchanged instead of an error, so cleanup can call stop unconditionally.
         $terminationRequest = [pscustomobject]@{
             job = $job
             reason = 'Stopped through managed-jobs.'

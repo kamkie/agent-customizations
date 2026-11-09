@@ -1,6 +1,6 @@
 # Reviewer stance for a prompt-driven range review
 
-Use this when manually constructing a range-scoped review because no controller path is available. The controller already builds an equivalent prompt for later `to-claude` rounds; the Codex reviewer receives its range directly.
+Use this when manually constructing a range-scoped review because no controller path is available or a substitute reviewer runs the round. The controller already builds an equivalent prompt for later `to-claude` rounds; the Codex reviewer receives its range directly.
 
 Write the prompt to a file outside the repository (for example under `$env:TEMP`) and pass it with `-PromptFile`. Never inline a multi-line prompt as a quoted argument.
 

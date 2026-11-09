@@ -51,7 +51,7 @@ Every agent-authored PR needs initial opposite-agent review before Ready.
 
 Keep one delivery record. Refresh after a push or recorded review, immediately before and after marking Ready, immediately before merge/auto-merge, and when new feedback, checks, ownership, or policy invalidate evidence. Fetch the remote head, thread-aware unresolved feedback, latest reviews and their SHAs, required checks, draft state, mergeability, and blocking-review state. Reuse valid evidence between these events, not a new record after every command.
 
-Mark Ready only for the intended current remote head with passing required checks, review coverage or a documented behavior-neutral repair disposition, all findings triaged, no unresolved blocking feedback or applicable `CHANGES_REQUESTED`, and clean mergeability. Reassess changes and affected evidence if the head moves; return to draft if a gate fails after Ready. Resolved feedback stays triaged, but an outstanding formal blocking review must be cleared.
+Mark Ready only for the intended current remote head with passing required checks, review coverage or a repair disposition documented under `cross-agent-review`, all findings triaged, no unresolved blocking feedback or applicable `CHANGES_REQUESTED`, and clean mergeability. Reassess changes and affected evidence if the head moves; return to draft if a gate fails after Ready. Resolved feedback stays triaged, but an outstanding formal blocking review must be cleared.
 
 Owner authorization is a merge gate, never approval invented by the author.
 

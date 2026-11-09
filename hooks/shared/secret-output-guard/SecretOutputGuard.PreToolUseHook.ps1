@@ -454,46 +454,48 @@ function Get-CommandBaseName {
     return (($Text -replace '^.*[\\/]', '') -replace '(?i)\.(?:exe|cmd|bat|ps1)$', '').ToLowerInvariant()
 }
 
+# Splits arguments into positionals and flags. A long spelling listed in
+# $Aliases is stored under its short spelling, and a repeated flag keeps its
+# last value, as the command-line tools do.
 function Read-CommandOptions {
-    param([object[]]$Words, [string[]]$ValueFlags)
+    param([object[]]$Words, [string[]]$ValueFlags, [hashtable]$Aliases = @{})
     $positionals = [Collections.Generic.List[string]]::new()
     $flags = [Collections.Hashtable]::new([StringComparer]::Ordinal)
     for ($i = 0; $i -lt $Words.Count; $i++) {
         $text = [string]$Words[$i].text
         if ($text -ceq '--') { break }
+        $name = $null
+        $value = $true
         if ($text -cmatch '^(--[A-Za-z][\w-]*)=(.*)$') {
-            $flags[$Matches[1]] = [string]$Matches[2]
+            $name = $Matches[1]
+            $value = [string]$Matches[2]
         } elseif ($text -cmatch '^--[A-Za-z]') {
-            if ($ValueFlags -ccontains $text -and $i + 1 -lt $Words.Count) {
-                $flags[$text] = [string]$Words[++$i].text
-            } else {
-                $flags[$text] = $true
-            }
+            $name = $text
+            if ($ValueFlags -ccontains $text -and $i + 1 -lt $Words.Count) { $value = [string]$Words[++$i].text }
         } elseif ($text -cmatch '^-[A-Za-z]') {
+            $name = $text
             $short = $text.Substring(0, 2)
             if ($ValueFlags -ccontains $short) {
+                $name = $short
                 if ($text.Length -gt 2) {
-                    $flags[$short] = $text.Substring(2).TrimStart('=')
+                    $value = $text.Substring(2).TrimStart('=')
                 } elseif ($i + 1 -lt $Words.Count) {
-                    $flags[$short] = [string]$Words[++$i].text
-                } else {
-                    $flags[$short] = $true
+                    $value = [string]$Words[++$i].text
                 }
-            } else {
-                $flags[$text] = $true
             }
         } else {
             $positionals.Add($text)
+            continue
         }
+        if ($Aliases.ContainsKey($name)) { $name = [string]$Aliases[$name] }
+        $flags[$name] = $value
     }
     return @{ positionals = $positionals.ToArray(); flags = $flags }
 }
 
 function Get-FlagText {
-    param($Flags, [string[]]$Names)
-    foreach ($name in $Names) {
-        if ($Flags.ContainsKey($name) -and $Flags[$name] -is [string]) { return [string]$Flags[$name] }
-    }
+    param($Flags, [string]$Name)
+    if ($Flags.ContainsKey($Name) -and $Flags[$Name] -is [string]) { return [string]$Flags[$Name] }
     return $null
 }
 
@@ -550,7 +552,7 @@ function Test-SafeGoTemplate {
 # provably limited to metadata.
 function Test-KubectlSecretRead {
     param([object[]]$Words)
-    $options = Read-CommandOptions -Words $Words -ValueFlags $script:KubectlValueFlags
+    $options = Read-CommandOptions -Words $Words -ValueFlags $script:KubectlValueFlags -Aliases @{ '--output' = '-o' }
     $positionals = @($options.positionals)
     $verbIndex = -1
     for ($i = 0; $i -lt $positionals.Count; $i++) {
@@ -564,8 +566,8 @@ function Test-KubectlSecretRead {
     }
     if (-not $readsSecret) { return $false }
 
-    $output = Get-FlagText -Flags $options.flags -Names @('-o', '--output')
-    $template = Get-FlagText -Flags $options.flags -Names @('--template')
+    $output = Get-FlagText -Flags $options.flags -Name '-o'
+    $template = Get-FlagText -Flags $options.flags -Name '--template'
     if ($null -eq $output -and $null -eq $template) { return $false }
     $format = if ($null -ne $output) { $output } else { 'go-template' }
     $expression = ''
@@ -589,11 +591,11 @@ function Test-KubectlSecretRead {
 # output to non-value fields.
 function Test-AzSecretRead {
     param([object[]]$Words)
-    $options = Read-CommandOptions -Words $Words -ValueFlags $script:AzValueFlags
+    $options = Read-CommandOptions -Words $Words -ValueFlags $script:AzValueFlags -Aliases @{ '--output' = '-o' }
     if (((@($options.positionals) | Select-Object -First 3) -join ' ') -cne 'keyvault secret show') { return $false }
-    $output = Get-FlagText -Flags $options.flags -Names @('-o', '--output')
+    $output = Get-FlagText -Flags $options.flags -Name '-o'
     if ($output -ieq 'none') { return $false }
-    $query = Get-FlagText -Flags $options.flags -Names @('--query')
+    $query = Get-FlagText -Flags $options.flags -Name '--query'
     return -not ($null -ne $query -and $query.Trim() -cmatch $script:VaultQueryPattern)
 }
 
@@ -604,28 +606,30 @@ function Test-GlabVariableRead {
     $subcommand = [string]$Words[0].text
     $rest = @($Words | Select-Object -Skip 1)
     if ($subcommand -ceq 'api') {
-        $options = Read-CommandOptions -Words $rest -ValueFlags $script:GlabApiValueFlags
+        $options = Read-CommandOptions -Words $rest -ValueFlags $script:GlabApiValueFlags -Aliases @{
+            '--method' = '-X'; '--raw-field' = '-f'; '--field' = '-F'
+        }
         $positionals = @($options.positionals)
         if ($positionals.Count -eq 0 -or $positionals[0] -notmatch '(?:^|/)variables(?:[/?#]|$)') { return $false }
         $flags = $options.flags
         if ($flags.ContainsKey('--silent')) { return $false }
-        $method = Get-FlagText -Flags $flags -Names @('-X', '--method')
+        $method = Get-FlagText -Flags $flags -Name '-X'
         if ($null -ne $method) { return $method -ieq 'GET' }
-        foreach ($bodyFlag in @('-f', '--raw-field', '-F', '--field', '--form', '--input')) {
+        foreach ($bodyFlag in @('-f', '-F', '--form', '--input')) {
             if ($flags.ContainsKey($bodyFlag)) { return $false }
         }
         return $true
     }
     if ($subcommand -cin @('variable', 'var')) {
-        $options = Read-CommandOptions -Words $rest -ValueFlags $script:GlabVariableValueFlags
+        $options = Read-CommandOptions -Words $rest -ValueFlags $script:GlabVariableValueFlags -Aliases @{ '--output' = '-F' }
         $positionals = @($options.positionals)
         if ($positionals.Count -eq 0) { return $false }
-        $filter = Get-FlagText -Flags $options.flags -Names @('--jq')
+        $filter = Get-FlagText -Flags $options.flags -Name '--jq'
         $keysOnly = $null -ne $filter -and $filter -cmatch $script:KeysFilterPattern
         switch -CaseSensitive ($positionals[0]) {
             { $_ -in @('get', 'export', 'ex') } { return -not $keysOnly }
             { $_ -in @('list', 'ls') } {
-                $json = (Get-FlagText -Flags $options.flags -Names @('-F', '--output')) -ieq 'json'
+                $json = (Get-FlagText -Flags $options.flags -Name '-F') -ieq 'json'
                 return ($json -or $options.flags.ContainsKey('--jq')) -and -not $keysOnly
             }
         }

@@ -44,6 +44,8 @@ kubectl -n prod get secret app -ojson
 kubectl --context dev get secret app --output=yaml
 kubectl get secret/app -o yaml
 kubectl get secrets,configmaps -o yaml
+kubectl get secret app -o name --output yaml
+kubectl get secret app --output name -o yaml
 kubectl get secret app -o jsonpath='{.data.password}'
 kubectl get secret app -o jsonpath="{.data.password}"
 kubectl get secret app -o jsonpath={.data.password}
@@ -144,6 +146,7 @@ az keyvault secret show --vault-name kv -n db-password --query value -o tsv > va
 VALUE=$(az keyvault secret show --vault-name kv -n db-password --query value -o tsv)
 az.cmd keyvault secret show --vault-name kv -n db-password
 az keyvault sec""ret show --vault-name kv -n db-password
+az keyvault secret show --vault-name kv -n db-password -o none --output json
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'az' -Commands (Split-Cases @'
 $v = az keyvault secret show --vault-name kv -n db-password --query value -o tsv
@@ -172,6 +175,8 @@ glab variable export
 glab variable export --output env > vars.env
 glab.exe variable get DEPLOY_TOKEN
 gl''ab var get DEPLOY_TOKEN
+glab variable list -F text --output json
+glab api --method POST -X GET projects/123/variables
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'glab' -Commands (Split-Cases @'
 glab api projects/123/variables | ConvertFrom-Json
@@ -186,6 +191,9 @@ kubectl get secret app
 kubectl get secrets -A
 kubectl get secret app -o wide
 kubectl get secret app -o name
+kubectl get secret app -o yaml --output name
+az keyvault secret show --vault-name kv -n db-password --output json -o none
+glab variable list --output json -F text
 kubectl describe secret app
 kubectl get secret app -o jsonpath='{.metadata.name}'
 kubectl get secret app -o jsonpath={.metadata.name}

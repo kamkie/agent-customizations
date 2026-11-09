@@ -45,6 +45,9 @@ targets.
   a band above the prompt.
 - `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.
 - `hooks/claude` — Claude Code-specific managed-job lifecycle cleanup scripts.
+- `hooks/shared` — hooks registered for both Codex and Claude Code: the
+  secret-output guard, which denies shell commands that would print secret
+  values.
 - `config/manifest.json` — the exact files, plugins, and hook registrations
   managed for each supported agent.
 - `docs/customization-ownership.md` — classification, admission, ownership,

@@ -155,6 +155,12 @@ Claude Code applies changed hook definitions when a new session starts. Sessions
 
 GitHub Copilot has no managed-jobs hook registrations in the manifest; its installed `managed-jobs` skill runs without automatic startup reconciliation or turn/session cleanup hooks, so Copilot sessions must explicitly stop started jobs and run `reconcile` after an interrupted session.
 
+### Secret-output guard
+
+The secret-output guard is a `PreToolUse` hook for the Codex and Claude Code shell tools; GitHub Copilot has no such hook. It denies a command before it runs when its output would print secret values: `kubectl get secret` with an output format that can reach `.data` or `.stringData`, `az keyvault secret show` without a `--query` limited to non-value fields, and GitLab CI/CD variable reads through `glab` that are not reduced to keys. Each denial names the safe alternative: key names, metadata, or a hash.
+
+A command passes when its output is piped only into a hash command, optionally through `base64` or `tr`. A filter, a redirect, or a variable capture does not pass. The guard reads the command text only, at command position, so quoted prose, search patterns, comments, and here-document bodies do not match. It cannot see inside scripts, remote shells, or aliases, and it fails open on its own errors: treat it as a guardrail, not as an enforcement boundary.
+
 ## Apply plugin changes
 
 Claude Code loads each plugin installed under `~/.claude/skills/<name>` as `<name>@skills-dir` in new sessions; `claude plugin list` shows its state. A same-named plugin loaded through `CLAUDE_CODE_PLUGIN_DIRS` or `--plugin-dir` takes precedence, so remove that entry to load the reviewed copy. Status ignores the type declarations Claude Code generates under a plugin's `.claude-plugin/types/`.

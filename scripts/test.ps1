@@ -41,6 +41,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\claude\managed-jobs\tests\ClaudeManagedJobHooks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Claude managed-job hook lifecycle test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\shared\secret-output-guard\tests\SecretOutputGuard.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Secret-output guard decision test failed.' }
 
     $null = New-Item -ItemType Directory -Path $codexSandbox -Force
     $lookalikeStopCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
@@ -179,9 +181,16 @@ try {
         throw 'Codex SessionStart hook must schedule ten-minute asynchronous reconciliation for startup and resume.'
     }
     $preToolHandlers = @($codexHooks.hooks.PreToolUse | ForEach-Object { $_.hooks })
-    if ($preToolHandlers.Count -ne 1 -or
-        [string]$preToolHandlers[0].command -notmatch 'ManagedHookId "managed-jobs-pre-tool-use"') {
+    if ($preToolHandlers.Count -ne 2 -or
+        @($preToolHandlers | Where-Object { [string]$_.command -match 'ManagedHookId "managed-jobs-pre-tool-use"' }).Count -ne 1) {
         throw 'Codex hook installation did not replace the exact legacy PreToolUse command with one marked managed definition.'
+    }
+    $codexSecretGuard = @($codexHooks.hooks.PreToolUse | Where-Object {
+        [string]$_.hooks[0].command -match 'ManagedHookId "secret-output-guard-pre-tool-use"'
+    })
+    if ($codexSecretGuard.Count -ne 1 -or [string]$codexSecretGuard[0].matcher -cne '^Bash$' -or
+        -not (Test-Path -LiteralPath (Join-Path $codexSandbox 'hooks\secret-output-guard\SecretOutputGuard.PreToolUseHook.ps1') -PathType Leaf)) {
+        throw 'Codex hook installation did not register and copy the secret-output guard for the shell tool.'
     }
     foreach ($script in @('ManagedJob.StopHook.ps1', 'ManagedJob.SessionEndHook.ps1')) {
         if (-not (Test-Path -LiteralPath (Join-Path $codexSandbox "hooks\managed-jobs\$script") -PathType Leaf)) {
@@ -217,9 +226,16 @@ try {
         throw 'Claude SessionStart hook must schedule ten-minute asynchronous reconciliation for startup and resume.'
     }
     $claudePreToolHandlers = @($claudeSettings.hooks.PreToolUse | ForEach-Object { $_.hooks })
-    if ($claudePreToolHandlers.Count -ne 1 -or
-        [string]$claudePreToolHandlers[0].command -notmatch 'ManagedHookId "managed-jobs-pre-tool-use"') {
+    if ($claudePreToolHandlers.Count -ne 2 -or
+        @($claudePreToolHandlers | Where-Object { [string]$_.command -match 'ManagedHookId "managed-jobs-pre-tool-use"' }).Count -ne 1) {
         throw 'Claude hook installation did not replace the exact legacy PreToolUse command with one marked managed definition.'
+    }
+    $claudeSecretGuard = @($claudeSettings.hooks.PreToolUse | Where-Object {
+        [string]$_.hooks[0].command -match 'ManagedHookId "secret-output-guard-pre-tool-use"'
+    })
+    if ($claudeSecretGuard.Count -ne 1 -or [string]$claudeSecretGuard[0].matcher -cne '^(Bash|PowerShell)$' -or
+        -not (Test-Path -LiteralPath (Join-Path $claudeSandbox 'hooks\secret-output-guard\SecretOutputGuard.PreToolUseHook.ps1') -PathType Leaf)) {
+        throw 'Claude hook installation did not register and copy the secret-output guard for both shell tools.'
     }
     foreach ($event in @('SessionStart', 'PreToolUse', 'Stop', 'StopFailure', 'SessionEnd')) {
         foreach ($handler in @($claudeSettings.hooks.$event | ForEach-Object { $_.hooks })) {

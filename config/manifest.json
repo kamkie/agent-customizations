@@ -51,6 +51,15 @@
             "source": "hooks/codex/managed-jobs/ManagedJob.SessionEndHook.ps1",
             "script": "hooks/managed-jobs/ManagedJob.SessionEndHook.ps1",
             "timeout": 3
+          },
+          {
+            "id": "secret-output-guard-pre-tool-use",
+            "event": "PreToolUse",
+            "matcher": "^Bash$",
+            "source": "hooks/shared/secret-output-guard/SecretOutputGuard.PreToolUseHook.ps1",
+            "script": "hooks/secret-output-guard/SecretOutputGuard.PreToolUseHook.ps1",
+            "timeout": 10,
+            "statusMessage": "Checking for secret output"
           }
         ]
       },
@@ -121,6 +130,14 @@
             "source": "hooks/claude/managed-jobs/ManagedJob.SessionEndHook.ps1",
             "script": "hooks/managed-jobs/ManagedJob.SessionEndHook.ps1",
             "timeout": 3
+          },
+          {
+            "id": "secret-output-guard-pre-tool-use",
+            "event": "PreToolUse",
+            "matcher": "^(Bash|PowerShell)$",
+            "source": "hooks/shared/secret-output-guard/SecretOutputGuard.PreToolUseHook.ps1",
+            "script": "hooks/secret-output-guard/SecretOutputGuard.PreToolUseHook.ps1",
+            "timeout": 10
           }
         ]
       },

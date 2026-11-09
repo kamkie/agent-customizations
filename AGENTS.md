@@ -17,7 +17,7 @@ Explicit implementation commands authorize the full workflow through Ready, incl
 
 Installation, live deployment, release, repository administration, protection bypass, and fabricated approval are never part of delivery authority. These actions require their own explicit authority.
 
-One standing grant: the owner's own report in the current conversation that a pull request changing manifest-deployed sources has merged authorizes one installation of that merge. Confirm the merge commit is on fetched `origin/main`, install from clean, current `main` under the [deployment guide](docs/deployment.md), and report the resulting `status.ps1` state. The report grants nothing else: no other source, no safeguard override, and no discarding of live-only guidance. A merge the agent performed or only observed is not that report. If a precondition fails, report it instead of installing.
+One standing grant: the owner's own report in the current conversation that a pull request changing manifest-deployed sources has merged authorizes one installation of current `main`. Confirm the reported merge is on fetched `origin/main`, fast-forward clean local `main` to that `origin/main` commit, install it under the [deployment guide](docs/deployment.md), and report the installed commit and the resulting `status.ps1` state. `main` holds only owner-authorized merges, so the installation covers everything merged up to that commit, not the reported pull request alone. The report grants nothing else: no other source, no safeguard override, and no discarding of live-only guidance. A merge the agent performed or only observed is not that report. If a precondition fails, report it instead of installing.
 
 ## Full delivery workflow
 

@@ -99,4 +99,4 @@ Delivery requirements have one owner: `AGENTS.md` owns repository stages, gates,
 
 Follow the canonical [implementation and delivery workflow](../AGENTS.md#implement-validate-and-commit) in `AGENTS.md`. It owns the exact validation triggers, drift inspection, activation boundary, final-diff review, branch and pull-request workflow, cross-review, and current-head readiness checks.
 
-A merged change is not live until it is installed. When the owner reports that a pull request changing manifest-deployed sources has merged, install it and report the status under [Request authority](../AGENTS.md#request-authority); do not wait for a separate install instruction.
+A merged change is not live until it is installed. When the owner reports that a pull request changing manifest-deployed sources has merged, install current `main` and report the status under [Request authority](../AGENTS.md#request-authority); do not wait for a separate install instruction.

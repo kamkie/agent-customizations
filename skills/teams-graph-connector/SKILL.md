@@ -5,7 +5,7 @@ description: Check, summarize, catch up on, or search Microsoft Teams chats, cha
 
 # Teams via a Graph-backed connector
 
-Use the connected Teams tools on the user's behalf. Make one connector call at a time. Never batch Teams, Outlook, or SharePoint connector calls in parallel or spread them across subagents: they draw on one Graph throttling budget, which other sessions can share. When subagents need Teams content, read it in the coordinating agent and pass it in their briefs. Tool schemas and returned limits govern the current connection: a page size above the schema maximum is rejected, so cover a longer period with several date windows.
+Use the connected Teams tools on the user's behalf. Make one connector call at a time. Never batch Teams, Outlook, or SharePoint connector calls in parallel or spread them across subagents: they draw on one Graph throttling budget, which other sessions can share. When subagents need Teams content, read it in the coordinating agent and pass it in their briefs. Tool schemas and returned limits govern the current connection: a page size above the schema maximum is rejected, so never pass one. Cover a longer period with the date bounds or cursors the tool exposes, and report what a capped response leaves unread.
 
 ## Select the connector
 

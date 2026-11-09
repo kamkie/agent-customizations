@@ -478,6 +478,14 @@ function Read-ShellLevel {
                 continue
             }
             # Here-document: its body starts after the next line break and is data.
+            # Digits written before the operator name the descriptor it feeds;
+            # only standard input can carry a shell's program.
+            $feedsStdin = $true
+            if ($frame.inWord -and -not $frame.quoted -and $frame.buffer.ToString() -cmatch '^\d+$') {
+                $feedsStdin = $frame.buffer.ToString() -cmatch '^0+$'
+                $null = $frame.buffer.Clear()
+                $frame.inWord = $false
+            }
             $cursor = $position + 2
             if ($cursor -lt $length -and $text[$cursor] -eq '-') { $cursor++ }
             while ($cursor -lt $length -and ($text[$cursor] -eq ' ' -or $text[$cursor] -eq "`t")) { $cursor++ }
@@ -494,7 +502,9 @@ function Read-ShellLevel {
                 }
             }
             if ($delimiter.Length -gt 0) {
-                $frame.pending.Add(@{ delimiter = $delimiter.ToString(); target = $frame.heredocs })
+                $target = $frame.heredocs
+                if (-not $feedsStdin) { $target = [Collections.Generic.List[string]]::new() }
+                $frame.pending.Add(@{ delimiter = $delimiter.ToString(); target = $target })
             }
             $script:ParsePosition = $cursor
             continue
@@ -987,9 +997,9 @@ function Get-CommandFinding {
         $scripts = [Collections.Generic.List[string]]::new()
         $scripts.AddRange([string[]]@($command.heredocs))
         for ($i = 0; $i -lt $command.words.Count; $i++) {
-            $text = [string]$command.words[$i].text
-            if (-not $command.words[$i].input -or $text -cnotmatch '^<<<') { continue }
-            if ($text.Length -gt 3) { $scripts.Add($text.Substring(3)) }
+            # A here-string may name descriptor 0 explicitly, as in 0<<<word.
+            if (-not $command.words[$i].input -or [string]$command.words[$i].text -cnotmatch '^0*<<<(.*)$') { continue }
+            if ($Matches[1]) { $scripts.Add($Matches[1]) }
             elseif ($i + 1 -lt $command.words.Count) { $scripts.Add([string]$command.words[$i + 1].text) }
         }
         foreach ($body in $scripts) {

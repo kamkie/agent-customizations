@@ -126,6 +126,8 @@ wsl kubectl get secret app -o yaml
 wsl -d Ubuntu -- kubectl get secret app -o yaml
 bash <<< "kubectl get secret app -o yaml"
 sh <<<'kubectl get secret app -o yaml'
+bash 0<<<'kubectl get secret app -o yaml'
+bash 0<<< 'kubectl get secret app -o yaml'
 pwsh -Command "kubectl get secret app -o yaml"
 eval "kubectl get secret app -o yaml"
 PASS=$(kubectl get secret app -o jsonpath='{.data.password}' | base64 -d)
@@ -158,6 +160,7 @@ Test-Cases -Tool 'Bash' -Expected 'kubectl' -Commands @(
     "bash <<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "bash -s -- arg <<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "bash -x <<'EOF'`nkubectl get secret app -o yaml`nEOF",
+    "bash 0<<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "cat <<EOF`nnote`nEOF`nkubectl get secret app -o yaml",
     # PowerShell text reaching a shell tool that is not named PowerShell.
     "kubectl get secret app ```n  -o yaml"
@@ -358,6 +361,8 @@ Test-Cases -Tool 'Bash' -Expected $null -Commands @(
     "cat <<EOF | grep kubectl`nkubectl get secret app -o yaml`nEOF",
     "bash -c 'cat' <<EOF`nkubectl get secret app -o yaml`nEOF",
     "bash notes.sh <<EOF`nkubectl get secret app -o yaml`nEOF",
+    "bash 3<<EOF`nkubectl get secret app -o yaml`nEOF",
+    "bash 3<<< 'kubectl get secret app -o yaml'",
     "# note`n# kubectl get secret app -o yaml`ngit status"
 )
 Test-Cases -Tool 'PowerShell' -Expected $null -Commands (Split-Cases @'

@@ -57,7 +57,7 @@ $script:AzValueFlags = @(
 )
 $script:GlabApiValueFlags = @(
     '-X', '--method', '-H', '--header', '-f', '--raw-field', '-F', '--field', '--form', '--input',
-    '--hostname', '--placeholder', '--output'
+    '--hostname', '--placeholder', '--output', '-R', '--repo'
 )
 $script:GlabVariableValueFlags = @(
     '-g', '--group', '-R', '--repo', '-F', '--output', '-p', '--page', '-P', '--per-page', '-s', '--scope', '--jq'
@@ -607,9 +607,17 @@ function Test-AzSecretRead {
 # True when the glab arguments read CI/CD variables in a form that prints values.
 function Test-GlabVariableRead {
     param([object[]]$Words)
-    if ($Words.Count -eq 0) { return $false }
-    $subcommand = [string]$Words[0].text
-    $rest = @($Words | Select-Object -Skip 1)
+    # Options may come before the subcommand, so find the first positional.
+    $valueFlags = $script:GlabApiValueFlags + $script:GlabVariableValueFlags
+    $subcommandIndex = -1
+    for ($i = 0; $i -lt $Words.Count; $i++) {
+        $text = [string]$Words[$i].text
+        if ($text -cnotmatch '^-') { $subcommandIndex = $i; break }
+        if ($valueFlags -ccontains $text) { $i++ }
+    }
+    if ($subcommandIndex -lt 0) { return $false }
+    $subcommand = [string]$Words[$subcommandIndex].text
+    $rest = @(for ($i = 0; $i -lt $Words.Count; $i++) { if ($i -ne $subcommandIndex) { $Words[$i] } })
     if ($subcommand -ceq 'api') {
         $options = Read-CommandOptions -Words $rest -ValueFlags $script:GlabApiValueFlags -Aliases @{
             '--method' = '-X'; '--raw-field' = '-f'; '--field' = '-F'

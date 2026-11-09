@@ -179,6 +179,10 @@ glab.exe variable get DEPLOY_TOKEN
 gl''ab var get DEPLOY_TOKEN
 glab variable list -F text --output json
 glab api --method POST -X GET projects/123/variables
+glab --repo group/project variable get DEPLOY_TOKEN
+glab -R group/project variable export
+glab --repo=group/project variable list --output json
+glab --hostname gitlab.example.com api projects/123/variables
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'glab' -Commands (Split-Cases @'
 glab api projects/123/variables | ConvertFrom-Json
@@ -239,6 +243,8 @@ az keyvault secret list --vault-name kv
 az keyvault show --name kv
 glab variable list
 glab variable list -g group --per-page 100
+glab --repo group/project variable list
+glab -R group/variable mr list
 glab variable list -F json --jq '.[].key'
 glab variable export --jq '[.[] | .key] | sort'
 glab api projects/123/variables | jq -r '.[].key'

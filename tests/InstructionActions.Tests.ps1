@@ -13,7 +13,7 @@ function Assert-True($condition, $message) {
 }
 function Assert-ExpectationContract($Expectation, [string]$Id) {
     $arrays = @('requiredTools','checks','requiredReads','readsBeforeMutation','forbiddenWritePaths','forbiddenTools','firstPhaseMessageContains')
-    $booleans = @('unchanged','firstPhaseUnchanged','firstPhaseRequiresProse','mustInterrupt','noToolsAfterStop','mustSteer','nextActionRequired')
+    $booleans = @('unchanged','firstPhaseUnchanged','firstPhaseRequiresProse','mustInterrupt','noToolsAfterStop','mustSteer','nextActionRequired','closingOptional')
     $strings = @('firstTool','firstPhaseNextWord')
     foreach ($name in @('requiredTools','checks')) {
         if (-not $Expectation.PSObject.Properties[$name]) { throw "Expectation '$Id' is missing required array '$name'." }
@@ -115,6 +115,30 @@ greeting.txt contains `helo`; the correction is `hello`.
     $badFinish.message = 'Done.'
     $result = Replay 'complete-without-extra-work' @($badFinish)
     Assert-True (-not $result.score.passed) 'Missing closing block passed.'
+    $optionalClosing = @{
+        'design-agreement' = @()
+        'capability-question-readonly' = @((Action 'read_file' 'greeting.txt'))
+    }
+    foreach ($id in $optionalClosing.Keys) {
+        foreach ($prose in @(
+            'Done.', 'Done. Next, say so when you want it implemented: nothing changed yet.',
+            "The correction is hello.`nNext steps: tell me when to apply it."
+        )) {
+            $badFinish.message = $prose
+            $result = Replay $id ($optionalClosing[$id] + $badFinish)
+            Assert-True $result.score.passed "A reply without closing lines was rejected for $id : '$prose'"
+        }
+        foreach ($partial in @(
+            '', "  `n", '**Next:** no further action required', "Agreed.`n`n**Done:** Agreed.`n**Next:** implement it",
+            '**Next**: implement it', "Agreed.`n- **Next:** implement it", "Agreed.`n> __Not done__ : implementation",
+            '1. **Next:** implement it', "Agreed.`n> 2) next: implement it", 'Agreed. **Next:** implement it',
+            'Agreed. <b>Next</b>: implement it', "Agreed.`n| Not done: | implementation |", "Agreed.`nNext`u{FF1A} implement it"
+        )) {
+            $badFinish.message = $partial
+            $result = Replay $id ($optionalClosing[$id] + $badFinish)
+            Assert-True ($result.score.errors -contains 'Final response lacks the required three-line closing block.') "An empty reply or partial closing block passed for $id : '$partial'"
+        }
+    }
     $badFinish.message = "**Done:** Complete.`n**Not done:** nothing.`n**Next:** Action required: say publish."
     $result = Replay 'complete-without-extra-work' @($badFinish)
     Assert-True (-not $result.score.passed) 'Invented action after completion passed.'

@@ -11,5 +11,5 @@ Refer to a repository only by its link, never also by its path or a descriptive 
 Tool pitfalls:
 
 - Bash: never put a file body or patch script in a heredoc or `python -c`; write the file and run it by path. On Windows a long command is cut off and fails with `unexpected EOF`, and `\\` arrives as `\`.
-- Shell calls: never set `run_in_background` or start a command with a sleep; both are denied. Run longer work as a `managed-jobs` job and block on its `wait` command.
+- Shell calls: never set `run_in_background` or start a command with a sleep; both are denied. Run longer work as a `managed-jobs` job, and use its `wait` command when the next step needs the job to finish.
 - Browser: verify page state with text tools. Take a screenshot as its own call, only when pixels are the evidence. After a second "tab not in group" error from Claude in Chrome on a fresh tab, stop and use the built-in browser.

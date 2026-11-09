@@ -374,6 +374,15 @@ try {
         $backgroundControllerDecision = ($backgroundControllerPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
         Assert-True ($backgroundControllerDecision.hookSpecificOutput.permissionDecision -eq 'deny') "Only controller wait, status, and logs calls may run in the background: $backgroundController"
     }
+    $bulkPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+        tool_input = [ordered]@{ command = 'npx prettier --check ' + (@(1..3000 | ForEach-Object { "src/components/file$_.ts" }) -join ' ') }
+    } | ConvertTo-Json -Compress
+    $bulkTimer = [Diagnostics.Stopwatch]::StartNew()
+    $bulkOutput = ($bulkPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+    $bulkTimer.Stop()
+    Assert-True ([string]::IsNullOrWhiteSpace($bulkOutput)) 'A package-runner command with thousands of file arguments should pass the launch guard.'
+    Assert-True ($bulkTimer.Elapsed.TotalSeconds -lt 10) "The launch guard must answer a long argument list within its ten-second hook timeout; it took $([math]::Round($bulkTimer.Elapsed.TotalSeconds, 1)) seconds."
 
     Remove-Item Env:CLAUDE_CODE_SESSION_ID -ErrorAction SilentlyContinue
     $payloadStopOutput = ($stopPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $stopHook | Out-String)

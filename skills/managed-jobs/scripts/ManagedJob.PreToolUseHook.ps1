@@ -210,12 +210,15 @@ function Get-CommandTrigger {
                 if ($words[$i] -ieq 'run' -and $words[$i + 1] -match '^dev\b') { return "$Stem run $($words[$i + 1])" }
             }
         }
-        # A package runner runs the tool named in its arguments.
+        # A package runner runs the tool named in its arguments. Inspect the first
+        # tool that can launch, once, so a long argument list stays linear.
         for ($i = 0; $i -lt $Arguments.Count; $i++) {
-            if ($Arguments[$i].quoted -or $words[$i].StartsWith('-')) { continue }
-            $inner = Get-CommandTrigger -Stem ($words[$i] -replace '(?i)\.(?:exe|cmd|bat|ps1)$', '') `
-                -Arguments @($Arguments | Select-Object -Skip ($i + 1)) -Depth $Depth
+            if ($Arguments[$i].quoted) { continue }
+            $tool = $words[$i] -replace '(?i)\.(?:exe|cmd|bat|ps1)$', ''
+            if ($tool -inotmatch '^(?:vite|webpack|tsc|claude|dotnet|gradlew|wt)$' -and $tool -inotmatch $shellNames) { continue }
+            $inner = Get-CommandTrigger -Stem $tool -Arguments @($Arguments | Select-Object -Skip ($i + 1)) -Depth $Depth
             if ($inner) { return $inner }
+            break
         }
     }
     $nested = $null

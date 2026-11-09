@@ -77,7 +77,7 @@ $script:WrapperCommands = @{
         '-u', '--user', '-g', '--group', '-h', '--host', '-p', '--prompt', '-C', '--close-from', '-D', '--chdir',
         '-R', '--chroot', '-T', '--command-timeout', '-U', '--other-user', '-r', '--role', '-t', '--type'
     )
-    doas = @('-u', '-C'); command = @(); exec = @('-a'); builtin = @(); nohup = @()
+    doas = @('-u', '-C'); command = @(); exec = @('-a'); builtin = @(); nohup = @(); busybox = @()
     nice = @('-n', '--adjustment'); winpty = @()
     stdbuf = @('-i', '--input', '-o', '--output', '-e', '--error')
     timeout = @('-s', '--signal', '-k', '--kill-after'); watch = @('-n', '--interval')
@@ -399,6 +399,11 @@ function Read-ShellLevel {
                 $frame.inWord = $true
                 continue
             }
+        }
+        if ($ch -eq '$' -and ($next -eq "'" -or $next -eq '"')) {
+            # $'...' and $"..." are quoting forms: the quote that follows decides.
+            $script:ParsePosition++
+            continue
         }
         if ($ch -eq '$' -and $next -eq '(' -and $canNest) {
             $script:ParsePosition += 2
@@ -890,9 +895,12 @@ function Get-ExecutableIndex {
                     continue
                 }
                 if ([string]$Words[$index].bare -cmatch '^[A-Za-z_][A-Za-z0-9_]*=') { $index++; continue }
-                if ($name -in @('timeout', 'nice', 'watch') -and $argument -cmatch '^\d+(?:\.\d+)?[smhd]?$') { $index++; continue }
+                if ($name -in @('timeout', 'nice') -and $argument -cmatch '^\d+(?:\.\d+)?[smhd]?$') { $index++; continue }
                 break
             }
+            # watch joins its remaining words and hands them to a shell, so they
+            # are read as one command line rather than as an argument vector.
+            if ($name -eq 'watch') { return $index }
             continue
         }
         break
@@ -927,7 +935,7 @@ function Get-ShellInvocation {
         $readsStdin = $null -eq $command -and -not $scriptFile
     } elseif ($Name -eq 'cmd') {
         for ($index = 0; $index -lt $texts.Count; $index++) {
-            if ($texts[$index] -imatch '^/[ck]$') {
+            if ($texts[$index] -imatch '^/{1,2}[ck]$') {
                 $command = @($texts | Select-Object -Skip ($index + 1)) -join ' '
                 break
             }
@@ -962,7 +970,8 @@ function Get-ShellInvocation {
         if ($commandFlag) {
             if ($index -lt $texts.Count) { $command = $texts[$index] }
         } else {
-            $readsStdin = $stdinFlag -or $index -ge $texts.Count
+            $readsStdin = $stdinFlag -or $index -ge $texts.Count -or
+                $texts[$index] -cmatch '^/(?:dev/stdin|dev/fd/0|proc/self/fd/0)$'
         }
     }
     return @{ command = $command; readsStdin = $readsStdin }
@@ -975,10 +984,10 @@ function Get-CommandFinding {
     $start = Get-ExecutableIndex -Words $words
     $wrapper = $script:ExecutableWrapper
     if ($start -ge $words.Count) { return $null }
-    if ($wrapper -eq 'watch' -and $words[$start].quoted -and [string]$words[$start].text -match '\s') {
-        # watch hands its command to a shell, so it may be one quoted string.
-        # Other wrappers run an argument vector: a quoted word is a path.
-        return Get-TextFinding -Text ([string]$words[$start].text) -Dialect 'posix' -Depth ($Depth + 1)
+    if ($wrapper -eq 'watch') {
+        # Other wrappers run an argument vector, where a quoted word is a path.
+        $joined = (@($words | Select-Object -Skip $start) | ForEach-Object { [string]$_.text }) -join ' '
+        return Get-TextFinding -Text $joined -Dialect 'posix' -Depth ($Depth + 1)
     }
     $name = Get-CommandBaseName -Text $words[$start].text
     $arguments = @($words | Select-Object -Skip ($start + 1))

@@ -118,6 +118,11 @@ env --unset HTTPS_PROXY kubectl get secret app -o yaml
 timeout --signal KILL 30 kubectl get secret app -o yaml
 time -p kubectl get secret app -o yaml
 watch -n 5 "kubectl get secret app -o yaml"
+watch sudo "kubectl get secret app -o yaml"
+watch -n 5 kubectl get secret app -o jsonpath='{.data.password}'
+busybox sh -c 'kubectl get secret app -o yaml'
+cmd //c "kubectl get secret app -o yaml"
+bash -c $'kubectl get secret app -o yaml'
 sudo "/opt/company tools/kubectl" get secret app -o yaml
 env KUBECONFIG=/tmp/kube "/opt/company tools/kubectl" get secret app -o yaml
 "/opt/company tools/kubectl" get secret app -o yaml
@@ -161,6 +166,7 @@ Test-Cases -Tool 'Bash' -Expected 'kubectl' -Commands @(
     "bash -s -- arg <<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "bash -x <<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "bash 0<<'EOF'`nkubectl get secret app -o yaml`nEOF",
+    "bash /dev/stdin <<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "cat <<EOF`nnote`nEOF`nkubectl get secret app -o yaml",
     # PowerShell text reaching a shell tool that is not named PowerShell.
     "kubectl get secret app ```n  -o yaml"
@@ -304,6 +310,8 @@ pwsh -File notes.ps1 "kubectl get secret app -o yaml"
 time kubectl get secret app
 watch -n 5 "kubectl get secret app"
 watch -n 5 "kubectl get secret app -o json | sha256sum"
+watch -n 5 kubectl get secret app
+echo $'kubectl get secret app -o yaml'
 sudo "/opt/company tools/kubectl" get secret app
 cat <<< "kubectl get secret app -o yaml"
 bash -c 'cat' <<< 'kubectl get secret app -o yaml'

@@ -30,9 +30,12 @@ $script:VaultQueryPattern = '^(?:' + $script:SafeVaultField +
     '|\[\s*' + $script:SafeVaultField + '(?:\s*,\s*' + $script:SafeVaultField + ')*\s*\]' +
     '|\{\s*[A-Za-z_]\w*\s*:\s*' + $script:SafeVaultField + '(?:\s*,\s*[A-Za-z_]\w*\s*:\s*' + $script:SafeVaultField + ')*\s*\})$'
 
+# A path below a metadata field continues only with .name or [..] segments, so
+# it cannot name a second path.
+$script:KubePathSegment = '(?:\.(?:[\w/-]|\\\.)+|\[[^\]{}]*\])'
 $script:SafeKubePathPattern = '^[$@]?(?:\.items(?:\[[^\]]*\])?)?(?:' +
-    '\.metadata\.(?:name|namespace|uid|creationTimestamp|deletionTimestamp|resourceVersion|generation|generateName|finalizers|labels|ownerReferences|managedFields)(?![A-Za-z])[^{}]*' +
-    '|\.metadata\.annotations[.\[][^{}]+' +
+    '\.metadata\.(?:name|namespace|uid|creationTimestamp|deletionTimestamp|resourceVersion|generation|generateName|finalizers|labels|ownerReferences|managedFields)' + $script:KubePathSegment + '*' +
+    '|\.metadata\.annotations' + $script:KubePathSegment + '+' +
     '|\.(?:type|kind|apiVersion|immutable))$'
 $script:SafeGoActionPattern = '^(?:end|range\s+\.items|"[^"]*"|`[^`]*`' +
     '|\.(?:metadata\.(?:name|namespace|uid|creationTimestamp|resourceVersion|generation|labels(?:\.[\w-]+)?)|type|kind|apiVersion))$'

@@ -166,8 +166,8 @@ try {
     Assert-True ($nothing.exitCode -eq 0 -and @($nothing.output | ConvertFrom-Json).Count -eq 0) `
         'A filter that matches nothing should print an empty JSON array.'
     $table = Invoke-ControllerProcess -Arguments @('list', '-Table', '-Status', 'running')
-    Assert-True ($table.exitCode -eq 0 -and $table.output -match '(?m)^id\s+name\s+kind\s+status' -and
-        $table.output -notmatch '^\s*\[') `
+    Assert-True ($table.exitCode -eq 0 -and $table.output -match '\bid\s+name\s+kind\s+status\b' -and
+        $table.output -match [regex]::Escape($runningId) -and $table.output -notmatch '^\s*\[') `
         "The table view should stay available behind -Table. Output: $($table.output)"
     $conflict = Invoke-ControllerProcess -Arguments @('list', '-Table', '-Json')
     Assert-True ($conflict.exitCode -ne 0 -and $conflict.output -match 'cannot be combined with -Json') `

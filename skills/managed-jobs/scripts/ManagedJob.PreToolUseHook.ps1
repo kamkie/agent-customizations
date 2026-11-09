@@ -114,7 +114,7 @@ function Get-ShellSegments {
 }
 
 $shellNames = '^(?:bash|sh|zsh|pwsh|powershell|cmd)$'
-$evaluatorNames = '^(?:Invoke-Expression|iex)$'
+$evaluatorNames = '^(?:Invoke-Expression|iex|eval)$'
 
 # The command a segment runs: its executable after leading VAR=value
 # assignments, a PowerShell `$name =` assignment, and words that only prefix a
@@ -141,10 +141,17 @@ function Get-SegmentCommand {
                 $index++
                 continue
             }
-            if ($token.text -in @('env', 'nohup', 'time', 'exec', 'command', 'sudo', 'setsid', 'timeout')) {
+            if ($token.text -in @('env', 'nohup', 'time', 'exec', 'command', 'sudo', 'setsid', 'timeout', 'nice', 'stdbuf', 'winpty')) {
                 # Skip the wrapper with its flags and a timeout duration.
                 $index++
                 while ($index -lt $Segment.Count -and -not $Segment[$index].quoted -and $Segment[$index].text -match '^(?:-.*|\d+(?:\.\d+)?[smhd]?)$') { $index++ }
+                continue
+            }
+            if ($token.text -ieq 'start') {
+                # cmd's start runs the command after its /flags and quoted title.
+                $index++
+                if ($index -lt $Segment.Count -and $Segment[$index].quoted) { $index++ }
+                while ($index -lt $Segment.Count -and -not $Segment[$index].quoted -and $Segment[$index].text -match '^/[A-Za-z]+$') { $index++ }
                 continue
             }
             if ($token.text -match ($variable + '$') -and $index + 1 -lt $Segment.Count -and
@@ -360,6 +367,13 @@ function Get-CommandTrigger {
             for ($i = 0; $i -lt $words.Count - 1; $i++) {
                 if ($words[$i] -ieq 'run' -and $words[$i + 1] -match '^dev\b') { return "$Stem run $($words[$i + 1])" }
             }
+        }
+        # A package runner runs the command string after -c or --call.
+        for ($i = 0; $i -lt $Arguments.Count - 1; $i++) {
+            if ($Arguments[$i].quoted -or $words[$i] -cnotmatch '^(?:-c|--call)$') { continue }
+            $inner = Get-LaunchTrigger -Text $words[$i + 1] -Depth ($Depth + 1)
+            if ($inner) { return $inner }
+            break
         }
         # A package runner runs the tool named in its arguments, which may be
         # another package runner. Inspect the first tool that can launch, once,

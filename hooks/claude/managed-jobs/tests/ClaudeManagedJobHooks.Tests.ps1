@@ -207,6 +207,8 @@ try {
     $backgroundDecision = ($backgroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'The launch guard should deny a natively backgrounded command.'
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'foreground') 'The deny reason should rule out the foreground-with-timeout fallback.'
+    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match '^Denied: run_in_background=true\.') 'A background denial should name run_in_background as its trigger.'
+    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'Invoke-ManagedJob\.ps1.* start -Name .* wait -Id ') 'The deny reason should carry the managed-job start and wait replacement.'
     $detachedPayload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
         tool_input = [ordered]@{ command = "Start-Process pwsh -ArgumentList '-File','engine.ps1'" }
@@ -300,6 +302,76 @@ try {
         } | ConvertTo-Json -Compress
         $headlessDecision = ($headlessPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
         Assert-True ($headlessDecision.hookSpecificOutput.permissionDecision -eq 'deny') "A headless Claude launch must still be denied: $headlessLaunch"
+    }
+    foreach ($launchMention in @(
+        'git commit -q -am "fix(server): log requests on the BFF too; npm run dev:bff mounts it"',
+        'gh pr create --title "Fix" --body "yarn dev fails on Windows"',
+        'sed -n 1,80p launch.ps1 | grep -n -i "lock\|start-process\|host" | head -30',
+        "Select-String -Path cli.mjs -Pattern 'prompt-file|--write|--background|--effort'",
+        "grep -rn -- '--background' src",
+        'echo ".card { color: var(--bg-success); }" >> site.css',
+        'git add scripts/start-job.ps1',
+        "`$note = 'Start-Process is denied'",
+        "cat > notes.md <<'EOF'`nRun the UI with:`nnpm run dev`nEOF",
+        "git commit -m @'`nDocument the dev server`n`nIt's started with:`nnpm run dev`n'@",
+        'npx tsc --noEmit'
+    )) {
+        $launchMentionPayload = [ordered]@{
+            hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+            tool_input = [ordered]@{ command = $launchMention }
+        } | ConvertTo-Json -Compress
+        $launchMentionOutput = ($launchMentionPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+        Assert-True ([string]::IsNullOrWhiteSpace($launchMentionOutput)) "Text that only mentions a launch must not be denied: $launchMention"
+    }
+    foreach ($launch in @(
+        @{ command = 'cd web && npm run dev'; trigger = 'npm run dev' },
+        @{ command = 'pnpm dev:bff'; trigger = 'pnpm dev:bff' },
+        @{ command = 'timeout 300 npm --prefix web run dev'; trigger = 'npm run dev' },
+        @{ command = '[Diagnostics.Process]$process = Start-Process pwsh -PassThru'; trigger = 'Start-Process' },
+        @{ command = 'Get-ChildItem | ForEach-Object { Start-Job { $_ } }'; trigger = 'Start-Job' },
+        @{ command = 'pwsh -NoProfile -Command "Start-Process notepad"'; trigger = 'Start-Process' },
+        @{ command = 'Invoke-Expression "Start-Process notepad"'; trigger = 'Start-Process' },
+        @{ command = 'bash -lc "yarn dev"'; trigger = 'yarn dev' },
+        @{ command = 'while true; do dotnet watch run; done'; trigger = 'dotnet watch' },
+        @{ command = './gradlew bootRun'; trigger = 'gradlew bootRun' },
+        @{ command = 'npx tsc --watch'; trigger = 'tsc --watch' },
+        @{ command = 'wt.exe -w 0 new-tab pwsh'; trigger = 'wt new-tab' },
+        @{ command = 'node cli.mjs task --background'; trigger = '--background' },
+        @{ command = "bash <<'EOF'`nnpm run dev`nEOF"; trigger = 'npm run dev' },
+        @{ command = "cat > notes.md <<'EOF'`ntext`nEOF`nnpm run dev"; trigger = 'npm run dev' },
+        @{ command = "# don't wait for it`nStart-Process notepad"; trigger = 'Start-Process' }
+    )) {
+        $launchPayload = [ordered]@{
+            hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+            tool_input = [ordered]@{ command = $launch.command }
+        } | ConvertTo-Json -Compress
+        $launchDecision = ($launchPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+        Assert-True ($launchDecision.hookSpecificOutput.permissionDecision -eq 'deny') "A launch at command position must still be denied: $($launch.command)"
+        Assert-True ($launchDecision.hookSpecificOutput.permissionDecisionReason.StartsWith("Denied: the command runs '$($launch.trigger)'")) "The deny reason should name its trigger '$($launch.trigger)': $($launchDecision.hookSpecificOutput.permissionDecisionReason)"
+    }
+    foreach ($backgroundMonitor in @(
+        "`$jobs = Join-Path `$skill 'scripts/Invoke-ManagedJob.ps1'; `$final = (& `$jobs wait -Id 'job-1' -TimeoutSeconds 540 | Out-String) | ConvertFrom-Json",
+        "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' status -Id job-1",
+        'pwsh -NoProfile -File "skills/managed-jobs/scripts/Invoke-ManagedJob.ps1" logs -Id job-1 -Tail 100 2>&1'
+    )) {
+        $backgroundMonitorPayload = [ordered]@{
+            hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+            tool_input = [ordered]@{ command = $backgroundMonitor; run_in_background = $true }
+        } | ConvertTo-Json -Compress
+        $backgroundMonitorOutput = ($backgroundMonitorPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+        Assert-True ([string]::IsNullOrWhiteSpace($backgroundMonitorOutput)) "A backgrounded controller wait, status, or logs call is already managed and must not be denied: $backgroundMonitor"
+    }
+    foreach ($backgroundController in @(
+        "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' start -Name api -Executable dotnet -Arguments @('run')",
+        "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' wait -Id job-1; python -m another.server",
+        "`$jobs = 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1'; `$jobs = 'engine.ps1'; & `$jobs wait -Id job-1"
+    )) {
+        $backgroundControllerPayload = [ordered]@{
+            hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
+            tool_input = [ordered]@{ command = $backgroundController; run_in_background = $true }
+        } | ConvertTo-Json -Compress
+        $backgroundControllerDecision = ($backgroundControllerPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String) | ConvertFrom-Json
+        Assert-True ($backgroundControllerDecision.hookSpecificOutput.permissionDecision -eq 'deny') "Only controller wait, status, and logs calls may run in the background: $backgroundController"
     }
 
     Remove-Item Env:CLAUDE_CODE_SESSION_ID -ErrorAction SilentlyContinue

@@ -32,6 +32,12 @@ function Get-ShellSegments {
             if ($chars[$i] -eq "`r" -and $i + 1 -lt $chars.Length -and $chars[$i + 1] -eq "`n") { $i++ }
             $ch = ' '
         }
+        # A `#` that starts a word begins a comment: skip to the end of the line so
+        # an apostrophe in the comment cannot open a quote over the next command.
+        if (-not $atEnd -and $ch -eq '#' -and $buffer.Length -eq 0 -and -not $quoted) {
+            while ($i + 1 -lt $chars.Length -and $chars[$i + 1] -ne "`n" -and $chars[$i + 1] -ne "`r") { $i++ }
+            continue
+        }
         if (-not $atEnd -and ($ch -eq '"' -or $ch -eq "'")) {
             $quote = $ch
             if (-not $quoted) { $unquotedPrefix = $buffer.ToString() }
@@ -61,44 +67,263 @@ function Get-ShellSegments {
     return $segments.ToArray()
 }
 
-# True when any shell segment runs claude or claude.exe as its executable
-# (after leading VAR=value assignments, `env`, or the PowerShell call operator)
-# with a `-p` flag or a `/review` slash-command argument, including a command
-# string handed to a shell with -c, -Command, or /c. Paths that merely contain
-# "claude" and file names that merely contain "review" are not launches.
-function Test-HeadlessClaudeLaunch {
-    param([string]$Text, [int]$Depth = 0)
-    if ($Depth -gt 3 -or [string]::IsNullOrWhiteSpace($Text)) { return $false }
-    foreach ($segment in Get-ShellSegments -Text $Text) {
-        $index = 0
-        while ($index -lt $segment.Count) {
-            $token = $segment[$index]
-            $isAssignment = $token.unquotedPrefix -match '^[A-Za-z_][A-Za-z0-9_]*='
-            if ($isAssignment -or (-not $token.quoted -and ($token.text -eq '&' -or $token.text -ieq 'env'))) {
+$shellNames = '^(?:bash|sh|zsh|pwsh|powershell|cmd)$'
+$evaluatorNames = '^(?:Invoke-Expression|iex)$'
+
+# The command a segment runs: its executable after leading VAR=value
+# assignments, a PowerShell `$name =` assignment, and words that only prefix a
+# command (`env`, `nohup`, shell keywords). Returns $null when the segment only
+# assigns a value, so a quoted string that mentions a launch is not a command.
+function Get-SegmentCommand {
+    param([object[]]$Segment)
+    $index = 0
+    $assigned = $false
+    $name = $null
+    # A PowerShell variable, with an optional [type] before it.
+    $variable = '^(?:\[[^\]]+\])*\$[\w:.\[\]{}]+'
+    while ($index -lt $Segment.Count) {
+        $token = $Segment[$index]
+        if ($token.unquotedPrefix -match '^[A-Za-z_][A-Za-z0-9_]*\+?=') { $index++; continue }
+        if ($token.unquotedPrefix -match ($variable + '\+?=')) {
+            # $name=value in one word: an unquoted value is the command it runs.
+            if ($token.quoted) { return $null }
+            $name = $token.text -replace ($variable + '\+?='), ''
+            break
+        }
+        if (-not $token.quoted) {
+            if ($token.text -in @('&', '.', '!', 'if', 'then', 'else', 'elif', 'do', 'while', 'until', 'return')) {
                 $index++
                 continue
             }
-            break
-        }
-        if ($index -ge $segment.Count) { continue }
-        $executable = $segment[$index].text
-        $baseName = $executable -replace '^.*[\\/]', ''
-        $arguments = @($segment | Select-Object -Skip ($index + 1))
-        if ($baseName -ieq 'claude' -or $baseName -ieq 'claude.exe') {
-            foreach ($argument in $arguments) {
-                if ($argument.text -eq '-p' -or $argument.text -match '^/review\b') { return $true }
+            if ($token.text -in @('env', 'nohup', 'time', 'exec', 'command', 'sudo', 'setsid', 'timeout')) {
+                # Skip the wrapper with its flags and a timeout duration.
+                $index++
+                while ($index -lt $Segment.Count -and -not $Segment[$index].quoted -and $Segment[$index].text -match '^(?:-.*|\d+(?:\.\d+)?[smhd]?)$') { $index++ }
+                continue
             }
-            continue
-        }
-        if ($baseName -imatch '^(?:bash|sh|zsh|pwsh|powershell|cmd)(?:\.exe)?$') {
-            for ($i = 0; $i -lt $arguments.Count - 1; $i++) {
-                if ($arguments[$i].text -imatch '^(?:-c|-Command|/c)$' -and (Test-HeadlessClaudeLaunch -Text $arguments[$i + 1].text -Depth ($Depth + 1))) {
-                    return $true
-                }
+            if ($token.text -match ($variable + '$') -and $index + 1 -lt $Segment.Count -and
+                -not $Segment[$index + 1].quoted -and $Segment[$index + 1].text -match '^[-+*/]?=$') {
+                $index += 2
+                $assigned = $true
+                continue
             }
         }
+        break
+    }
+    if ($index -ge $Segment.Count) { return $null }
+    if ($null -eq $name) {
+        if ($assigned -and $Segment[$index].quoted) { return $null }
+        $name = $Segment[$index].text
+    }
+    $baseName = $name -replace '^.*[\\/]', ''
+    return [pscustomobject]@{
+        stem = $baseName -replace '(?i)\.(?:exe|cmd|bat|ps1)$', ''
+        arguments = @($Segment | Select-Object -Skip ($index + 1))
+    }
+}
+
+# True when a command on the line is a shell or an evaluator, so text the line
+# feeds it (a here-document or here-string body) runs as commands.
+function Test-ShellRecipient {
+    param([string]$Line)
+    foreach ($segment in Get-ShellSegments -Text $Line) {
+        $segmentCommand = Get-SegmentCommand -Segment $segment
+        if ($segmentCommand -and ($segmentCommand.stem -imatch $shellNames -or $segmentCommand.stem -imatch $evaluatorNames)) { return $true }
     }
     return $false
+}
+
+# Remove here-document and PowerShell here-string bodies from the command text:
+# they are data (a commit message, a file body), not commands. A body fed to a
+# shell is returned separately so it is still inspected as a command line.
+function Get-InspectableText {
+    param([string]$Text)
+    $lines = [Collections.Generic.List[string]]::new([string[]]($Text -split "`r?`n"))
+    $kept = [Collections.Generic.List[string]]::new()
+    $shellBodies = [Collections.Generic.List[string]]::new()
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        $hereString = [regex]::Match($line, '@([''"])\s*$')
+        if ($hereString.Success) {
+            $terminator = $hereString.Groups[1].Value + '@'
+            $end = $i + 1
+            while ($end -lt $lines.Count -and -not $lines[$end].StartsWith($terminator)) { $end++ }
+            if ($end -lt $lines.Count) {
+                # Rejoin the text around the body and examine that line again: it
+                # may open another here-string.
+                $joined = $line.Substring(0, $hereString.Index) + "'here-string'" + $lines[$end].Substring(2)
+                if (Test-ShellRecipient -Line $joined) {
+                    $shellBodies.Add((@($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"))
+                }
+                $lines[$end] = $joined
+                $i = $end - 1
+                continue
+            }
+        }
+        $kept.Add($line)
+        $feedsShell = $null
+        foreach ($hereDocument in [regex]::Matches($line, '(?<!<)<<(?!<)[-~]?\s*([''"]?)([A-Za-z_]\w*)\1')) {
+            $delimiter = $hereDocument.Groups[2].Value
+            $end = $i + 1
+            while ($end -lt $lines.Count -and $lines[$end].Trim() -cne $delimiter) { $end++ }
+            # Without its terminator this is not a here-document: keep the lines.
+            if ($end -ge $lines.Count) { break }
+            if ($null -eq $feedsShell) { $feedsShell = Test-ShellRecipient -Line $line }
+            if ($feedsShell) {
+                $shellBodies.Add((@($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"))
+            }
+            $i = $end
+        }
+    }
+    return [pscustomobject]@{ text = $kept -join "`n"; shellBodies = $shellBodies.ToArray() }
+}
+
+# The command line handed to a shell after -c, -Command, or /c. A quoted first
+# word is the whole script; otherwise the remaining words are, with quoted
+# words kept as single words so their content is not read as commands.
+function Get-NestedCommandText {
+    param([object[]]$Tokens)
+    if ($Tokens.Count -eq 0) { return '' }
+    if ($Tokens[0].quoted) { return $Tokens[0].text }
+    return (@($Tokens | ForEach-Object {
+        if ($_.quoted) { '"' + ($_.text -replace '[''"\r\n]', ' ') + '"' } else { $_.text }
+    }) -join ' ')
+}
+
+# The launch a command performs, as a short label for the denial, or $null.
+function Get-CommandTrigger {
+    param([string]$Stem, [object[]]$Arguments, [int]$Depth)
+    $words = @($Arguments | ForEach-Object { $_.text })
+    if ($Stem -in @('Start-Process', 'Start-Job')) { return $Stem }
+    if ($Stem -ieq 'wt' -and $words -contains 'new-tab') { return 'wt new-tab' }
+    if ($Stem -ieq 'dotnet' -and $words.Count -gt 0 -and $words[0] -ieq 'watch') { return 'dotnet watch' }
+    if ($Stem -ieq 'gradlew' -and ($words -match '(?:^|:)bootRun\b')) { return 'gradlew bootRun' }
+    if ($Stem -in @('vite', 'webpack', 'tsc') -and ($words -match '^--watch\b')) { return "$Stem --watch" }
+    if ($Stem -ieq 'claude') {
+        if ($words -eq '-p') { return 'claude -p' }
+        if ($words -match '^/review\b') { return 'claude /review' }
+    }
+    if ($Stem -in @('npm', 'pnpm', 'yarn', 'npx', 'bunx', 'corepack')) {
+        if ($Stem -in @('npm', 'pnpm', 'yarn')) {
+            if ($words.Count -gt 0 -and $words[0] -match '^dev\b') { return "$Stem $($words[0])" }
+            for ($i = 0; $i -lt $words.Count - 1; $i++) {
+                if ($words[$i] -ieq 'run' -and $words[$i + 1] -match '^dev\b') { return "$Stem run $($words[$i + 1])" }
+            }
+        }
+        # A package runner runs the tool named in its arguments.
+        for ($i = 0; $i -lt $Arguments.Count; $i++) {
+            if ($Arguments[$i].quoted -or $words[$i].StartsWith('-')) { continue }
+            $inner = Get-CommandTrigger -Stem ($words[$i] -replace '(?i)\.(?:exe|cmd|bat|ps1)$', '') `
+                -Arguments @($Arguments | Select-Object -Skip ($i + 1)) -Depth $Depth
+            if ($inner) { return $inner }
+        }
+    }
+    $nested = $null
+    if ($Stem -imatch $shellNames) {
+        for ($i = 0; $i -lt $Arguments.Count - 1 -and $null -eq $nested; $i++) {
+            if ($Arguments[$i].quoted) { continue }
+            if ($words[$i] -imatch '^(?:-c|-Command|/c|/k)$' -or ($Stem -imatch '^(?:bash|sh|zsh)$' -and $words[$i] -cmatch '^-[A-Za-z]*c$')) {
+                $nested = Get-NestedCommandText -Tokens @($Arguments | Select-Object -Skip ($i + 1))
+            }
+        }
+    } elseif ($Stem -imatch $evaluatorNames) {
+        $skip = if ($words.Count -gt 0 -and -not $Arguments[0].quoted -and $words[0] -imatch '^-Command$') { 1 } else { 0 }
+        $nested = Get-NestedCommandText -Tokens @($Arguments | Select-Object -Skip $skip)
+    }
+    if ($nested) {
+        $inner = Get-LaunchTrigger -Text $nested -Depth ($Depth + 1)
+        if ($inner) { return $inner }
+    }
+    # A background flag counts as an argument of a command, not as text handed
+    # to a search or print tool.
+    if ($Stem -notin @('grep', 'egrep', 'fgrep', 'rg', 'ag', 'findstr', 'Select-String', 'sls', 'echo', 'printf', 'Write-Output', 'Write-Host', 'sed', 'awk', 'cat')) {
+        $flag = @($words -match '^--(?:background|bg)(?:=|$)') | Select-Object -First 1
+        if ($flag) { return ($flag -replace '=.*$', '') }
+    }
+    return $null
+}
+
+# The first detached or long-running launch the command line performs, or
+# $null. A launch is recognized where a command runs: as the executable of a
+# shell segment with its arguments, including a command string handed to a
+# shell with -c, -Command, or /c. Text that only mentions a launch (a search
+# pattern, a commit message, a file body, a path) is not one.
+function Get-LaunchTrigger {
+    param([string]$Text, [int]$Depth = 0)
+    if ($Depth -gt 3 -or [string]::IsNullOrWhiteSpace($Text)) { return $null }
+    $source = Get-InspectableText -Text $Text
+    foreach ($segment in Get-ShellSegments -Text $source.text) {
+        $segmentCommand = Get-SegmentCommand -Segment $segment
+        if (-not $segmentCommand) { continue }
+        $trigger = Get-CommandTrigger -Stem $segmentCommand.stem -Arguments $segmentCommand.arguments -Depth $Depth
+        if ($trigger) { return $trigger }
+    }
+    foreach ($body in $source.shellBodies) {
+        $trigger = Get-LaunchTrigger -Text $body -Depth ($Depth + 1)
+        if ($trigger) { return $trigger }
+    }
+    return $null
+}
+
+# True when every command in the text is the managed-jobs controller reading
+# job state (wait, status, logs), apart from naming the controller script,
+# capturing the result, and formatting it. Such a call is already managed, so
+# it may run in the background; anything else on the line keeps the denial.
+function Test-ControllerMonitorOnly {
+    param([string]$Text)
+    $controllerPattern = '(?i)(?:^|[\\/])Invoke-ManagedJob\.ps1$'
+    $variablePattern = '^\$\{?(?<name>[A-Za-z_]\w*)\}?$'
+    $formatters = @('Out-String', 'ConvertFrom-Json', 'ConvertTo-Json', 'Select-Object', 'Format-List', 'Format-Table', 'Out-Host', 'cd', 'Set-Location')
+    $controllerVariables = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $isController = {
+        param($Token)
+        if ($Token.text -match $controllerPattern) { return $true }
+        $variable = [regex]::Match($Token.text, $variablePattern)
+        return ($variable.Success -and $controllerVariables.Contains($variable.Groups['name'].Value))
+    }
+    $monitorCalls = 0
+    foreach ($segment in Get-ShellSegments -Text ($Text -replace '\d?>&\d', ' ')) {
+        $first = $segment[0]
+        if ($segment.Count -eq 1) {
+            $definition = [regex]::Match($first.text, '^\$?(?<name>[A-Za-z_]\w*)=(?<value>.+)$')
+            if ($definition.Success -and $definition.Groups['value'].Value -match $controllerPattern) {
+                $null = $controllerVariables.Add($definition.Groups['name'].Value)
+                continue
+            }
+        }
+        $target = [regex]::Match($first.text, $variablePattern)
+        if (-not $first.quoted -and $target.Success -and $segment.Count -ge 2 -and -not $segment[1].quoted -and $segment[1].text -eq '=') {
+            $name = $target.Groups['name'].Value
+            # `$result = (` or `$result = &`: the command follows in its own segment.
+            if ($segment.Count -eq 2) { $null = $controllerVariables.Remove($name); continue }
+            $joinsPath = $segment.Count -eq 5 -and -not $segment[2].quoted -and $segment[2].text -ieq 'Join-Path'
+            if (($segment.Count -eq 3 -or $joinsPath) -and $segment[-1].text -match $controllerPattern) {
+                $null = $controllerVariables.Add($name)
+                continue
+            }
+            return $false
+        }
+        $index = 0
+        while ($index -lt $segment.Count -and $segment[$index].unquotedPrefix -match '^[A-Za-z_][A-Za-z0-9_]*=') { $index++ }
+        if ($index -ge $segment.Count) { return $false }
+        $executable = $segment[$index]
+        $rest = @($segment | Select-Object -Skip ($index + 1))
+        $baseName = $executable.text -replace '^.*[\\/]', ''
+        if (-not $executable.quoted -and $baseName -in $formatters) { continue }
+        if (-not (& $isController $executable)) {
+            # pwsh [-NoProfile ...] -File <controller> <action>
+            if ($executable.quoted -or $baseName -inotmatch '^(?:pwsh|powershell)(?:\.exe)?$') { return $false }
+            $i = 0
+            while ($i -lt $rest.Count -and $rest[$i].text -imatch '^-(?:NoProfile|NoLogo|NonInteractive|ExecutionPolicy)$') {
+                $i += if ($rest[$i].text -ieq '-ExecutionPolicy') { 2 } else { 1 }
+            }
+            if ($i + 1 -ge $rest.Count -or $rest[$i].text -ine '-File' -or -not (& $isController $rest[$i + 1])) { return $false }
+            $rest = @($rest | Select-Object -Skip ($i + 2))
+        }
+        if ($rest.Count -eq 0 -or $rest[0].text -notin @('wait', 'status', 'logs')) { return $false }
+        $monitorCalls++
+    }
+    return ($monitorCalls -gt 0)
 }
 
 try {
@@ -121,25 +346,16 @@ try {
         $payload.tool_input.PSObject.Properties['run_in_background'] -and
         [bool]$payload.tool_input.run_in_background
 
-    $patterns = @(
-        '(?i)\bStart-Job\b',
-        '(?i)\bStart-Process\b',
-        '(?i)\bwt(?:\.exe)?\b.*\bnew-tab\b',
-        '(?i)(?:npm|pnpm|yarn)\s+(?:run\s+)?dev\b',
-        '(?i)\bdotnet\s+watch\b',
-        '(?i)\bgradlew(?:\.bat)?\s+bootRun\b',
-        '(?i)\b(?:vite|webpack|tsc)\b.*--watch\b',
-        '(?i)(?:--background|--bg)\b'
-    )
-    $matched = $patterns | Where-Object { $command -match $_ } | Select-Object -First 1
-    # A headless Claude launch is recognized by executable position, not by a
-    # substring, so paths under .claude/ or names containing "review" pass.
-    if (-not $matched -and (Test-HeadlessClaudeLaunch -Text $command)) { $matched = 'headless-claude' }
+    # Launches are recognized at command position, not as substrings, so text
+    # that only mentions one passes.
+    $matched = Get-LaunchTrigger -Text $command
 
     # The controller exemption never covers a compound command that also uses a
-    # raw detach primitive or a natively backgrounded tool call.
+    # raw detach primitive. A natively backgrounded call passes only when all it
+    # does is read job state through the controller.
     $usesController = $command -match 'Invoke-ManagedJob\.ps1|managed-jobs[\\/]scripts'
-    if ($usesController -and -not $matched -and -not $backgroundRequested) { exit 0 }
+    if ($usesController -and -not $matched -and
+        (-not $backgroundRequested -or (Test-ControllerMonitorOnly -Text $command))) { exit 0 }
 
     # Retry memory is best-effort: a cache failure — including an unavailable
     # state-root drive — must weaken only retry detection, never a pattern or
@@ -238,11 +454,24 @@ try {
         }
     }
 
-    $reason = if ($retryOfDenied -and -not $matched -and -not $backgroundRequested) {
-        "This command was recently denied as a background or detached launch, and rerunning it in the foreground bounded by a tool-call timeout is not an acceptable substitute. Start it as a managed job via the managed-jobs skill and poll status/logs. If the user explicitly requested unmanaged execution, add the comment marker '# managed-jobs: allow-direct'."
+    # Name what fired and carry the replacement, so the next call is the
+    # managed job rather than another variant of the denied command.
+    $trigger = if ($backgroundRequested -and $matched) {
+        "run_in_background=true, and the command runs '$matched', a detached or long-running launch"
+    } elseif ($backgroundRequested) {
+        'run_in_background=true'
+    } elseif ($matched) {
+        "the command runs '$matched', a detached or long-running launch"
     } else {
-        "Long-running or detached command must use the managed-jobs skill so its PID, state, and logs survive agent restarts. Do not retry it as a foreground run bounded by a tool-call timeout; start a managed job and poll status/logs instead. If the user explicitly requested unmanaged execution, add the comment marker '# managed-jobs: allow-direct'."
+        'this command was recently denied as a background or detached launch and is now a foreground rerun of it'
     }
+    $controllerPath = (Join-Path $PSScriptRoot 'Invoke-ManagedJob.ps1') -replace "'", "''"
+    $reason = "Denied: $trigger. Start the command as a managed job and block on it with wait, in a foreground PowerShell call without run_in_background: " +
+        "`$jobs = '$controllerPath'; `$job = (& `$jobs start -Name <name> -Executable <executable> -Arguments @('<argument>') -WorkingDirectory <directory> | Out-String) | ConvertFrom-Json; " +
+        "& `$jobs wait -Id `$job.id -TimeoutSeconds <seconds below the tool-call timeout>. " +
+        'When wait times out the job is still running: call wait -Id <job id> again. For a shell loop or pipeline, save it as a script file and start that file as the job. ' +
+        'Do not rerun the command in the foreground bounded by a tool-call timeout. ' +
+        "If the user explicitly requested unmanaged execution, add the comment marker '# managed-jobs: allow-direct'."
     [ordered]@{
         hookSpecificOutput = [ordered]@{
             hookEventName = 'PreToolUse'

@@ -890,6 +890,74 @@ function Get-ExecutableIndex {
     return $index
 }
 
+# How a shell invocation gets its program: the command string that follows its
+# command option, or standard input when it has neither that nor a script file.
+function Get-ShellInvocation {
+    param([string]$Name, [object[]]$Arguments)
+    $texts = @($Arguments | ForEach-Object { [string]$_.text })
+    $command = $null
+    $readsStdin = $false
+    if ($Name -in @('pwsh', 'powershell')) {
+        $scriptFile = $false
+        for ($index = 0; $index -lt $texts.Count; $index++) {
+            $text = $texts[$index]
+            if ($text -imatch '^-(?:c|co|com|comm|comma|comman|command|commandwithargs|cwa)$') {
+                $command = @($texts | Select-Object -Skip ($index + 1)) -join ' '
+                break
+            }
+            if ($text -imatch '^-(?:f|fi|fil|file|e|ec|en|enc\w*)$') { $scriptFile = $true; break }
+            if ($text -imatch '^-(?:ex|ep|exec\w*|wd|work\w*|o|of|out\w*|if|in|inp\w*|config\w*|custom\w*|settings\w*|w|win\w*)$') { $index++; continue }
+            if ($text -cmatch '^-') { continue }
+            # A first positional is a script file for pwsh and a command for
+            # Windows PowerShell.
+            if ($Name -eq 'powershell') { $command = @($texts | Select-Object -Skip $index) -join ' ' } else { $scriptFile = $true }
+            break
+        }
+        if ($null -ne $command -and $command.Trim() -ceq '-') { $command = $null }
+        $readsStdin = $null -eq $command -and -not $scriptFile
+    } elseif ($Name -eq 'cmd') {
+        for ($index = 0; $index -lt $texts.Count; $index++) {
+            if ($texts[$index] -imatch '^/[ck]$') {
+                $command = @($texts | Select-Object -Skip ($index + 1)) -join ' '
+                break
+            }
+        }
+        $readsStdin = $null -eq $command
+    } elseif ($Name -eq 'su') {
+        for ($index = 0; $index -lt $texts.Count; $index++) {
+            if ($texts[$index] -cmatch '^--command=(.*)$') { $command = $Matches[1]; break }
+            if ($texts[$index] -cmatch '^(?:-[A-Za-z]*c|--command)$' -and $index + 1 -lt $texts.Count) {
+                $command = $texts[$index + 1]
+                break
+            }
+        }
+        $readsStdin = $null -eq $command
+    } else {
+        # Options come first. The c may stand anywhere in a short cluster, as in
+        # -cx, and each o or O in a cluster takes the following word as its value,
+        # as in -co pipefail. The command string is the first operand after them.
+        $index = 0
+        $commandFlag = $false
+        $stdinFlag = $false
+        while ($index -lt $texts.Count) {
+            $text = $texts[$index]
+            if ($text -ceq '--' -or $text -ceq '-') { $index++; break }
+            if ($text -cmatch '^--(?:rcfile|init-file)$') { $index += 2; continue }
+            if ($text -cmatch '^--') { $index++; continue }
+            if ($text -cnotmatch '^[-+][A-Za-z]+$') { break }
+            if ($text[0] -eq '-' -and $text.Contains('c')) { $commandFlag = $true }
+            if ($text[0] -eq '-' -and $text.Contains('s')) { $stdinFlag = $true }
+            $index += 1 + [regex]::Matches($text, '[oO]').Count
+        }
+        if ($commandFlag) {
+            if ($index -lt $texts.Count) { $command = $texts[$index] }
+        } else {
+            $readsStdin = $stdinFlag -or $index -ge $texts.Count
+        }
+    }
+    return @{ command = $command; readsStdin = $readsStdin }
+}
+
 function Get-CommandFinding {
     param([object[]]$Line, [int]$Index, [int]$Depth)
     $command = $Line[$Index]
@@ -907,28 +975,10 @@ function Get-CommandFinding {
 
     if ($name -in @('bash', 'sh', 'zsh', 'dash', 'ksh', 'su', 'pwsh', 'powershell', 'cmd')) {
         $dialect = if ($name -in @('pwsh', 'powershell')) { 'powershell' } else { 'posix' }
-        for ($i = 0; $i -lt $arguments.Count - 1; $i++) {
-            $flag = [string]$arguments[$i].text
-            $isCommandFlag = if ($dialect -eq 'powershell') {
-                $flag -imatch '^-(?:c|co|com|comm|comma|comman|command|commandwithargs|cwa)$'
-            } elseif ($name -eq 'cmd') {
-                $flag -imatch '^/[ck]$'
-            } else {
-                # The c may stand anywhere in a short-option cluster, as in -cx.
-                $flag -cmatch '^(?:-[A-Za-z]*c[A-Za-z]*|--command)$'
-            }
-            if (-not $isCommandFlag) { continue }
-            $inner = if ($dialect -eq 'powershell' -or $name -eq 'cmd') {
-                (@($arguments | Select-Object -Skip ($i + 1)) | ForEach-Object { [string]$_.text }) -join ' '
-            } else {
-                # The command string is the first operand after the options.
-                $operand = $i + 1
-                while ($operand -lt $arguments.Count - 1 -and [string]$arguments[$operand].text -cmatch '^[-+]') { $operand++ }
-                [string]$arguments[$operand].text
-            }
-            $finding = Get-TextFinding -Text $inner -Dialect $dialect -Depth ($Depth + 1)
+        $invocation = Get-ShellInvocation -Name $name -Arguments $arguments
+        if ($invocation.command) {
+            $finding = Get-TextFinding -Text $invocation.command -Dialect $dialect -Depth ($Depth + 1)
             if ($finding) { return $finding }
-            break
         }
         # A shell also takes its script from a here-document or a here-string.
         $scripts = [Collections.Generic.List[string]]::new()

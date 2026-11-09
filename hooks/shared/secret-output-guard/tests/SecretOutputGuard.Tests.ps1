@@ -105,6 +105,13 @@ bash -lc 'kubectl get secret app -o yaml'
 bash -cx 'kubectl get secret app -o yaml'
 bash -o pipefail -xc "kubectl get secret app -o yaml"
 sh -c -e 'kubectl get secret app -o yaml'
+bash -co pipefail 'kubectl get secret app -o yaml'
+bash -c -o pipefail 'kubectl get secret app -o yaml'
+bash -euo pipefail -c 'kubectl get secret app -o yaml'
+bash --norc -O extglob -c 'kubectl get secret app -o yaml'
+powershell "kubectl get secret app -o yaml"
+pwsh -NoProfile -ExecutionPolicy Bypass -Command kubectl get secret app -o yaml
+cmd.exe /d /s /c "kubectl get secret app -o yaml"
 sudo --user root kubectl get secret app -o yaml
 sudo --user=root kubectl get secret app -o yaml
 env --unset HTTPS_PROXY kubectl get secret app -o yaml
@@ -232,6 +239,7 @@ glab -R group/project variable export
 glab --repo=group/project variable list --output json
 glab --hostname gitlab.example.com api projects/123/variables
 glab api projects/123/variables --silent=false
+bash -c -o pipefail 'glab variable get DEPLOY_TOKEN'
 2>/dev/null glab variable get DEPLOY_TOKEN
 glab api projects/123/variables --silent --silent=false
 '@)
@@ -285,6 +293,9 @@ kubectl get secret app -o yaml 2> /dev/null | sha256sum
 2>& 1 kubectl get secret app
 kubectl get secret ${NAME:-app}
 bash -cx 'kubectl get secret app'
+bash -co pipefail 'kubectl get secret app -o json | sha256sum'
+bash notes.sh -c 'kubectl get secret app -o yaml'
+pwsh -File notes.ps1 "kubectl get secret app -o yaml"
 time kubectl get secret app
 watch -n 5 "kubectl get secret app"
 watch -n 5 "kubectl get secret app -o json | sha256sum"

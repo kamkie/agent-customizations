@@ -111,6 +111,9 @@ env --unset HTTPS_PROXY kubectl get secret app -o yaml
 timeout --signal KILL 30 kubectl get secret app -o yaml
 time -p kubectl get secret app -o yaml
 watch -n 5 "kubectl get secret app -o yaml"
+sudo "/opt/company tools/kubectl" get secret app -o yaml
+env KUBECONFIG=/tmp/kube "/opt/company tools/kubectl" get secret app -o yaml
+"/opt/company tools/kubectl" get secret app -o yaml
 su - deploy -c 'kubectl get secret app -o yaml'
 wsl kubectl get secret app -o yaml
 wsl -d Ubuntu -- kubectl get secret app -o yaml
@@ -284,6 +287,8 @@ kubectl get secret ${NAME:-app}
 bash -cx 'kubectl get secret app'
 time kubectl get secret app
 watch -n 5 "kubectl get secret app"
+watch -n 5 "kubectl get secret app -o json | sha256sum"
+sudo "/opt/company tools/kubectl" get secret app
 cat <<< "kubectl get secret app -o yaml"
 sudo --user root kubectl get secret app
 sudo --user root grep -rn "kubectl get secret app -o yaml" docs/

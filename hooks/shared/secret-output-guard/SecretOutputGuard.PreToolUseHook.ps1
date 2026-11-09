@@ -846,11 +846,11 @@ function Test-PipedIntoKeysFilter {
 
 # Index of the word that is the executable: after leading assignments, shell
 # keywords, and wrapper commands with their options. Sets
-# $script:ExecutableWrapped when a wrapper command runs it.
+# $script:ExecutableWrapper to the wrapper command that runs it, if any.
 function Get-ExecutableIndex {
     param([object[]]$Words)
     $index = 0
-    $script:ExecutableWrapped = $false
+    $script:ExecutableWrapper = $null
     while ($index -lt $Words.Count) {
         $word = $Words[$index]
         $text = [string]$word.text
@@ -870,7 +870,7 @@ function Get-ExecutableIndex {
         $name = Get-CommandBaseName -Text $text
         if ($script:WrapperCommands.ContainsKey($name)) {
             $valueFlags = $script:WrapperCommands[$name]
-            $script:ExecutableWrapped = $true
+            $script:ExecutableWrapper = $name
             $index++
             while ($index -lt $Words.Count) {
                 $argument = [string]$Words[$index].text
@@ -895,10 +895,11 @@ function Get-CommandFinding {
     $command = $Line[$Index]
     $words = Get-ArgumentWords -Words $command.words
     $start = Get-ExecutableIndex -Words $words
-    $wrapped = $script:ExecutableWrapped
+    $wrapper = $script:ExecutableWrapper
     if ($start -ge $words.Count) { return $null }
-    if ($wrapped -and $words[$start].quoted -and [string]$words[$start].text -match '\s') {
-        # A wrapper such as watch takes its command as one quoted string.
+    if ($wrapper -eq 'watch' -and $words[$start].quoted -and [string]$words[$start].text -match '\s') {
+        # watch hands its command to a shell, so it may be one quoted string.
+        # Other wrappers run an argument vector: a quoted word is a path.
         return Get-TextFinding -Text ([string]$words[$start].text) -Dialect 'posix' -Depth ($Depth + 1)
     }
     $name = Get-CommandBaseName -Text $words[$start].text

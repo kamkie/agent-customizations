@@ -45,6 +45,9 @@ targets.
   a band above the prompt.
 - `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.
 - `hooks/claude` — Claude Code-specific managed-job lifecycle cleanup scripts.
+- `hooks/shared` — the closing-phrase Stop hook for Codex and Claude Code. Once
+  per turn it makes the agent rewrite an ending that dictates a reply phrase
+  or offers a check instead of running it.
 - `config/manifest.json` — the exact files, plugins, and hook registrations
   managed for each supported agent.
 - `docs/customization-ownership.md` — classification, admission, ownership,

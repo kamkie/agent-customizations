@@ -5,8 +5,9 @@ $ErrorActionPreference = 'Stop'
 # Split a command line into shell segments and each segment into tokens.
 # Quotes group a token; `;`, `|`, `&`, `(`, `{`, and newlines end a segment.
 # Each token records whether it was quoted so a shell command string can be
-# inspected as a nested command line. -LiteralHash reads `#` as plain text,
-# for cmd.exe, which has no `#` comments.
+# inspected as a nested command line, and whether any part was double-quoted,
+# where a shell still runs `$(...)` substitutions. -LiteralHash reads `#` as
+# plain text, for cmd.exe, which has no `#` comments.
 function Get-ShellSegments {
     param([string]$Text, [switch]$LiteralHash)
     $segments = [Collections.Generic.List[object]]::new()
@@ -14,6 +15,7 @@ function Get-ShellSegments {
     $buffer = [Text.StringBuilder]::new()
     $quote = [char]0
     $quoted = $false
+    $expandable = $false
     # Unquoted text before the first quote, so NAME="value" still reads as an
     # assignment even though its value is quoted.
     $unquotedPrefix = $null
@@ -43,6 +45,7 @@ function Get-ShellSegments {
             $quote = $ch
             if (-not $quoted) { $unquotedPrefix = $buffer.ToString() }
             $quoted = $true
+            if ($ch -eq '"') { $expandable = $true }
             continue
         }
         $isSeparator = $atEnd -or ";|&(){}`r`n".IndexOf($ch) -ge 0
@@ -51,10 +54,12 @@ function Get-ShellSegments {
                 $tokens.Add([pscustomobject]@{
                     text = $buffer.ToString()
                     quoted = $quoted
+                    expandable = $expandable
                     unquotedPrefix = if ($quoted) { $unquotedPrefix } else { $buffer.ToString() }
                 })
                 $null = $buffer.Clear()
                 $quoted = $false
+                $expandable = $false
                 $unquotedPrefix = $null
             }
             if ($isSeparator -and $tokens.Count -gt 0) {
@@ -145,9 +150,35 @@ function Test-ShellRecipient {
     return $false
 }
 
+# The commands a shell runs while it expands text: the content of each
+# `$(...)` and, with -Backticks (Bash), of each backtick pair.
+function Get-Substitutions {
+    param([string]$Text, [switch]$Backticks)
+    $found = [Collections.Generic.List[string]]::new()
+    $start = $Text.IndexOf('$(')
+    while ($start -ge 0) {
+        $depth = 1
+        $end = $start + 2
+        while ($end -lt $Text.Length -and $depth -gt 0) {
+            if ($Text[$end] -eq '(') { $depth++ } elseif ($Text[$end] -eq ')') { $depth-- }
+            $end++
+        }
+        $length = $end - $start - 2
+        if ($depth -eq 0) { $length-- }
+        $found.Add($Text.Substring($start + 2, $length))
+        $start = if ($end -lt $Text.Length) { $Text.IndexOf('$(', $end) } else { -1 }
+    }
+    if ($Backticks) {
+        foreach ($pair in [regex]::Matches($Text, '`([^`]+)`')) { $found.Add($pair.Groups[1].Value) }
+    }
+    return $found.ToArray()
+}
+
 # Remove here-document and PowerShell here-string bodies from the command text:
-# they are data (a commit message, a file body), not commands. A body fed to a
-# shell is returned separately so it is still inspected as a command line.
+# they are data (a commit message, a file body), not commands. What a body
+# still runs is returned separately so it is inspected as a command line: the
+# whole body when a shell receives it, otherwise the substitutions of an
+# expandable body (an unquoted delimiter, or a double-quoted here-string).
 function Get-InspectableText {
     param([string]$Text)
     $lines = [Collections.Generic.List[string]]::new([string[]]($Text -split "`r?`n"))
@@ -167,6 +198,8 @@ function Get-InspectableText {
                 $body = @($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"
                 if (Test-ShellRecipient -Line $joined -Index $hereString.Index) {
                     $shellBodies.Add($body)
+                } elseif ($hereString.Groups[1].Value -eq '"') {
+                    foreach ($substitution in Get-Substitutions -Text $body) { $shellBodies.Add($substitution) }
                 }
                 $lines[$end] = $joined
                 $i = $end - 1
@@ -183,6 +216,8 @@ function Get-InspectableText {
             $body = @($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"
             if (Test-ShellRecipient -Line $line -Index $hereDocument.Index) {
                 $shellBodies.Add($body)
+            } elseif (-not $hereDocument.Groups[1].Value) {
+                foreach ($substitution in Get-Substitutions -Text $body -Backticks) { $shellBodies.Add($substitution) }
             }
             $i = $end
         }
@@ -270,17 +305,26 @@ function Get-CommandTrigger {
 # The first detached or long-running launch the command line performs, or
 # $null. A launch is recognized where a command runs: as the executable of a
 # shell segment with its arguments, including a command string handed to a
-# shell with -c, -Command, or /c. Text that only mentions a launch (a search
-# pattern, a commit message, a file body, a path) is not one.
+# shell with -c, -Command, or /c, and a `$(...)` substitution inside a
+# double-quoted word. Text that only mentions a launch (a search pattern, a
+# commit message, a file body, a path) is not one.
 function Get-LaunchTrigger {
     param([string]$Text, [int]$Depth = 0, [switch]$LiteralHash)
     if ($Depth -gt 3 -or [string]::IsNullOrWhiteSpace($Text)) { return $null }
     $source = Get-InspectableText -Text $Text
     foreach ($segment in Get-ShellSegments -Text $source.text -LiteralHash:$LiteralHash) {
         $segmentCommand = Get-SegmentCommand -Segment $segment
-        if (-not $segmentCommand) { continue }
-        $trigger = Get-CommandTrigger -Stem $segmentCommand.stem -Arguments $segmentCommand.arguments -Depth $Depth
-        if ($trigger) { return $trigger }
+        if ($segmentCommand) {
+            $trigger = Get-CommandTrigger -Stem $segmentCommand.stem -Arguments $segmentCommand.arguments -Depth $Depth
+            if ($trigger) { return $trigger }
+        }
+        foreach ($token in $segment) {
+            if (-not $token.expandable -or -not $token.text.Contains('$(')) { continue }
+            foreach ($substitution in Get-Substitutions -Text $token.text) {
+                $trigger = Get-LaunchTrigger -Text $substitution -Depth ($Depth + 1)
+                if ($trigger) { return $trigger }
+            }
+        }
     }
     foreach ($body in $source.shellBodies) {
         $trigger = Get-LaunchTrigger -Text $body -Depth ($Depth + 1)

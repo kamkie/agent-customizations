@@ -314,6 +314,7 @@ try {
         "`$note = 'Start-Process is denied'",
         "cat > notes.md <<'EOF'`nRun the UI with:`nnpm run dev`nEOF",
         "git commit -m @'`nDocument the dev server`n`nIt's started with:`nnpm run dev`n'@",
+        "git commit -m `"`$(cat <<'EOF'`nFix the dev server`n`nnpm run dev now works`nEOF`n)`"",
         "cat > review.sh <<'EOF' && bash -n review.sh`nclaude -p hello`nEOF",
         'npx tsc --noEmit'
     )) {
@@ -342,7 +343,9 @@ try {
         @{ command = "cat > notes.md <<'EOF'`ntext`nEOF`nnpm run dev"; trigger = 'npm run dev' },
         @{ command = "# don't wait for it`nStart-Process notepad"; trigger = 'Start-Process' },
         @{ command = 'cmd /c "echo # starting review & claude -p hello"'; trigger = 'claude -p' },
-        @{ command = "bash <<< 'claude -p hello'"; trigger = 'claude -p' }
+        @{ command = "bash <<< 'claude -p hello'"; trigger = 'claude -p' },
+        @{ command = 'echo "$(claude -p hello)"'; trigger = 'claude -p' },
+        @{ command = "cat > review.txt <<EOF`n`$(claude -p hello)`nEOF"; trigger = 'claude -p' }
     )) {
         $launchPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

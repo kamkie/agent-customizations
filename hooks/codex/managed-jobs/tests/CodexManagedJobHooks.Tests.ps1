@@ -66,9 +66,122 @@ function Start-SessionStartHookProcess {
     [pscustomobject]@{ process = $process; outputTask = $outputTask; errorTask = $errorTask }
 }
 
+function Invoke-MockedCleanupHook {
+    param([string]$Hook, [string]$Payload, [string]$EnvironmentId, [switch]$ControllerFailure)
+
+    if (Test-Path -LiteralPath $mockCapture) { Remove-Item -LiteralPath $mockCapture }
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $pwsh
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.Environment['CODEX_HOME'] = $mockHome
+    $startInfo.Environment['CODEX_THREAD_ID'] = $EnvironmentId
+    $startInfo.Environment['HOOK_TEST_CAPTURE'] = $mockCapture
+    $startInfo.Environment['HOOK_TEST_FAILURE'] = [string]$ControllerFailure.IsPresent
+    foreach ($argument in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Hook)) {
+        $startInfo.ArgumentList.Add($argument)
+    }
+    $process = [Diagnostics.Process]::Start($startInfo)
+    try {
+        $outputTask = $process.StandardOutput.ReadToEndAsync()
+        $errorTask = $process.StandardError.ReadToEndAsync()
+        $process.StandardInput.Write($Payload)
+        $process.StandardInput.Close()
+        if (-not $process.WaitForExit(15000)) {
+            throw 'Mocked cleanup hook did not exit.'
+        }
+        [pscustomobject]@{
+            exitCode = $process.ExitCode
+            output = $outputTask.GetAwaiter().GetResult()
+            error = $errorTask.GetAwaiter().GetResult()
+            cleanup = if (Test-Path -LiteralPath $mockCapture) {
+                Get-Content -LiteralPath $mockCapture -Raw | ConvertFrom-Json
+            } else { $null }
+        }
+    } finally {
+        if (-not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }
+        $process.Dispose()
+    }
+}
+
 try {
     $null = New-Item -ItemType Directory -Path $stateRoot -Force
     $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+    $mockHome = Join-Path $testRoot 'mock-home'
+    $mockCapture = Join-Path $testRoot 'cleanup-call.json'
+    $mockScripts = Join-Path $mockHome 'skills\managed-jobs\scripts'
+    $null = New-Item -ItemType Directory -Path $mockScripts -Force
+    @'
+param([string]$Command, [string]$OwnerAgent, [string]$OwnerSessionId, [string[]]$CleanupLifetime)
+[ordered]@{
+    command = $Command; agent = $OwnerAgent; owner = $OwnerSessionId; lifetimes = $CleanupLifetime
+} | ConvertTo-Json | Set-Content -LiteralPath $env:HOOK_TEST_CAPTURE
+if ($env:HOOK_TEST_FAILURE -eq 'True') { throw 'Synthetic controller failure.' }
+'{"failures":[]}'
+'@ | Set-Content -LiteralPath (Join-Path $mockScripts 'Invoke-ManagedJob.ps1') -Encoding utf8
+
+    $identityCases = @(
+        @{ name = 'child payload'; payload = '{"session_id":"child-session"}'; environment = 'parent-session'; owner = 'child-session' },
+        @{ name = 'matching identities'; payload = '{"session_id":"child-session"}'; environment = 'child-session'; owner = 'child-session' },
+        @{ name = 'payload only'; payload = '{"session_id":"child-session"}'; environment = ''; owner = 'child-session' },
+        @{ name = 'empty stdin'; payload = ''; environment = 'parent-session'; owner = 'parent-session' },
+        @{ name = 'whitespace stdin'; payload = " `r`n`t"; environment = 'parent-session'; owner = 'parent-session' },
+        @{ name = 'missing property'; payload = '{}'; environment = 'parent-session' },
+        @{ name = 'null identity'; payload = '{"session_id":null}'; environment = 'parent-session' },
+        @{ name = 'blank identity'; payload = '{"session_id":"  "}'; environment = 'parent-session' },
+        @{ name = 'empty identity'; payload = '{"session_id":""}'; environment = 'parent-session' },
+        @{ name = 'number identity'; payload = '{"session_id":42}'; environment = 'parent-session' },
+        @{ name = 'boolean identity'; payload = '{"session_id":true}'; environment = 'parent-session' },
+        @{ name = 'array identity'; payload = '{"session_id":["child-session"]}'; environment = 'parent-session' },
+        @{ name = 'object identity'; payload = '{"session_id":{"value":"child-session"}}'; environment = 'parent-session' },
+        @{ name = 'array payload'; payload = '[{"session_id":"child-session"}]'; environment = 'parent-session' },
+        @{ name = 'null payload'; payload = 'null'; environment = 'parent-session' },
+        @{ name = 'scalar payload'; payload = '"child-session"'; environment = 'parent-session' },
+        @{ name = 'malformed JSON'; payload = '{'; environment = 'parent-session' },
+        @{ name = 'no identity'; payload = ''; environment = '' }
+    )
+    foreach ($hook in @($stopHook, $sessionEndHook)) {
+        $isStop = $hook -eq $stopHook
+        foreach ($case in $identityCases) {
+            $result = Invoke-MockedCleanupHook -Hook $hook -Payload $case.payload -EnvironmentId $case.environment
+            $label = "$(Split-Path -Leaf $hook): $($case.name)"
+            if ($case.owner) {
+                Assert-True ($result.exitCode -eq 0 -and [string]::IsNullOrWhiteSpace($result.output) -and
+                    [string]::IsNullOrWhiteSpace($result.error)) "$label should succeed silently."
+                Assert-True ($result.cleanup.owner -ceq $case.owner) "$label should clean only the selected owner."
+                Assert-True ($result.cleanup.command -eq 'cleanup' -and $result.cleanup.agent -eq 'codex') "$label should call Codex cleanup."
+                $expectedLifetimes = if ($isStop) { 'Turn' } else { 'Turn,Session' }
+                Assert-True (($result.cleanup.lifetimes -join ',') -eq $expectedLifetimes) "$label should preserve lifetime filters."
+            } else {
+                Assert-True ($null -eq $result.cleanup) "$label must not call cleanup or fall back to an inherited owner."
+                if ($isStop) {
+                    $diagnostic = $result.output | ConvertFrom-Json
+                    Assert-True ($result.exitCode -eq 0 -and
+                        ($diagnostic.reason -match 'could not verify' -or $diagnostic.systemMessage -match 'could not verify')) "$label should diagnose safely."
+                } else {
+                    Assert-True ($result.exitCode -eq 1 -and $result.error -match 'cleanup failed') "$label should report failure."
+                }
+            }
+        }
+        $failed = Invoke-MockedCleanupHook -Hook $hook -EnvironmentId 'parent-session' -ControllerFailure `
+            -Payload '{"session_id":"child-session","stop_hook_active":false}'
+        Assert-True ($failed.cleanup.owner -eq 'child-session') 'Controller failure must still target only the child.'
+        if ($isStop) {
+            Assert-True (($failed.output | ConvertFrom-Json).decision -eq 'block') 'Controller failure should block Stop once.'
+            foreach ($payload in @('{"session_id":"child-session","stop_hook_active":true}', '{"stop_hook_active":true}')) {
+                $continued = Invoke-MockedCleanupHook -Hook $hook -EnvironmentId 'parent-session' -ControllerFailure -Payload $payload
+                $diagnostic = $continued.output | ConvertFrom-Json
+                Assert-True ($diagnostic.systemMessage -match 'will not block the turn again' -and
+                    $diagnostic.PSObject.Properties.Name -notcontains 'decision') 'Repeated controller or identity failure must not block again.'
+            }
+        } else {
+            Assert-True ($failed.exitCode -eq 1 -and $failed.error -match 'Synthetic controller failure') 'SessionEnd should report controller failure.'
+        }
+    }
+
     $sessionId = 'codex-hook-session'
     $env:CODEX_HOME = $repositoryRoot
     $env:CODEX_THREAD_ID = $sessionId

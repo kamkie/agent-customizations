@@ -4,17 +4,17 @@ $ErrorActionPreference = 'Stop'
 
 try {
     $payloadText = [Console]::In.ReadToEnd()
-    $payload = if ([string]::IsNullOrWhiteSpace($payloadText)) {
-        $null
+    if (-not [string]::IsNullOrWhiteSpace($payloadText)) {
+        $payload = $payloadText | ConvertFrom-Json -NoEnumerate
+        if ($payload -isnot [System.Management.Automation.PSCustomObject] -or
+            $payload.session_id -isnot [string] -or
+            [string]::IsNullOrWhiteSpace($payload.session_id)) {
+            throw 'Codex hook payload must provide a nonblank string session_id for process cleanup.'
+        }
+        # The event owns cleanup; a nested session can inherit its parent's environment.
+        $sessionId = $payload.session_id
     } else {
-        $payloadText | ConvertFrom-Json
-    }
-    $sessionId = if ($env:CODEX_THREAD_ID) {
-        [string]$env:CODEX_THREAD_ID
-    } elseif ($payload) {
-        [string]$payload.session_id
-    } else {
-        $null
+        $sessionId = $env:CODEX_THREAD_ID
     }
     if ([string]::IsNullOrWhiteSpace($sessionId)) {
         throw 'Codex did not provide a session identifier for process cleanup.'

@@ -737,8 +737,9 @@ function Get-ArgumentWords {
     $arguments = [Collections.Generic.List[object]]::new()
     for ($i = 0; $i -lt $Words.Count; $i++) {
         if ($Words[$i].redirect -or $Words[$i].input) {
-            # An operator written apart from its target takes the next word.
-            if ([string]$Words[$i].text -cmatch '^(?:\d*>>?|&>>?|\d*<|<<<)$') { $i++ }
+            # An operator written apart from its target takes the next word. This
+            # includes descriptor duplication, as in 2>& 1, and read-write opens.
+            if ([string]$Words[$i].text -cmatch '^(?:\d*(?:>>?|<>?|[<>]&)|&>>?|\d*<<<)$') { $i++ }
             continue
         }
         $arguments.Add($Words[$i])

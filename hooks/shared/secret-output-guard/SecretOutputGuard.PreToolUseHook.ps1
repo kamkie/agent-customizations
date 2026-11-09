@@ -264,6 +264,15 @@ function Read-ShellLevel {
             $script:ParsePosition++
             continue
         }
+        if ($ch -eq '<' -and $next -eq '#' -and -not $frame.inWord) {
+            # PowerShell block comment. Read in both quoting styles, because the
+            # shell behind a tool that is not named PowerShell is not known.
+            $commentEnd = $text.IndexOf('#>', $position + 2)
+            if ($commentEnd -ge 0) {
+                $script:ParsePosition = $commentEnd + 2
+                continue
+            }
+        }
         if ($ch -eq '#' -and -not $frame.inWord) {
             $lineEnd = $text.IndexOf("`n", $position)
             $script:ParsePosition = if ($lineEnd -lt 0) { $length } else { $lineEnd }

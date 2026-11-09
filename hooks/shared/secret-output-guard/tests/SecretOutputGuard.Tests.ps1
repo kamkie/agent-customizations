@@ -324,7 +324,15 @@ glab api projects/123/variables | jq -r '.[].key'
 Test-Cases -Tool 'PowerShell' -Expected $null -Commands @(
     "`$body = @'`nkubectl get secret app -o yaml`n'@`nSet-Content notes.md `$body",
     "`$body = @`"`naz keyvault secret show --name x`n`"@`nSet-Content notes.md `$body",
-    "# kubectl get secret app -o yaml`ngit status"
+    "# kubectl get secret app -o yaml`ngit status",
+    "<#`nkubectl get secret app -o yaml`n#>`nGet-Date",
+    "Get-Date <# kubectl get secret app -o yaml #>"
+)
+# A block comment hides only its own text, also in a tool whose shell is unknown.
+Test-Cases -Tool 'Bash' -Expected $null -Commands @("<#`nkubectl get secret app -o yaml`n#>`nGet-Date")
+Test-Cases -Tool 'PowerShell' -Expected 'kubectl' -Commands @(
+    "<# note #> kubectl get secret app -o yaml",
+    "<#`nnote`n#>`nkubectl get secret app -o yaml"
 )
 
 if ($failures.Count -gt 0) {

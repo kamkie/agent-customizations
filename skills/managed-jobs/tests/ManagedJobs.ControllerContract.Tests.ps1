@@ -105,6 +105,20 @@ try {
     Assert-True (@(Get-Content -LiteralPath $cachePath).Count -eq 3) `
         'The cache should drop the entry of a record that is active again.'
     New-FixtureRecord -Id $stoppedId -Name 'contract server' -Status stopped -AgeMinutes 30
+    $null = @(Get-ManagedJobActiveRecords -UpdateCache)
+
+    # A late host can publish running over a cached terminal record while a
+    # scan is under way. The directory listing was read before the rewrite, so
+    # the scan must check the file itself before it trusts a cache entry. The
+    # running fixture sorts before the stopped one and is emitted first; the
+    # rewrite happens while the scan is paused on it.
+    $scan = @(Get-ManagedJobActiveRecords | ForEach-Object {
+        if ($_.id -eq $runningId) { New-FixtureRecord -Id $stoppedId -Name 'contract server' -Status running -AgeMinutes 30 }
+        $_
+    })
+    Assert-True ($scan.Count -eq 2 -and $scan.id -contains $stoppedId) `
+        'A cached record rewritten as active during a scan must still be reported by that scan.'
+    New-FixtureRecord -Id $stoppedId -Name 'contract server' -Status stopped -AgeMinutes 30
     Set-Content -LiteralPath $cachePath -Value @('not a cache entry', "$completedId.json|1|1") -Encoding utf8
     $scan = @(Get-ManagedJobActiveRecords -UpdateCache)
     $cachedKeys = @(Get-Content -LiteralPath $cachePath | Sort-Object)

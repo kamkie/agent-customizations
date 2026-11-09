@@ -120,47 +120,53 @@ function Get-ManagedJobActiveRecords {
     # `start` looks for an equivalent active job while it holds the launch lock,
     # so this scan must not open every historical record. Once a record is read
     # as terminal, its file name, write time, and length are remembered, and
-    # later scans skip that exact file version from directory metadata alone.
-    # Every record write replaces the file, so a rewritten record no longer
-    # matches its entry and is read again. A missing, stale, or damaged cache
-    # costs a slower scan and never hides an active record.
+    # later scans skip that exact file version from directory metadata, without
+    # opening it. Every record write replaces the file, so a rewritten record
+    # no longer matches its entry and is read again. A missing, stale, or
+    # damaged cache costs a slower scan and never hides an active record.
     $root = Get-ManagedJobRoot
+    $jobsDirectory = [IO.DirectoryInfo]::new((Join-Path $root 'jobs'))
     $cachePath = Join-Path $root '.terminal-records.cache'
     $known = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     try { $known.UnionWith([IO.File]::ReadAllLines($cachePath)) } catch {}
-    $terminalKeys = [Collections.Generic.List[string]]::new()
+    # File name -> the version taken as terminal by the first pass.
+    $terminal = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
     $learned = 0
     $activeText = '"status"\s*:\s*"(?:starting|running)"'
     $terminalText = '"status"\s*:\s*"(?:completed|failed|stopped|orphaned)"'
-    foreach ($file in [IO.DirectoryInfo]::new((Join-Path $root 'jobs')).EnumerateFiles('*.json')) {
-        $key = '{0}|{1}|{2}' -f $file.Name, $file.LastWriteTimeUtc.Ticks, $file.Length
-        if ($known.Contains($key)) {
-            $terminalKeys.Add($key)
-            continue
-        }
-        $text = $null
-        try { $text = [IO.File]::ReadAllText($file.FullName) } catch {}
-        if ($null -eq $text -or $text -match $activeText) {
-            # Parse only what may be active; a record that is mid-replace gets
-            # the retrying reader.
-            try { $job = Read-ManagedJob -Path $file.FullName } catch { continue }
-            if ($job.PSObject.Properties.Name -contains 'status' -and $job.status -in @('starting', 'running')) { $job }
-            continue
-        }
-        if ($text -notmatch $terminalText) { continue }
-        # Remember the record only when the file still is what the directory
-        # listing described, so the entry cannot describe other bytes.
-        $file.Refresh()
-        if ($file.Exists -and $key -eq ('{0}|{1}|{2}' -f $file.Name, $file.LastWriteTimeUtc.Ticks, $file.Length)) {
-            $terminalKeys.Add($key)
-            $learned++
+    # A host can publish a new version of a record while the first pass runs,
+    # after its directory listing was read. The second pass lists again and
+    # reads every record whose version changed, so nothing is taken as terminal
+    # on metadata older than one listing. A version that is unchanged across
+    # both listings is also the one whose text was read in between.
+    foreach ($pass in 1, 2) {
+        foreach ($file in $jobsDirectory.EnumerateFiles('*.json')) {
+            $key = '{0}|{1}|{2}' -f $file.Name, $file.LastWriteTimeUtc.Ticks, $file.Length
+            if ($pass -eq 2) {
+                if (-not $terminal.ContainsKey($file.Name) -or $terminal[$file.Name] -eq $key) { continue }
+                $null = $terminal.Remove($file.Name)
+            } elseif ($known.Contains($key)) {
+                $terminal[$file.Name] = $key
+                continue
+            }
+            $text = $null
+            try { $text = [IO.File]::ReadAllText($file.FullName) } catch {}
+            if ($null -eq $text -or $text -match $activeText) {
+                # Parse only what may be active; a record that is mid-replace
+                # gets the retrying reader.
+                try { $job = Read-ManagedJob -Path $file.FullName } catch { continue }
+                if ($job.PSObject.Properties.Name -contains 'status' -and $job.status -in @('starting', 'running')) { $job }
+            } elseif ($pass -eq 1 -and $text -match $terminalText) {
+                $terminal[$file.Name] = $key
+                $learned++
+            }
         }
     }
-    if ($UpdateCache -and ($learned -gt 0 -or $terminalKeys.Count -ne $known.Count)) {
-        # Rewriting from this listing also drops entries of pruned records.
+    if ($UpdateCache -and ($learned -gt 0 -or $terminal.Count -ne $known.Count)) {
+        # Rewriting from this scan also drops entries of pruned records.
         $temporary = "$cachePath.$([guid]::NewGuid().ToString('N')).tmp"
         try {
-            [IO.File]::WriteAllLines($temporary, $terminalKeys)
+            [IO.File]::WriteAllLines($temporary, [string[]]@($terminal.Values))
             Move-ManagedFileAtomic -Source $temporary -Destination $cachePath
         } catch {} finally {
             if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }

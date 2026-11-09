@@ -334,12 +334,13 @@ function Read-ShellLevel {
             $frame.inWord = $true
             continue
         }
-        if ($ch -eq '$' -and $next -eq '{') {
-            $end = $text.IndexOf('}', $position)
-            if ($end -lt 0) { $end = $length - 1 }
-            $null = $frame.buffer.Append($text, $position, $end - $position + 1)
+        if ($ch -eq '$' -and $next -eq '{' -and $canNest) {
+            # A parameter expansion stays in its word, and a substitution inside
+            # it, as in ${name:-$(command)}, is parsed like any other.
+            $script:ParsePosition += 2
+            Read-ShellLevel -Close '}'
+            $null = $frame.buffer.Append($text, $position, $script:ParsePosition - $position)
             $frame.inWord = $true
-            $script:ParsePosition = $end + 1
             continue
         }
         if ($ch -eq '(' -and $canNest) {

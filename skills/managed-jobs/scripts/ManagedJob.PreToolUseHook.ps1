@@ -229,7 +229,9 @@ function Test-ReadsProgramFromInput {
         if ($posix) {
             if ($word -cmatch '^-[A-Za-z]*c[A-Za-z]*$') { return $false }
             if ($word -cmatch '^-[A-Za-z]*s[A-Za-z]*$') { return $true }
-            if ($word -cmatch '^(?:[-+]o|--rcfile|--init-file)$') { $i++ }
+            # -o and -O take the next word, also at the end of a flag group
+            # such as -euo pipefail.
+            if ($word -cmatch '^(?:[-+][A-Za-z]*[oO]|--rcfile|--init-file)$') { $i++ }
         } else {
             if ($word -imatch '^-(?:c|Command|CommandWithArgs|cwa|f|File)$') {
                 return ($i + 1 -lt $Arguments.Count -and $Arguments[$i + 1].text -eq '-')

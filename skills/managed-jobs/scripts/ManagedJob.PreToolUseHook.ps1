@@ -193,15 +193,70 @@ function Get-PipelineText {
     return $Line.Substring($start, $end - $start)
 }
 
-# True when a command on the line is a shell or an evaluator, so text the line
-# feeds it (a here-document or here-string body) runs as commands.
+# True when the word is the flag after which a shell takes a command string.
+function Test-CommandFlag {
+    param([string]$Stem, [string]$Word)
+    return ($Word -imatch '^(?:-c|-Command|/c|/k)$' -or ($Stem -imatch '^(?:bash|sh|zsh)$' -and $Word -cmatch '^-[A-Za-z]*c$'))
+}
+
+# True when a shell or evaluator takes its program from standard input or the
+# pipeline, so text fed to it runs as commands. False when it runs a command
+# string or a script file: its input is then data for that program.
+function Test-ReadsProgramFromInput {
+    param([string]$Stem, [object[]]$Arguments)
+    if ($Stem -ieq 'cmd') {
+        return (@($Arguments | Where-Object { -not $_.quoted -and $_.text -imatch '^/[ck]$' }).Count -eq 0)
+    }
+    $posix = $Stem -imatch '^(?:bash|sh|zsh)$'
+    for ($i = 0; $i -lt $Arguments.Count; $i++) {
+        $word = $Arguments[$i].text
+        if ($Arguments[$i].unquotedPrefix -match '^\d*[<>]') {
+            # A redirection; a bare operator takes the next word as its target.
+            if ($word -match '^\d*[<>]+$') { $i++ }
+            continue
+        }
+        # A script file or a command string: input is data.
+        if ($Arguments[$i].quoted -or $word -notmatch '^[-+]') { return $false }
+        if ($posix) {
+            if ($word -cmatch '^-[A-Za-z]*c[A-Za-z]*$') { return $false }
+            if ($word -cmatch '^-[A-Za-z]*s[A-Za-z]*$') { return $true }
+            if ($word -cmatch '^(?:[-+]o|--rcfile|--init-file)$') { $i++ }
+        } else {
+            if ($word -imatch '^-(?:c|Command|CommandWithArgs|cwa|f|File)$') {
+                return ($i + 1 -lt $Arguments.Count -and $Arguments[$i + 1].text -eq '-')
+            }
+            if ($word -imatch '^-(?:e|ec|EncodedCommand)$') { return $false }
+            if ($word -imatch '^-(?:ExecutionPolicy|ep|ex|WorkingDirectory|wd|ConfigurationName|CustomPipeName|SettingsFile|InputFormat|OutputFormat|WindowStyle)$') { $i++ }
+        }
+    }
+    return $true
+}
+
+# True when the here-document or here-string at position $Index of the line
+# runs as commands: a shell or evaluator in its pipeline reads its program
+# from input, takes the here-string ($Placeholder) as its command string, or
+# runs the command substitution that contains the here-document.
 function Test-ShellRecipient {
-    param([string]$Line, [int]$Index)
+    param([string]$Line, [int]$Index, [string]$Placeholder)
     # Only the pipeline that receives the text counts: a shell elsewhere on the
     # line, such as a syntax check after `&&`, does not run it.
-    foreach ($segment in Get-ShellSegments -Text (Get-PipelineText -Line $Line -Index $Index)) {
+    $pipeline = Get-PipelineText -Line $Line -Index $Index
+    $before = $Line.Substring(0, $Index)
+    $opened = $before.LastIndexOf('$(')
+    $inSubstitution = $opened -ge 0 -and (Get-SubstitutionEnd -Text $before -Start ($opened + 2)) -ge $before.Length
+    foreach ($segment in Get-ShellSegments -Text $pipeline) {
         $segmentCommand = Get-SegmentCommand -Segment $segment
-        if ($segmentCommand -and ($segmentCommand.stem -imatch $shellNames -or $segmentCommand.stem -imatch $evaluatorNames)) { return $true }
+        if (-not $segmentCommand) { continue }
+        $stem = $segmentCommand.stem
+        $arguments = $segmentCommand.arguments
+        if ($stem -imatch $evaluatorNames) {
+            if ($inSubstitution -or $arguments.Count -eq 0 -or ($Placeholder -and @($arguments | Where-Object { $_.text -eq $Placeholder }).Count -gt 0)) { return $true }
+        } elseif ($stem -imatch $shellNames) {
+            if ($inSubstitution -or (Test-ReadsProgramFromInput -Stem $stem -Arguments $arguments)) { return $true }
+            for ($i = 1; $Placeholder -and $i -lt $arguments.Count; $i++) {
+                if ($arguments[$i].text -eq $Placeholder -and (Test-CommandFlag -Stem $stem -Word $arguments[$i - 1].text)) { return $true }
+            }
+        }
     }
     return $false
 }
@@ -243,9 +298,9 @@ function Get-InspectableText {
             if ($end -lt $lines.Count) {
                 # Rejoin the text around the body and examine that line again: it
                 # may open another here-string.
-                $joined = $line.Substring(0, $hereString.Index) + "'here-string'" + $lines[$end].Substring(2)
+                $joined = $line.Substring(0, $hereString.Index) + "'<here-string>'" + $lines[$end].Substring(2)
                 $body = @($lines.GetRange($i + 1, $end - $i - 1)) -join "`n"
-                if (Test-ShellRecipient -Line $joined -Index $hereString.Index) {
+                if (Test-ShellRecipient -Line $joined -Index $hereString.Index -Placeholder '<here-string>') {
                     $shellBodies.Add($body)
                 } elseif ($hereString.Groups[1].Value -eq '"') {
                     foreach ($substitution in Get-Substitutions -Text $body) { $shellBodies.Add($substitution) }
@@ -321,15 +376,21 @@ function Get-CommandTrigger {
     $nested = [Collections.Generic.List[string]]::new()
     if ($Stem -imatch $shellNames) {
         $commandFound = $false
+        # A Bash here-string (`<<< text`) is the shell's standard input: its
+        # program when the shell reads one from input, otherwise data.
+        $readsInput = Test-ReadsProgramFromInput -Stem $Stem -Arguments $Arguments
         for ($i = 0; $i -lt $Arguments.Count; $i++) {
-            # A Bash here-string is the shell's standard input: `<<< script`.
             if ($Arguments[$i].unquotedPrefix -like '<<<*') {
-                if ($words[$i].Length -gt 3) { $nested.Add($words[$i].Substring(3)) }
-                elseif ($i + 1 -lt $Arguments.Count) { $nested.Add($words[$i + 1]) }
+                if ($words[$i].Length -gt 3) {
+                    if ($readsInput) { $nested.Add($words[$i].Substring(3)) }
+                } elseif ($i + 1 -lt $Arguments.Count) {
+                    $i++
+                    if ($readsInput) { $nested.Add($words[$i]) }
+                }
                 continue
             }
             if ($commandFound -or $Arguments[$i].quoted -or $i + 1 -ge $Arguments.Count) { continue }
-            if ($words[$i] -imatch '^(?:-c|-Command|/c|/k)$' -or ($Stem -imatch '^(?:bash|sh|zsh)$' -and $words[$i] -cmatch '^-[A-Za-z]*c$')) {
+            if (Test-CommandFlag -Stem $Stem -Word $words[$i]) {
                 $nested.Add((Get-NestedCommandText -Tokens @($Arguments | Select-Object -Skip ($i + 1))))
                 $commandFound = $true
             }

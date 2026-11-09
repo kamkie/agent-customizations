@@ -316,6 +316,8 @@ try {
         "git commit -m @'`nDocument the dev server`n`nIt's started with:`nnpm run dev`n'@",
         "git commit -m `"`$(cat <<'EOF'`nFix the dev server`n`nnpm run dev now works`nEOF`n)`"",
         "cat > review.sh <<'EOF' && bash -n review.sh`nclaude -p hello`nEOF",
+        "bash -c 'cat' <<< 'claude -p hello'",
+        "bash count-lines.sh <<'EOF'`nnpm run dev`nEOF",
         'npx tsc --noEmit'
     )) {
         $launchMentionPayload = [ordered]@{
@@ -343,6 +345,9 @@ try {
         @{ command = 'node cli.mjs task --background'; trigger = '--background' },
         @{ command = "bash <<'EOF'`nnpm run dev`nEOF"; trigger = 'npm run dev' },
         @{ command = "bash -s -- 'a;b' 'c&&d' <<'EOF'`nnpm run dev`nEOF"; trigger = 'npm run dev' },
+        @{ command = "cat <<'EOF' | pwsh -NoProfile -Command -`nStart-Process notepad`nEOF"; trigger = 'Start-Process' },
+        @{ command = "bash -c `"`$(cat <<'EOF'`nnpm run dev`nEOF`n)`""; trigger = 'npm run dev' },
+        @{ command = "pwsh -NoProfile -Command @'`nStart-Process notepad`n'@"; trigger = 'Start-Process' },
         @{ command = "cat > notes.md <<'EOF'`ntext`nEOF`nnpm run dev"; trigger = 'npm run dev' },
         @{ command = "# don't wait for it`nStart-Process notepad"; trigger = 'Start-Process' },
         @{ command = 'cmd /c "echo # starting review & claude -p hello"'; trigger = 'claude -p' },

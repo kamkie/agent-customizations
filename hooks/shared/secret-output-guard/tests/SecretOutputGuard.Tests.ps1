@@ -119,6 +119,8 @@ kubectl get secret ${NAME:-app} -o yaml
 printf '%s\n' ${unused:-$(kubectl get secret app -o yaml)}
 echo "${unused:-$(kubectl get secret app -o yaml)}"
 echo ${unused:-`kubectl get secret app -o yaml`}
+echo ${#NAME}; kubectl get secret app -o yaml
+echo ${NAME/ #x/y}; kubectl get secret app -o yaml
 kubectl get secret $(cat name.txt) -o yaml
 xargs -I {} kubectl get secret {} -o yaml
 (kubectl get secret app -o yaml)

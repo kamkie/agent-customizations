@@ -239,7 +239,7 @@ function Read-DoubleQuoted {
 }
 
 function Read-ShellLevel {
-    param([char]$Close = [char]0)
+    param([char]$Close = [char]0, [switch]$NoComments)
     $script:ParseDepth++
     $frame = New-ParseFrame
     $text = $script:ParseText
@@ -267,7 +267,7 @@ function Read-ShellLevel {
             $script:ParsePosition++
             continue
         }
-        if ($ch -eq '<' -and $next -eq '#' -and -not $frame.inWord) {
+        if ($ch -eq '<' -and $next -eq '#' -and -not $frame.inWord -and -not $NoComments) {
             # PowerShell block comment. Read in both quoting styles, because the
             # shell behind a tool that is not named PowerShell is not known.
             $commentEnd = $text.IndexOf('#>', $position + 2)
@@ -276,7 +276,7 @@ function Read-ShellLevel {
                 continue
             }
         }
-        if ($ch -eq '#' -and -not $frame.inWord) {
+        if ($ch -eq '#' -and -not $frame.inWord -and -not $NoComments) {
             $lineEnd = $text.IndexOf("`n", $position)
             $script:ParsePosition = if ($lineEnd -lt 0) { $length } else { $lineEnd }
             continue
@@ -357,9 +357,10 @@ function Read-ShellLevel {
         }
         if ($ch -eq '$' -and $next -eq '{' -and $canNest) {
             # A parameter expansion stays in its word, and a substitution inside
-            # it, as in ${name:-$(command)}, is parsed like any other.
+            # it, as in ${name:-$(command)}, is parsed like any other. A # there
+            # is an operator, as in ${#name}, never a comment.
             $script:ParsePosition += 2
-            Read-ShellLevel -Close '}'
+            Read-ShellLevel -Close '}' -NoComments
             $null = $frame.buffer.Append($text, $position, $script:ParsePosition - $position)
             $frame.inWord = $true
             continue

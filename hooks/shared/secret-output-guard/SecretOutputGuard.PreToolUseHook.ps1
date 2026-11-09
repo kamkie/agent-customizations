@@ -69,10 +69,19 @@ $script:PassThroughCommands = @('base64', 'tr')
 $script:ShellKeywords = @('if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', 'time', 'return', 'try', 'finally')
 # Wrapper commands that run another command, with their value-taking options.
 $script:WrapperCommands = @{
-    env = @('-u', '-C', '-S'); sudo = @('-u', '-g', '-h', '-p', '-C', '-D', '-R', '-T', '-U', '-r', '-t')
-    doas = @('-u', '-C'); command = @(); exec = @('-a'); builtin = @(); nohup = @(); nice = @('-n')
-    winpty = @(); stdbuf = @('-i', '-o', '-e'); timeout = @('-s', '-k'); watch = @('-n')
-    xargs = @('-I', '-n', '-P', '-L', '-s', '-d', '-E', '-a')
+    env = @('-u', '--unset', '-C', '--chdir', '-S', '--split-string')
+    sudo = @(
+        '-u', '--user', '-g', '--group', '-h', '--host', '-p', '--prompt', '-C', '--close-from', '-D', '--chdir',
+        '-R', '--chroot', '-T', '--command-timeout', '-U', '--other-user', '-r', '--role', '-t', '--type'
+    )
+    doas = @('-u', '-C'); command = @(); exec = @('-a'); builtin = @(); nohup = @()
+    nice = @('-n', '--adjustment'); winpty = @()
+    stdbuf = @('-i', '--input', '-o', '--output', '-e', '--error')
+    timeout = @('-s', '--signal', '-k', '--kill-after'); watch = @('-n', '--interval')
+    xargs = @(
+        '-I', '-n', '--max-args', '-P', '--max-procs', '-L', '--max-lines', '-s', '--max-chars',
+        '-d', '--delimiter', '-E', '-a', '--arg-file'
+    )
 }
 
 $script:DenyReasons = @{
@@ -812,13 +821,17 @@ function Get-CommandFinding {
             } elseif ($name -eq 'cmd') {
                 $flag -imatch '^/[ck]$'
             } else {
-                $flag -cmatch '^-[A-Za-z]*c$'
+                # The c may stand anywhere in a short-option cluster, as in -cx.
+                $flag -cmatch '^-[A-Za-z]*c[A-Za-z]*$'
             }
             if (-not $isCommandFlag) { continue }
             $inner = if ($dialect -eq 'powershell' -or $name -eq 'cmd') {
                 (@($arguments | Select-Object -Skip ($i + 1)) | ForEach-Object { [string]$_.text }) -join ' '
             } else {
-                [string]$arguments[$i + 1].text
+                # The command string is the first operand after the options.
+                $operand = $i + 1
+                while ($operand -lt $arguments.Count - 1 -and [string]$arguments[$operand].text -cmatch '^[-+]') { $operand++ }
+                [string]$arguments[$operand].text
             }
             $finding = Get-TextFinding -Text $inner -Dialect $dialect -Depth ($Depth + 1)
             if ($finding) { return $finding }

@@ -91,6 +91,13 @@ echo start; kubectl get secret app -o yaml
 kubectl get pods; kubectl get secret app -o yaml
 bash -c "kubectl get secret app -o yaml"
 bash -lc 'kubectl get secret app -o yaml'
+bash -cx 'kubectl get secret app -o yaml'
+bash -o pipefail -xc "kubectl get secret app -o yaml"
+sh -c -e 'kubectl get secret app -o yaml'
+sudo --user root kubectl get secret app -o yaml
+sudo --user=root kubectl get secret app -o yaml
+env --unset HTTPS_PROXY kubectl get secret app -o yaml
+timeout --signal KILL 30 kubectl get secret app -o yaml
 pwsh -Command "kubectl get secret app -o yaml"
 eval "kubectl get secret app -o yaml"
 PASS=$(kubectl get secret app -o jsonpath='{.data.password}' | base64 -d)
@@ -237,6 +244,9 @@ kubectl get secret app -o yaml 2> /dev/null | sha256sum
 2>/dev/null kubectl get secret app -o yaml | 2>/dev/null sha256sum
 2>/dev/null kubectl get secret app
 kubectl get secret ${NAME:-app}
+bash -cx 'kubectl get secret app'
+sudo --user root kubectl get secret app
+sudo --user root grep -rn "kubectl get secret app -o yaml" docs/
 echo ${NOTE:-kubectl get secret app -o yaml}
 kubectl get secret app -o jsonpath='{.data.password}' | base64 --decode | tr -d '\n' | openssl dgst -sha256
 a=$(kubectl get secret app -o jsonpath='{.data.password}' | base64 -d | sha256sum); echo "$a"

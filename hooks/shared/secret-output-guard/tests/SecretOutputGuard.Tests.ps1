@@ -81,6 +81,11 @@ kubectl.exe get secret app -o yaml
 "kubectl" get secret app -o yaml
 kubectl get sec""ret app -o yaml
 kubectl get sec\ret app -o yaml
+2>/dev/null kubectl get secret app -o yaml
+2> /dev/null kubectl get secret app -o yaml
+kubectl get 2>/dev/null secret app -o yaml
+< /dev/null kubectl get secret app -o yaml
+kubectl get secret app -o json | 2>/dev/null jq .
 cd repo && kubectl get secret app -o yaml
 echo start; kubectl get secret app -o yaml
 kubectl get pods; kubectl get secret app -o yaml
@@ -149,6 +154,7 @@ VALUE=$(az keyvault secret show --vault-name kv -n db-password --query value -o 
 az.cmd keyvault secret show --vault-name kv -n db-password
 az keyvault sec""ret show --vault-name kv -n db-password
 az keyvault secret show --vault-name kv -n db-password -o none --output json
+2>/dev/null az keyvault secret show --vault-name kv -n db-password
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'az' -Commands (Split-Cases @'
 $v = az keyvault secret show --vault-name kv -n db-password --query value -o tsv
@@ -184,6 +190,7 @@ glab -R group/project variable export
 glab --repo=group/project variable list --output json
 glab --hostname gitlab.example.com api projects/123/variables
 glab api projects/123/variables --silent=false
+2>/dev/null glab variable get DEPLOY_TOKEN
 glab api projects/123/variables --silent --silent=false
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'glab' -Commands (Split-Cases @'
@@ -223,6 +230,8 @@ kubectl get secret app -o json | sha256sum
 kubectl get secret app -o jsonpath='{.data.password}' | base64 -d | sha256sum
 kubectl get secret app -o yaml 2>/dev/null | sha256sum | cut -c1-12
 kubectl get secret app -o yaml 2> /dev/null | sha256sum
+2>/dev/null kubectl get secret app -o yaml | 2>/dev/null sha256sum
+2>/dev/null kubectl get secret app
 kubectl get secret app -o jsonpath='{.data.password}' | base64 --decode | tr -d '\n' | openssl dgst -sha256
 a=$(kubectl get secret app -o jsonpath='{.data.password}' | base64 -d | sha256sum); echo "$a"
 git commit -m "Deny kubectl get secret -o yaml in the guard"

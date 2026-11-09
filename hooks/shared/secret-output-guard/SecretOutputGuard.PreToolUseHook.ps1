@@ -105,6 +105,7 @@ function New-ParseFrame {
         quoted = $false
         bare = $null
         redirect = $false
+        input = $false
     }
 }
 
@@ -117,12 +118,14 @@ function Complete-ParseWord {
         quoted = $Frame.quoted
         bare = if ($Frame.quoted) { $Frame.bare } else { $text }
         redirect = $Frame.redirect
+        input = $Frame.input
     })
     $null = $Frame.buffer.Clear()
     $Frame.inWord = $false
     $Frame.quoted = $false
     $Frame.bare = $null
     $Frame.redirect = $false
+    $Frame.input = $false
 }
 
 function Complete-ParseCommand {
@@ -396,6 +399,7 @@ function Read-ShellLevel {
             if ($position + 2 -lt $length -and $text[$position + 2] -eq '<') {
                 $null = $frame.buffer.Append('<<<')
                 $frame.inWord = $true
+                $frame.input = $true
                 $script:ParsePosition += 3
                 continue
             }
@@ -422,6 +426,7 @@ function Read-ShellLevel {
             continue
         }
         if ($ch -eq '>') { $frame.redirect = $true }
+        if ($ch -eq '<') { $frame.input = $true }
         $null = $frame.buffer.Append($ch)
         $frame.inWord = $true
         $script:ParsePosition++
@@ -651,6 +656,22 @@ function Test-GlabVariableRead {
     return $false
 }
 
+# The command's words without redirections: a redirection may stand anywhere,
+# including before the executable.
+function Get-ArgumentWords {
+    param([object[]]$Words)
+    $arguments = [Collections.Generic.List[object]]::new()
+    for ($i = 0; $i -lt $Words.Count; $i++) {
+        if ($Words[$i].redirect -or $Words[$i].input) {
+            # An operator written apart from its target takes the next word.
+            if ([string]$Words[$i].text -cmatch '^(?:\d*>>?|&>>?|\d*<|<<<)$') { $i++ }
+            continue
+        }
+        $arguments.Add($Words[$i])
+    }
+    return , $arguments.ToArray()
+}
+
 # True when the stage sends its standard output to the next pipeline stage:
 # the only redirections it may carry discard or merge standard error.
 function Test-StageKeepsOutput {
@@ -674,7 +695,8 @@ function Test-PipedOnlyIntoHash {
         if (-not (Test-StageKeepsOutput -Stage $Line[$current])) { return $false }
         if ($Line[$current].sep -ne 'pipe' -or $current + 1 -ge $Line.Count) { return $false }
         $current++
-        $words = $Line[$current].words
+        $words = Get-ArgumentWords -Words $Line[$current].words
+        if ($words.Count -eq 0) { return $false }
         $name = Get-CommandBaseName -Text $words[0].text
         $arguments = @($words | Select-Object -Skip 1 | ForEach-Object { [string]$_.text })
         if ($script:HashCommands -contains $name) {
@@ -694,8 +716,10 @@ function Test-PipedIntoKeysFilter {
     if (-not (Test-StageKeepsOutput -Stage $Line[$Index])) { return $false }
     if ($Line[$Index].sep -ne 'pipe' -or $Index + 1 -ge $Line.Count) { return $false }
     $stage = $Line[$Index + 1]
-    $name = Get-CommandBaseName -Text $stage.words[0].text
-    $arguments = @($stage.words | Select-Object -Skip 1 | ForEach-Object { [string]$_.text })
+    $stageWords = Get-ArgumentWords -Words $stage.words
+    if ($stageWords.Count -eq 0) { return $false }
+    $name = Get-CommandBaseName -Text $stageWords[0].text
+    $arguments = @($stageWords | Select-Object -Skip 1 | ForEach-Object { [string]$_.text })
     if ($name -eq 'jq') {
         $filter = $null
         foreach ($argument in $arguments) {
@@ -772,7 +796,7 @@ function Get-ExecutableIndex {
 function Get-CommandFinding {
     param([object[]]$Line, [int]$Index, [int]$Depth)
     $command = $Line[$Index]
-    $words = $command.words
+    $words = Get-ArgumentWords -Words $command.words
     $start = Get-ExecutableIndex -Words $words
     if ($start -ge $words.Count) { return $null }
     $name = Get-CommandBaseName -Text $words[$start].text

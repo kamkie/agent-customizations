@@ -625,7 +625,8 @@ function Test-GlabVariableRead {
         $positionals = @($options.positionals)
         if ($positionals.Count -eq 0 -or $positionals[0] -notmatch '(?:^|/)variables(?:[/?#]|$)') { return $false }
         $flags = $options.flags
-        if ($flags.ContainsKey('--silent')) { return $false }
+        if ($flags.ContainsKey('--silent') -and
+            ($flags['--silent'] -is [bool] -or [string]$flags['--silent'] -imatch '^(?:true|t|1)$')) { return $false }
         $method = Get-FlagText -Flags $flags -Name '-X'
         if ($null -ne $method) { return $method -ieq 'GET' }
         foreach ($bodyFlag in @('-f', '-F', '--form', '--input')) {

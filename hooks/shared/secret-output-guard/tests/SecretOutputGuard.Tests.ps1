@@ -183,6 +183,8 @@ glab --repo group/project variable get DEPLOY_TOKEN
 glab -R group/project variable export
 glab --repo=group/project variable list --output json
 glab --hostname gitlab.example.com api projects/123/variables
+glab api projects/123/variables --silent=false
+glab api projects/123/variables --silent --silent=false
 '@)
 Test-Cases -Tool 'PowerShell' -Expected 'glab' -Commands (Split-Cases @'
 glab api projects/123/variables | ConvertFrom-Json
@@ -253,6 +255,7 @@ glab api projects/123/variables | jq 'map(.key)' | head -20
 glab api projects/123/variables | jq length
 glab api projects/123/variables/DEPLOY_TOKEN | jq -r .key
 glab api projects/123/variables --silent
+glab api projects/123/variables --silent=true
 glab api -X PUT projects/123/variables/FLAG -f value=dummy
 glab api projects/123/pipelines
 glab api "projects/123/merge_requests?search=variables"

@@ -7,7 +7,7 @@ This repository is the reviewed source for the global guidance, skills, plugins,
 - Put shared defaults in `global/shared.md`, agent-specific guidance in its overlay, each skill in `skills/<name>/`, and each agent plugin in `plugins/<target>/<name>/`. Classify changes with [customization ownership](docs/customization-ownership.md); portable skills discover repository contracts rather than embed them.
 - Follow [maintenance guidance](docs/maintaining-customizations.md). Keep each skill's common path executable from `SKILL.md` alone; references hold uncommon branches and detail.
 - Do not import sessions, memories, logs, artifacts, managed-job records, credentials, plugin caches, or machine-generated configuration. Keep examples portable: no usernames, home paths, repository-specific absolute paths, tokens, or session identifiers.
-- Develop on an agent-owned branch or worktree. `install.ps1` activates live configuration and requires explicit deployment authority; it is not validation. Deploy from clean `main` unless the user explicitly authorizes another source.
+- Develop on an agent-owned branch or worktree. `install.ps1` activates live configuration and requires deployment authority under [Request authority](#request-authority); it is not validation. Deploy from clean `main` unless the user explicitly authorizes another source.
 
 The manifest and installer own managed-jobs hook registrations for Codex and Claude Code and preserve unrelated machine-local entries; GitHub Copilot receives the `managed-jobs` skill without automatic lifecycle hooks, so Copilot sessions must stop started jobs explicitly and run `reconcile` after an interrupted session. Other machine-specific hooks stay outside this repository unless deliberately given a portable reviewed installer.
 
@@ -16,6 +16,8 @@ The manifest and installer own managed-jobs hook registrations for Codex and Cla
 Explicit implementation commands authorize the full workflow through Ready, including commit, push, PR, cross-review, and readiness, unless the user limits the terminal state. Questions, investigation, review, and design remain read-only or proposal-only until implementation is explicitly authorized.
 
 Installation, live deployment, release, repository administration, protection bypass, and fabricated approval are never part of delivery authority. These actions require their own explicit authority.
+
+One standing grant: the owner's own report in the current conversation that a pull request changing manifest-deployed sources has merged authorizes one installation of that merge. Confirm the merge commit is on fetched `origin/main`, install from clean, current `main` under the [deployment guide](docs/deployment.md), and report the resulting `status.ps1` state. The report grants nothing else: no other source, no safeguard override, and no discarding of live-only guidance. A merge the agent performed or only observed is not that report. If a precondition fails, report it instead of installing.
 
 ## Full delivery workflow
 
@@ -29,7 +31,7 @@ Use **Prepare -> Implement -> Validate -> Review -> Ready** in progress updates,
 
 ### Implement, validate, and commit
 
-- Complete the scoped change and directly affected tests/documentation. Keep one coherent problem per PR, preserve the public/private boundary, and separate changes to different skills into separate commits when practical.
+- Complete the scoped change and directly affected tests/documentation. Keep one coherent problem per PR, except that instruction corrections share an open PR under [maintenance guidance](docs/maintaining-customizations.md#maintain-agent-instructions); preserve the public/private boundary, and separate changes to different skills into separate commits when practical.
 - Run `pwsh ./scripts/verify.ps1` and `git diff --check` for every change before committing. Run `pwsh ./scripts/test.ps1` after changes to installation, status, verification, manifest, or other deployment tooling. Run directly affected behavioral checks under [maintenance guidance](docs/maintaining-customizations.md).
 - For reviewed-versus-live drift work, use `pwsh ./scripts/status.ps1`. Drift is evidence, not installation authority.
 - Record validation results, including commands that could not run, observed causes, and remaining risk. Commit intentionally and push; a local commit is intermediate. Validate is complete when applicable checks pass and are recorded.

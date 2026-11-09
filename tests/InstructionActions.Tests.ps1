@@ -13,7 +13,7 @@ function Assert-True($condition, $message) {
 }
 function Assert-ExpectationContract($Expectation, [string]$Id) {
     $arrays = @('requiredTools','checks','requiredReads','readsBeforeMutation','forbiddenWritePaths','forbiddenTools','firstPhaseMessageContains')
-    $booleans = @('unchanged','firstPhaseUnchanged','firstPhaseRequiresProse','mustInterrupt','noToolsAfterStop','mustSteer','nextActionRequired')
+    $booleans = @('unchanged','firstPhaseUnchanged','firstPhaseRequiresProse','mustInterrupt','noToolsAfterStop','mustSteer','nextActionRequired','closingOptional')
     $strings = @('firstTool','firstPhaseNextWord')
     foreach ($name in @('requiredTools','checks')) {
         if (-not $Expectation.PSObject.Properties[$name]) { throw "Expectation '$Id' is missing required array '$name'." }
@@ -115,6 +115,15 @@ greeting.txt contains `helo`; the correction is `hello`.
     $badFinish.message = 'Done.'
     $result = Replay 'complete-without-extra-work' @($badFinish)
     Assert-True (-not $result.score.passed) 'Missing closing block passed.'
+    $result = Replay 'design-agreement' @($badFinish)
+    Assert-True $result.score.passed 'A discussion turn without closing lines was rejected.'
+    $result = Replay 'capability-question-readonly' @((Action 'read_file' 'greeting.txt'), $badFinish)
+    Assert-True $result.score.passed 'A short answer without closing lines was rejected.'
+    foreach ($partial in @('**Next:** no further action required', "Agreed.`n`n**Done:** Agreed.`n**Next:** implement it")) {
+        $badFinish.message = $partial
+        $result = Replay 'design-agreement' @($badFinish)
+        Assert-True ($result.score.errors -contains 'Final response lacks the required three-line closing block.') 'A partial closing block passed where the block is optional.'
+    }
     $badFinish.message = "**Done:** Complete.`n**Not done:** nothing.`n**Next:** Action required: say publish."
     $result = Replay 'complete-without-extra-work' @($badFinish)
     Assert-True (-not $result.score.passed) 'Invented action after completion passed.'

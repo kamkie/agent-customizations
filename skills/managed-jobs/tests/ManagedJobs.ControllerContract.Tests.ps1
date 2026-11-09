@@ -107,17 +107,28 @@ try {
     New-FixtureRecord -Id $stoppedId -Name 'contract server' -Status stopped -AgeMinutes 30
     $null = @(Get-ManagedJobActiveRecords -UpdateCache)
 
-    # A late host can publish running over a cached terminal record while a
-    # scan is under way. The directory listing was read before the rewrite, so
-    # the scan must check the file itself before it trusts a cache entry. The
-    # running fixture sorts before the stopped one and is emitted first; the
-    # rewrite happens while the scan is paused on it.
+    # A late host can publish running over a terminal record while a scan is
+    # under way, after the directory listing was read. The scan must notice
+    # the new version whatever it concluded first: from a cache entry (the
+    # stopped fixture, listed after the running one) or from a parsed record
+    # (the nested fixture, read before it; its text mentions an active status,
+    # so it is parsed and found terminal). The running fixture is emitted in
+    # between, and both rewrites happen while the scan is paused on it.
+    $nestedId = '20000101-000000-contract-nested-000001'
+    New-FixtureRecord -Id $nestedId -Name 'contract nested' -Status completed -AgeMinutes 35
+    $nestedRecord = Read-ManagedJob -Path (Get-ManagedJobFile -Id $nestedId)
+    $nestedRecord | Add-Member -NotePropertyName previous -NotePropertyValue ([ordered]@{ status = 'running' })
+    Write-ManagedJob -Path (Get-ManagedJobFile -Id $nestedId) -Job $nestedRecord
     $scan = @(Get-ManagedJobActiveRecords | ForEach-Object {
-        if ($_.id -eq $runningId) { New-FixtureRecord -Id $stoppedId -Name 'contract server' -Status running -AgeMinutes 30 }
+        if ($_.id -eq $runningId) {
+            New-FixtureRecord -Id $stoppedId -Name 'contract server' -Status running -AgeMinutes 30
+            New-FixtureRecord -Id $nestedId -Name 'contract nested' -Status running -AgeMinutes 35
+        }
         $_
     })
-    Assert-True ($scan.Count -eq 2 -and $scan.id -contains $stoppedId) `
-        'A cached record rewritten as active during a scan must still be reported by that scan.'
+    Assert-True ($scan.Count -eq 3 -and $scan.id -contains $stoppedId -and $scan.id -contains $nestedId) `
+        "Records rewritten as active during a scan must still be reported by that scan. Reported: $($scan.id -join ', ')"
+    Remove-Item -LiteralPath (Get-ManagedJobFile -Id $nestedId) -Force
     New-FixtureRecord -Id $stoppedId -Name 'contract server' -Status stopped -AgeMinutes 30
     Set-Content -LiteralPath $cachePath -Value @('not a cache entry', "$completedId.json|1|1") -Encoding utf8
     $scan = @(Get-ManagedJobActiveRecords -UpdateCache)

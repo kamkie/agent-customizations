@@ -129,25 +129,32 @@ function Get-ManagedJobActiveRecords {
     $cachePath = Join-Path $root '.terminal-records.cache'
     $known = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     try { $known.UnionWith([IO.File]::ReadAllLines($cachePath)) } catch {}
-    # File name -> the version taken as terminal by the first pass.
+    # File name -> version, for every record as the first listing described it
+    # and for the subset the first pass took as terminal.
+    $versions = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
     $terminal = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $emitted = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $learned = 0
     $activeText = '"status"\s*:\s*"(?:starting|running)"'
     $terminalText = '"status"\s*:\s*"(?:completed|failed|stopped|orphaned)"'
     # A host can publish a new version of a record while the first pass runs,
     # after its directory listing was read. The second pass lists again and
-    # reads every record whose version changed, so nothing is taken as terminal
-    # on metadata older than one listing. A version that is unchanged across
-    # both listings is also the one whose text was read in between.
+    # reads every record that is new or whose version changed, whatever the
+    # first pass concluded about it, so no conclusion rests on metadata older
+    # than one listing. A version that is unchanged across both listings is
+    # also the one whose text was read in between.
     foreach ($pass in 1, 2) {
         foreach ($file in $jobsDirectory.EnumerateFiles('*.json')) {
             $key = '{0}|{1}|{2}' -f $file.Name, $file.LastWriteTimeUtc.Ticks, $file.Length
             if ($pass -eq 2) {
-                if (-not $terminal.ContainsKey($file.Name) -or $terminal[$file.Name] -eq $key) { continue }
+                if ($versions.ContainsKey($file.Name) -and $versions[$file.Name] -eq $key) { continue }
                 $null = $terminal.Remove($file.Name)
-            } elseif ($known.Contains($key)) {
-                $terminal[$file.Name] = $key
-                continue
+            } else {
+                $versions[$file.Name] = $key
+                if ($known.Contains($key)) {
+                    $terminal[$file.Name] = $key
+                    continue
+                }
             }
             $text = $null
             try { $text = [IO.File]::ReadAllText($file.FullName) } catch {}
@@ -155,7 +162,10 @@ function Get-ManagedJobActiveRecords {
                 # Parse only what may be active; a record that is mid-replace
                 # gets the retrying reader.
                 try { $job = Read-ManagedJob -Path $file.FullName } catch { continue }
-                if ($job.PSObject.Properties.Name -contains 'status' -and $job.status -in @('starting', 'running')) { $job }
+                if ($job.PSObject.Properties.Name -contains 'status' -and $job.status -in @('starting', 'running') -and
+                    $emitted.Add($file.Name)) {
+                    $job
+                }
             } elseif ($pass -eq 1 -and $text -match $terminalText) {
                 $terminal[$file.Name] = $key
                 $learned++

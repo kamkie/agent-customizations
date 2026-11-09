@@ -271,6 +271,8 @@ function Get-LaunchTrigger {
 # it may run in the background; anything else on the line keeps the denial.
 function Test-ControllerMonitorOnly {
     param([string]$Text)
+    # A substitution inside an argument would run another command.
+    if ($Text -match '\$\(|`') { return $false }
     $controllerPattern = '(?i)(?:^|[\\/])Invoke-ManagedJob\.ps1$'
     $variablePattern = '^\$\{?(?<name>[A-Za-z_]\w*)\}?$'
     $formatters = @('Out-String', 'ConvertFrom-Json', 'ConvertTo-Json', 'Select-Object', 'Format-List', 'Format-Table', 'Out-Host', 'cd', 'Set-Location')

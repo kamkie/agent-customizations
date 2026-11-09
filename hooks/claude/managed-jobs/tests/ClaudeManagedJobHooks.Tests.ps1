@@ -364,6 +364,7 @@ try {
     foreach ($backgroundController in @(
         "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' start -Name api -Executable dotnet -Arguments @('run')",
         "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' wait -Id job-1; python -m another.server",
+        "& 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1' wait -Id `"`$(python -m another.server)`"",
         "`$jobs = 'skills/managed-jobs/scripts/Invoke-ManagedJob.ps1'; `$jobs = 'engine.ps1'; & `$jobs wait -Id job-1"
     )) {
         $backgroundControllerPayload = [ordered]@{

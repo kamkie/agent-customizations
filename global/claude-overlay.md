@@ -7,3 +7,9 @@ To monitor pull-request CI, use any mechanism that surfaces both the first failu
 Put any question or pending decision, with its links, in the closing **Done:**, **Not done:**, and **Next:** lines. In the desktop app, write those lines before calling the end-of-turn next-step tool, because a question in its box ends the turn; give the box a question and buttons only for a decision those lines already name, never for work you can do yourself. Use `AskUserQuestion` only for a required confirmation or a material decision that blocks authorized work. Do requested work in the current session; do not make the user choose between a new session and this one unless they asked for a separate session.
 
 Refer to a repository only by its link, never also by its path or a descriptive name.
+
+Tool pitfalls:
+
+- Bash: never put a file body or patch script in a heredoc or `python -c`; write the file and run it by path. On Windows a long command is cut off and fails with `unexpected EOF`, and `\\` arrives as `\`.
+- Shell calls: never set `run_in_background` or start a command with a sleep; both are denied. Run longer work as a `managed-jobs` job, and use its `wait` command when the next step needs the job to finish.
+- Browser: verify page state with text tools. Take a screenshot as its own call, only when pixels are the evidence. After a second "tab not in group" error from Claude in Chrome on a fresh tab, stop and use the built-in browser.

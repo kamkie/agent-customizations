@@ -54,3 +54,15 @@ For Windows cleanup, verify the absolute target and use `Remove-Item -LiteralPat
 ## Delivery campaigns
 
 `Start delivery campaign <tracker>` authorizes the bounded campaign workflow: inventory, task and branch creation, remote branch pushes, draft pull or merge requests, CI monitoring, opposite-agent review, and readiness. It selects Autonomous mode for that campaign. Use `orchestrate-work-campaigns` and the active repository's rules. This trigger does not authorize merge or deployment.
+
+## Shell and paths
+
+In PowerShell:
+
+- A `foreach` statement cannot be piped; use `ForEach-Object`.
+- Write `${name}:` when a colon follows a variable in a string.
+- Typographic quotes end a string; pass prose through a file.
+- On Windows, native commands get no `*` or `{a,b}` expansion; use the tool's glob option or list the files.
+- Call helper scripts with `&`, not `pwsh -File <script> @(...)`: the array does not survive.
+
+Read only paths you have seen in this session; when a path is a guess, list its folder first.

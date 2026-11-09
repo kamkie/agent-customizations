@@ -70,6 +70,10 @@ kubectl get secret app -o yaml > secret.yaml
 kubectl get secret app -o json | jq '.data'
 kubectl get secret app -o json | tee out.json | sha256sum
 kubectl get secret app -o json | sha256sum --check
+kubectl get secret app -o yaml | md5 -p
+kubectl get secret app -o yaml | shasum -a 256 -c
+kubectl get secret app -o yaml | sha256sum notes.txt
+kubectl get secret app -o yaml | openssl dgst -sha256 -out digest.txt -hmac key
 kubectl get secret app -o yaml || sha256sum
 kubectl get secret app -o yaml >&2 | sha256sum
 KUBECONFIG=/tmp/kube kubectl get secret app -o yaml
@@ -238,6 +242,10 @@ kubectl get configmap/app pod/secret -o yaml
 kubectl delete secret app
 kubectl create secret generic app --from-literal=key=dummy --dry-run=client -o yaml
 kubectl get secret app -o json | sha256sum
+kubectl get secret app -o json | sha256sum -
+kubectl get secret app -o json | shasum -a 256
+kubectl get secret app -o json | md5 -q
+kubectl get secret app -o json | openssl sha256 -r
 kubectl get secret app -o jsonpath='{.data.password}' | base64 -d | sha256sum
 kubectl get secret app -o yaml 2>/dev/null | sha256sum | cut -c1-12
 kubectl get secret app -o yaml 2> /dev/null | sha256sum

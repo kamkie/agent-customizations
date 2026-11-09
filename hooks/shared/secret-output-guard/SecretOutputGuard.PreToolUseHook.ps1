@@ -709,13 +709,26 @@ function Test-PipedOnlyIntoHash {
         if ($words.Count -eq 0) { return $false }
         $name = Get-CommandBaseName -Text $words[0].text
         $arguments = @($words | Select-Object -Skip 1 | ForEach-Object { [string]$_.text })
+        # A hash stage may carry only arguments known to print a digest and
+        # nothing else: no check mode, no input echo, no file operand.
         if ($script:HashCommands -contains $name) {
-            return -not ($arguments -ccontains '-c' -or $arguments -ccontains '--check')
+            foreach ($argument in $arguments) {
+                if ($argument -cnotmatch '^(?:-|-b|-t|-z|-q|-r|--binary|--text|--tag|--zero|-a|--algorithm|-l|--length|\d+)$') { return $false }
+            }
+            return $true
         }
         if ($name -eq 'openssl' -and $arguments.Count -gt 0 -and $arguments[0] -cmatch '^(?:dgst|md5|sha\d+|sha3-\d+|blake2\w*)$') {
+            foreach ($argument in ($arguments | Select-Object -Skip 1)) {
+                if ($argument -cnotmatch '^-(?:hex|binary|r|c|md5|sha\d+|sha3-\d+|sha512-\d+|blake2\w+)$') { return $false }
+            }
             return $true
         }
         if ($script:PassThroughCommands -notcontains $name) { return $false }
+        if ($name -eq 'base64') {
+            foreach ($argument in $arguments) {
+                if ($argument -cnotmatch '^(?:-d|-D|--decode|--ignore-garbage|-w\d*|--wrap=\d+|\d+)$') { return $false }
+            }
+        }
     }
 }
 

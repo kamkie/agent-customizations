@@ -115,6 +115,59 @@ function Write-ManagedJob {
     Write-ManagedJson -Path $Path -Value $Job
 }
 
+function Get-ManagedJobActiveRecords {
+    param([switch]$UpdateCache)
+    # `start` looks for an equivalent active job while it holds the launch lock,
+    # so this scan must not open every historical record. Once a record is read
+    # as terminal, its file name, write time, and length are remembered, and
+    # later scans skip that exact file version from directory metadata alone.
+    # Every record write replaces the file, so a rewritten record no longer
+    # matches its entry and is read again. A missing, stale, or damaged cache
+    # costs a slower scan and never hides an active record.
+    $root = Get-ManagedJobRoot
+    $cachePath = Join-Path $root '.terminal-records.cache'
+    $known = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    try { $known.UnionWith([IO.File]::ReadAllLines($cachePath)) } catch {}
+    $terminalKeys = [Collections.Generic.List[string]]::new()
+    $learned = 0
+    $activeText = '"status"\s*:\s*"(?:starting|running)"'
+    $terminalText = '"status"\s*:\s*"(?:completed|failed|stopped|orphaned)"'
+    foreach ($file in [IO.DirectoryInfo]::new((Join-Path $root 'jobs')).EnumerateFiles('*.json')) {
+        $key = '{0}|{1}|{2}' -f $file.Name, $file.LastWriteTimeUtc.Ticks, $file.Length
+        if ($known.Contains($key)) {
+            $terminalKeys.Add($key)
+            continue
+        }
+        $text = $null
+        try { $text = [IO.File]::ReadAllText($file.FullName) } catch {}
+        if ($null -eq $text -or $text -match $activeText) {
+            # Parse only what may be active; a record that is mid-replace gets
+            # the retrying reader.
+            try { $job = Read-ManagedJob -Path $file.FullName } catch { continue }
+            if ($job.PSObject.Properties.Name -contains 'status' -and $job.status -in @('starting', 'running')) { $job }
+            continue
+        }
+        if ($text -notmatch $terminalText) { continue }
+        # Remember the record only when the file still is what the directory
+        # listing described, so the entry cannot describe other bytes.
+        $file.Refresh()
+        if ($file.Exists -and $key -eq ('{0}|{1}|{2}' -f $file.Name, $file.LastWriteTimeUtc.Ticks, $file.Length)) {
+            $terminalKeys.Add($key)
+            $learned++
+        }
+    }
+    if ($UpdateCache -and ($learned -gt 0 -or $terminalKeys.Count -ne $known.Count)) {
+        # Rewriting from this listing also drops entries of pruned records.
+        $temporary = "$cachePath.$([guid]::NewGuid().ToString('N')).tmp"
+        try {
+            [IO.File]::WriteAllLines($temporary, $terminalKeys)
+            Move-ManagedFileAtomic -Source $temporary -Destination $cachePath
+        } catch {} finally {
+            if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
+        }
+    }
+}
+
 function Get-ManagedJobOwnerDirectory {
     param(
         [Parameter(Mandatory)][string]$OwnerAgent,

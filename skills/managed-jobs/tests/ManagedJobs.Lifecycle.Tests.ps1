@@ -345,7 +345,8 @@ try {
     $completed = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-complete' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Write-Output lifecycle-ok') -Environment @{ LIFECYCLE_MARKER = 'not-recorded'; GIT_AUTHOR_NAME = 'Lifecycle Test' } | Out-String) | ConvertFrom-Json
     $completed = (& $controller wait -StateRoot $stateRoot -Id $completed.id -TimeoutSeconds 15 | Out-String) | ConvertFrom-Json
-    Assert-True ($completed.status -eq 'completed' -and $completed.exitCode -eq 0 -and $completed.finishedAtUtc) `
+    Assert-True ($completed.status -eq 'completed' -and $completed.exitCode -eq 0 -and $completed.finishedAtUtc -and
+        $completed.timedOut -eq $false) `
         'Completion wait should return the final successful record, including exit result and finish time.'
     $failedWaitJob = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-wait-failed' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Milliseconds 300; exit 19') | Out-String) | ConvertFrom-Json
@@ -355,15 +356,16 @@ try {
     $timeoutTarget = (& $controller start -StateRoot $stateRoot -Name 'lifecycle-wait-timeout' -Executable $pwsh `
         -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') | Out-String) | ConvertFrom-Json
     $activeIds.Add($timeoutTarget.id)
-    $waitTimeoutError = $null
-    try {
-        & $controller wait -StateRoot $stateRoot -Id $timeoutTarget.id -TimeoutSeconds 1 | Out-Null
-    } catch { $waitTimeoutError = $_.Exception.Message }
-    Assert-True ($waitTimeoutError -match 'did not complete within 1 seconds' -and
+    $waitTimeout = (& $controller wait -StateRoot $stateRoot -Id $timeoutTarget.id -TimeoutSeconds 1 | Out-String) | ConvertFrom-Json
+    Assert-True ($waitTimeout.timedOut -eq $true -and $waitTimeout.status -in @('starting', 'running') -and
         (Get-JobStatus -Id $timeoutTarget.id).status -in @('starting', 'running')) `
-        'A wait timeout should report its bound and leave the target running.'
-    $null = & $controller stop -StateRoot $stateRoot -Id $timeoutTarget.id
+        'A wait timeout should return the current record marked timedOut and leave the target running.'
+    $timeoutStopped = (& $controller stop -StateRoot $stateRoot -Id $timeoutTarget.id | Out-String) | ConvertFrom-Json
     $activeIds.Remove($timeoutTarget.id) | Out-Null
+    $stoppedAgain = (& $controller stop -StateRoot $stateRoot -Id $timeoutTarget.id | Out-String) | ConvertFrom-Json
+    Assert-True ($timeoutStopped.status -eq 'stopped' -and $stoppedAgain.status -eq 'stopped' -and
+        $stoppedAgain.finishedAtUtc -eq $timeoutStopped.finishedAtUtc) `
+        'Stopping a job that already ended should return its unchanged record instead of failing.'
     for ($raceAttempt = 0; $raceAttempt -lt 3; $raceAttempt++) {
         $raceJob = (& $controller start -StateRoot $stateRoot -Name "lifecycle-wait-race-$raceAttempt" `
             -Executable $pwsh -Arguments @('-NoProfile', '-Command', 'exit 0') | Out-String) | ConvertFrom-Json
@@ -402,6 +404,9 @@ try {
         "Structured list filter should return the completed job ($($completed.id)); got $(@($completedList.id) -join ',')."
     $completedStatus = @((& $controller status -StateRoot $stateRoot -Status completed -Json | Out-String) | ConvertFrom-Json)
     Assert-True ($completedStatus.id -contains $completed.id) 'Structured status filter should return the completed job.'
+    $namedList = @((& $controller list -StateRoot $stateRoot -Name 'lifecycle-complete' | Out-String) | ConvertFrom-Json)
+    Assert-True ($namedList.Count -eq 1 -and $namedList[0].id -eq $completed.id) `
+        'List should print JSON without a flag and recover a job id from its name.'
 
     # Readiness probes accept only credential-free loopback HTTP(S) URLs and
     # must reject invalid targets before creating a durable record.

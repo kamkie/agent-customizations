@@ -35,6 +35,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Managed-job profile regression tests failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\managed-jobs\tests\ManagedJobs.AtomicWrite.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Managed-job atomic record write test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\managed-jobs\tests\ManagedJobs.ControllerContract.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Managed-job controller contract test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\managed-jobs\tests\ManagedJobs.GuardCache.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Managed-job guard cache serialization test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\codex\managed-jobs\tests\CodexManagedJobHooks.Tests.ps1')

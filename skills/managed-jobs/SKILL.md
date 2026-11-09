@@ -25,7 +25,7 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - Keep short commands attached to the active tool call.
 - Default long work to hidden supervised execution. On targets with installed lifecycle hooks (Codex and Claude Code), the startup hook reconciles global state asynchronously; do not run `reconcile` around normal starts.
 - `Auto` uses the current agent turn when ownership is available (`CODEX_THREAD_ID` or `CLAUDE_CODE_SESSION_ID`), and resolves to `persistent` on targets without installed lifecycle hooks (GitHub Copilot). Use `-Lifetime Session` only across turns when session ownership is active, and `Persistent` across sessions or on targets without lifecycle hooks (stopping started jobs explicitly before finishing, and running `reconcile` after an interrupted session).
-- Use the returned job instead of a global `list`; target `status` when needed.
+- Use the returned job instead of a global `list`; target `status` when needed. `list` prints a JSON array; narrow it with `-Status` and `-Name`, and add `-Table` only for a person to read.
 - Use `wait -Id <job-id>` when the next step needs process completion. It blocks until the job is completed, failed, stopped, or orphaned and returns the final record, including `exitCode` when the host recorded one. Check that status and exit code before treating the work as successful; an orphan may have no exit code.
 - Keep that tool call pending until it returns. If its transport yields a session ID, wait on that session and, where supported, combine transport waits inside one tool invocation so the model stays idle. Do not make repeated agent-side `status` calls. A background job does not wake an idle agent by itself.
 - For finite work, use `-TimeoutSeconds` to bound the wait:
@@ -36,13 +36,13 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
   $final = (& $jobs wait -Id $build.id -TimeoutSeconds 600 | Out-String) | ConvertFrom-Json
   ```
 
-  A timeout leaves the target job running. Stop it separately if it is no longer needed.
+  When the bound expires, `wait` returns the current record with `timedOut` set to `true` and leaves the job running. Wait again, or stop the job if it is no longer needed. An unknown id is still an error.
 - `wait` follows the job record, so it also finishes when a completed `-KeepTerminalOpen` job leaves its visible terminal open.
 - Treat arguments, environment values, records, and logs as non-secret.
 - Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen` leaves a completed terminal for the user to close manually.
 - Never replace this controller with a detached/background launch. Use `claude-runner` for Claude session, resume, and review behavior.
 
-Stop running work that is no longer needed; a terminal job needs no stop call:
+Stop running work that is no longer needed. A job that already ended needs no stop call; one made anyway returns its record unchanged:
 
 ```powershell
 & $jobs stop -Id <job-id>
@@ -52,7 +52,7 @@ Hand off the id, status, lifetime, log path, working directory, and exact status
 
 ## Agent progress and completion
 
-For a CLI agent or an agent-driven test, track three separate facts: the managed process state, the native session's latest completed tool/output event, and the required result artifacts. A live PID, startup log or heartbeat proves liveness, not useful progress. Inspect the returned job and its native session/log paths; use a filtered registry lookup only to recover a lost job ID, not as routine polling. Preserve the PID/start identity when diagnosing a vanished supervisor.
+For a CLI agent or an agent-driven test, track three separate facts: the managed process state, the native session's latest completed tool/output event, and the required result artifacts. A live PID, startup log or heartbeat proves liveness, not useful progress. Inspect the returned job and its native session/log paths; use a filtered registry lookup such as `& $jobs list -Name api -Status running,starting` only to recover a lost job ID, not as routine polling. Preserve the PID/start identity when diagnosing a vanished supervisor.
 
 A coordinator's final message does not establish that its child workers finished. Keep the owner waiting through the runtime's supported completion mechanism; check child terminal state and required artifacts before workspace teardown. Inspect interruption timestamps and effective child settings before assigning the failure to the model, wrapper or harness. Reuse a recoverable session rather than launching a duplicate paid attempt without the applicable retry authority.
 

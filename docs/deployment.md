@@ -4,7 +4,7 @@ This guide owns validation, live-drift inspection, and activation of the reviewe
 
 ## Authorization boundary
 
-Deployment writes to live agent configuration directories and requires a separate, explicit instruction to activate reviewed changes. Authorization to edit, validate, commit, push, or open a pull request does not authorize `scripts/install.ps1`.
+Deployment writes to live agent configuration directories and requires a separate, explicit instruction to activate reviewed changes, or the owner's merge report as [`AGENTS.md`](../AGENTS.md#request-authority) defines it. Authorization to edit, validate, commit, push, or open a pull request does not authorize `scripts/install.ps1`.
 
 Edit the reviewed sources in this repository, not their installed copies. Verification, tests, and status inspection do not deploy changes.
 
@@ -110,7 +110,7 @@ The installer runs repository verification and its clean-`main` safeguards befor
 
 ## Activate reviewed changes
 
-Activation requires its own explicit authorization. Deploy from a clean, current `main` checkout:
+Activation requires authorization under the [boundary above](#authorization-boundary). Deploy from a clean, current `main` checkout:
 
 ```powershell
 git switch main

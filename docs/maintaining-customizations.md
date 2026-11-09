@@ -24,6 +24,8 @@ Before editing a repository instruction file, check whether it briefly defines, 
 
 Include only information an agent needs before changing the repository. Do not duplicate the README or general architecture documentation.
 
+- Before adding a sentence, find the existing rule that should have covered the case and decide why it failed. Prefer tightening, moving, or deleting that rule, or enforcing it with a script or hook, over a new sentence; a second sentence on the same point fails the same way.
+- When a pull request that changes instruction wording is already open and no other active task is writing to its branch, add a further correction to it as its own commit instead of opening a pull request per correction. The moved head needs the checks and review `AGENTS.md` requires.
 - Keep a rule only when it is stable, broadly applicable at that instruction scope, and likely to change agent behavior materially.
 - Write direct, testable instructions. State the trigger, required behavior, important boundary, and expected evidence when those are not obvious.
 - Replace obsolete behavior instead of preserving contradictory old and new rules. Remove duplicated copies whose independent maintenance could drift.
@@ -96,3 +98,5 @@ Delivery requirements have one owner: `AGENTS.md` owns repository stages, gates,
 ## Validate and deliver
 
 Follow the canonical [implementation and delivery workflow](../AGENTS.md#implement-validate-and-commit) in `AGENTS.md`. It owns the exact validation triggers, drift inspection, activation boundary, final-diff review, branch and pull-request workflow, cross-review, and current-head readiness checks.
+
+A merged change is not live until it is installed. When the owner reports that a pull request changing manifest-deployed sources has merged, install current `main` and report the status under [Request authority](../AGENTS.md#request-authority); do not wait for a separate install instruction.

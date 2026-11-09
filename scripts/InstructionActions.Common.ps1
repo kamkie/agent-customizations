@@ -131,9 +131,11 @@ function Test-InstructionActionResult {
     $errors = [Collections.Generic.List[string]]::new()
     if (-not $Actual.finished) { $errors.Add('Action limit reached without finishing.') }
     $closing = '(?s)(?:^|\r?\n\r?\n)\*\*Done:\*\* [^\r\n]+\r?\n\*\*Not done:\*\* [^\r\n]+\r?\n\*\*Next:\*\* ([^\r\n]+)\s*$'
-    # A discussion turn or one-fact answer may omit the block; a partial block never passes.
+    # A discussion turn or one-fact answer may omit the block. An empty reply or any
+    # line led by a closing label, whatever its Markdown, is not an omission.
     $closingOmitted = (Get-ActionProperty $Expected 'closingOptional') -and
-        $Actual.finalMessage -notmatch '(?im)^[ \t]*\**(?:Done|Not done|Next):'
+        -not [string]::IsNullOrWhiteSpace($Actual.finalMessage) -and
+        $Actual.finalMessage -notmatch '(?im)^[\W_]*(?:Done|Not done|Next)[\W_]*:'
     if ($Actual.finalMessage -notmatch $closing -and -not $closingOmitted) { $errors.Add('Final response lacks the required three-line closing block.') }
     if (Get-ActionProperty $Expected 'unchanged') {
         foreach ($name in $Actual.initial.Keys) {

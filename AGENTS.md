@@ -9,7 +9,7 @@ This repository is the reviewed source for the global guidance, skills, plugins,
 - Do not import sessions, memories, logs, artifacts, managed-job records, credentials, plugin caches, or machine-generated configuration. Keep examples portable: no usernames, home paths, repository-specific absolute paths, tokens, or session identifiers.
 - Develop on an agent-owned branch or worktree. `install.ps1` activates live configuration and requires deployment authority under [Request authority](#request-authority); it is not validation. Deploy from clean `main` unless the user explicitly authorizes another source.
 
-The manifest and installer own managed-jobs hook registrations for Codex and Claude Code and preserve unrelated machine-local entries; GitHub Copilot receives the `managed-jobs` skill without automatic lifecycle hooks, so Copilot sessions must stop started jobs explicitly and run `reconcile` after an interrupted session. Other machine-specific hooks stay outside this repository unless deliberately given a portable reviewed installer.
+The manifest and installer own the managed-jobs and closing-phrase hook registrations for Codex and Claude Code and preserve unrelated machine-local entries; GitHub Copilot receives the `managed-jobs` skill without automatic lifecycle hooks, so Copilot sessions must stop started jobs explicitly and run `reconcile` after an interrupted session. Other machine-specific hooks stay outside this repository unless deliberately given a portable reviewed installer.
 
 ## Request authority
 

@@ -14,6 +14,12 @@ $codexSandbox = Join-Path $resolvedSandbox 'codex'
 $claudeSandbox = Join-Path $resolvedSandbox 'claude'
 $copilotSandbox = Join-Path $resolvedSandbox 'copilot'
 
+# Several managed handlers share the Stop event, so find one by its identity, never by its position.
+function Get-ManagedJobsStopGroup {
+    param([Parameter(Mandatory)]$Config)
+    @($Config.hooks.Stop | Where-Object { @($_.hooks).command -match 'ManagedHookId "managed-jobs-stop"' })[0]
+}
+
 try {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'verify.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Repository verification test failed.' }
@@ -43,6 +49,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\claude\managed-jobs\tests\ClaudeManagedJobHooks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Claude managed-job hook lifecycle test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\shared\closing-phrase\tests\ClosingPhrase.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Closing-phrase Stop hook test failed.' }
 
     $null = New-Item -ItemType Directory -Path $codexSandbox -Force
     $lookalikeStopCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
@@ -247,7 +255,7 @@ try {
     }
 
     $sessionEndDefinitionBeforeRepair = $codexHooks.hooks.SessionEnd | ConvertTo-Json -Depth 10 -Compress
-    $codexHooks.hooks.Stop[0].hooks[0].timeout = 1
+    (Get-ManagedJobsStopGroup $codexHooks).hooks[0].timeout = 1
     $codexHooks.hooks.SessionStart[0].hooks[0].async = $false
     $codexHooks | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $codexHooksPath -Encoding utf8
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
@@ -263,7 +271,7 @@ try {
         -AllowNonMain
     if ($LASTEXITCODE -ne 0) { throw 'Codex hook repair installation failed.' }
     $repairedHooks = Get-Content -LiteralPath $codexHooksPath -Raw | ConvertFrom-Json
-    if ([int]$repairedHooks.hooks.Stop[0].hooks[0].timeout -ne 15) {
+    if ([int](Get-ManagedJobsStopGroup $repairedHooks).hooks[0].timeout -ne 15) {
         throw 'Codex hook repair did not restore the reviewed timeout.'
     }
     if (-not [bool]$repairedHooks.hooks.SessionStart[0].hooks[0].async) {
@@ -279,13 +287,13 @@ try {
         throw 'Codex hook repair must preserve lookalike commands that it does not own.'
     }
 
-    $misplacedStopGroup = $repairedHooks.hooks.Stop[0]
+    $misplacedStopGroup = Get-ManagedJobsStopGroup $repairedHooks
     $legacyManagedStopCommand = 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' +
         (Join-Path $codexSandbox 'hooks\legacy\ManagedJob.StopHook.ps1') +
         '" -ManagedHookId "managed-jobs-stop"'
     $misplacedStopGroup.hooks[0].command = $legacyManagedStopCommand
     $misplacedStopGroup.hooks[0].commandWindows = $legacyManagedStopCommand
-    $repairedHooks.hooks.PSObject.Properties.Remove('Stop')
+    $repairedHooks.hooks.Stop = @($repairedHooks.hooks.Stop | Where-Object { $_ -ne $misplacedStopGroup })
     $repairedHooks.hooks.SessionEnd = @($repairedHooks.hooks.SessionEnd) + @($misplacedStopGroup)
     $repairedHooks | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $codexHooksPath -Encoding utf8
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'status.ps1') `
@@ -304,7 +312,7 @@ try {
     $stopScriptName = 'ManagedJob.StopHook.ps1'
     $wrongEventCommands = @($relocatedHooks.hooks.SessionEnd | ForEach-Object { $_.hooks } |
         ForEach-Object { @($_.command, $_.commandWindows) })
-    $repairedStopCommand = [string]$relocatedHooks.hooks.Stop[0].hooks[0].command
+    $repairedStopCommand = [string](Get-ManagedJobsStopGroup $relocatedHooks).hooks[0].command
     if (-not $relocatedHooks.hooks.Stop -or
         $wrongEventCommands -match 'ManagedHookId "managed-jobs-stop"' -or
         $repairedStopCommand -notmatch 'ManagedHookId "managed-jobs-stop"' -or
@@ -313,7 +321,7 @@ try {
     }
 
     $claudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
-    $claudeSettings.hooks.Stop[0].hooks[0].timeout = 1
+    (Get-ManagedJobsStopGroup $claudeSettings).hooks[0].timeout = 1
     $claudeSettings.hooks.SessionStart[0].hooks[0].async = $false
     $claudeSettings.hooks.SessionEnd[0].hooks[0] |
         Add-Member -NotePropertyName async -NotePropertyValue $true
@@ -331,7 +339,7 @@ try {
         -AllowNonMain
     if ($LASTEXITCODE -ne 0) { throw 'Claude hook repair installation failed.' }
     $repairedClaudeSettings = Get-Content -LiteralPath $claudeSettingsPath -Raw | ConvertFrom-Json
-    if ([int]$repairedClaudeSettings.hooks.Stop[0].hooks[0].timeout -ne 15) {
+    if ([int](Get-ManagedJobsStopGroup $repairedClaudeSettings).hooks[0].timeout -ne 15) {
         throw 'Claude hook repair did not restore the reviewed timeout.'
     }
     if (-not [bool]$repairedClaudeSettings.hooks.SessionStart[0].hooks[0].async) {

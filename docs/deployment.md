@@ -153,6 +153,8 @@ Codex requires separate review and trust for new or changed personal hook defini
 
 Claude Code applies changed hook definitions when a new session starts. Sessions already running keep the hook snapshot captured at startup.
 
+The closing-phrase Stop hook can make an agent rewrite its ending once per turn: it blocks the first stop when the last 500 characters of the final message dictate a reply phrase or offer a check instead of running it, and never blocks a stop that a hook already continued. Its whole pattern list is in `hooks/shared/closing-phrase/ClosingPhrase.StopHook.ps1`.
+
 GitHub Copilot has no managed-jobs hook registrations in the manifest; its installed `managed-jobs` skill runs without automatic startup reconciliation or turn/session cleanup hooks, so Copilot sessions must explicitly stop started jobs and run `reconcile` after an interrupted session.
 
 ## Apply plugin changes

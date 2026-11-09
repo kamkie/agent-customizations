@@ -137,6 +137,8 @@ bash <<< "kubectl get secret app -o yaml"
 sh <<<'kubectl get secret app -o yaml'
 bash 0<<<'kubectl get secret app -o yaml'
 bash 0<<< 'kubectl get secret app -o yaml'
+pwsh -NoProfile -File - <<< 'kubectl get secret app -o yaml'
+pwsh -Command - <<< 'kubectl get secret app -o yaml'
 pwsh -Command "kubectl get secret app -o yaml"
 eval "kubectl get secret app -o yaml"
 PASS=$(kubectl get secret app -o jsonpath='{.data.password}' | base64 -d)
@@ -171,6 +173,7 @@ Test-Cases -Tool 'Bash' -Expected 'kubectl' -Commands @(
     "bash -x <<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "bash 0<<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "bash /dev/stdin <<'EOF'`nkubectl get secret app -o yaml`nEOF",
+    "pwsh -NoProfile -File - <<'EOF'`nkubectl get secret app -o yaml`nEOF",
     "cat <<EOF`nnote`nEOF`nkubectl get secret app -o yaml",
     # PowerShell text reaching a shell tool that is not named PowerShell.
     "kubectl get secret app ```n  -o yaml"
@@ -322,6 +325,7 @@ sudo "/opt/company tools/kubectl" get secret app
 cat <<< "kubectl get secret app -o yaml"
 bash -c 'cat' <<< 'kubectl get secret app -o yaml'
 bash notes.sh <<< 'kubectl get secret app -o yaml'
+pwsh -NoProfile -File notes.ps1 <<< 'kubectl get secret app -o yaml'
 sudo --user root kubectl get secret app
 sudo --user root grep -rn "kubectl get secret app -o yaml" docs/
 echo ${NOTE:-kubectl get secret app -o yaml}

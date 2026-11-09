@@ -929,7 +929,12 @@ function Get-ShellInvocation {
                 $command = @($texts | Select-Object -Skip ($index + 1)) -join ' '
                 break
             }
-            if ($text -imatch '^-(?:f|fi|fil|file|e|ec|en|enc\w*)$') { $scriptFile = $true; break }
+            if ($text -imatch '^-(?:f|fi|fil|file)$') {
+                # -File - runs the commands on standard input.
+                $scriptFile = -not ($index + 1 -lt $texts.Count -and $texts[$index + 1] -ceq '-')
+                break
+            }
+            if ($text -imatch '^-(?:e|ec|en|enc\w*)$') { $scriptFile = $true; break }
             if ($text -imatch '^-(?:ex|ep|exec\w*|wd|work\w*|o|of|out\w*|if|in|inp\w*|config\w*|custom\w*|settings\w*|w|win\w*)$') { $index++; continue }
             if ($text -cmatch '^-') { continue }
             # A first positional is a script file for pwsh and a command for

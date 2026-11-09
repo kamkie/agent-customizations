@@ -5,9 +5,10 @@ $ErrorActionPreference = 'Stop'
 # Split a command line into shell segments and each segment into tokens.
 # Quotes group a token; `;`, `|`, `&`, `(`, `{`, and newlines end a segment.
 # Each token records whether it was quoted so a shell command string can be
-# inspected as a nested command line.
+# inspected as a nested command line. -LiteralHash reads `#` as plain text,
+# for cmd.exe, which has no `#` comments.
 function Get-ShellSegments {
-    param([string]$Text)
+    param([string]$Text, [switch]$LiteralHash)
     $segments = [Collections.Generic.List[object]]::new()
     $tokens = [Collections.Generic.List[object]]::new()
     $buffer = [Text.StringBuilder]::new()
@@ -34,7 +35,7 @@ function Get-ShellSegments {
         }
         # A `#` that starts a word begins a comment: skip to the end of the line so
         # an apostrophe in the comment cannot open a quote over the next command.
-        if (-not $atEnd -and $ch -eq '#' -and $buffer.Length -eq 0 -and -not $quoted) {
+        if (-not $atEnd -and -not $LiteralHash -and $ch -eq '#' -and $buffer.Length -eq 0 -and -not $quoted) {
             while ($i + 1 -lt $chars.Length -and $chars[$i + 1] -ne "`n" -and $chars[$i + 1] -ne "`r") { $i++ }
             continue
         }
@@ -234,7 +235,8 @@ function Get-CommandTrigger {
         $nested = Get-NestedCommandText -Tokens @($Arguments | Select-Object -Skip $skip)
     }
     if ($nested) {
-        $inner = Get-LaunchTrigger -Text $nested -Depth ($Depth + 1)
+        # cmd.exe has no `#` comments, so `#` must not hide the rest of its line.
+        $inner = Get-LaunchTrigger -Text $nested -Depth ($Depth + 1) -LiteralHash:($Stem -ieq 'cmd')
         if ($inner) { return $inner }
     }
     # A background flag counts as an argument of a command, not as text handed
@@ -252,10 +254,10 @@ function Get-CommandTrigger {
 # shell with -c, -Command, or /c. Text that only mentions a launch (a search
 # pattern, a commit message, a file body, a path) is not one.
 function Get-LaunchTrigger {
-    param([string]$Text, [int]$Depth = 0)
+    param([string]$Text, [int]$Depth = 0, [switch]$LiteralHash)
     if ($Depth -gt 3 -or [string]::IsNullOrWhiteSpace($Text)) { return $null }
     $source = Get-InspectableText -Text $Text
-    foreach ($segment in Get-ShellSegments -Text $source.text) {
+    foreach ($segment in Get-ShellSegments -Text $source.text -LiteralHash:$LiteralHash) {
         $segmentCommand = Get-SegmentCommand -Segment $segment
         if (-not $segmentCommand) { continue }
         $trigger = Get-CommandTrigger -Stem $segmentCommand.stem -Arguments $segmentCommand.arguments -Depth $Depth

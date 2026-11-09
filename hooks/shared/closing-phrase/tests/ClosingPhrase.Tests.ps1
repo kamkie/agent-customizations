@@ -80,7 +80,10 @@ $silent = @(
     '{"hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":{"text":"Say \"go\" now."}}',
     "{`"hook_event_name`":`"Stop`",$message}",
     "{`"hook_event_name`":`"Stop`",`"stop_hook_active`":`"false`",$message}",
-    "{`"hook_event_name`":`"SubagentStop`",`"stop_hook_active`":false,$message}"
+    "{`"hook_event_name`":`"SubagentStop`",`"stop_hook_active`":false,$message}",
+    "{`"hook_event_name`":[],`"stop_hook_active`":false,$message}",
+    "{`"hook_event_name`":[`"Stop`"],`"stop_hook_active`":false,$message}",
+    "[{`"hook_event_name`":`"Stop`",`"stop_hook_active`":false,$message}]"
 )
 Assert-True ((Invoke-Hook "{`"hook_event_name`":`"Stop`",`"stop_hook_active`":false,$message}") -match '"decision":"block"') `
     'The hand-written payload shape should block when nothing is wrong with it.'

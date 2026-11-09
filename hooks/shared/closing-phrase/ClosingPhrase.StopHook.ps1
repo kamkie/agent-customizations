@@ -30,10 +30,11 @@ $patterns = [ordered]@{
 try {
     # Read stdin as UTF-8 bytes: the console code page would garble curly quotes.
     $reader = [IO.StreamReader]::new([Console]::OpenStandardInput(), [Text.UTF8Encoding]::new($false))
-    $payload = $reader.ReadToEnd() | ConvertFrom-Json
+    $payload = ConvertFrom-Json -InputObject $reader.ReadToEnd() -NoEnumerate
 
-    # Block at most once per stop: only a first Stop with an explicit false flag.
-    if ($payload.hook_event_name -cne 'Stop' -or $payload.stop_hook_active -isnot [bool] -or $payload.stop_hook_active) { exit 0 }
+    # Block at most once per stop: only a JSON object for a first Stop with an explicit false flag.
+    if ($payload -isnot [Management.Automation.PSCustomObject] -or $payload.hook_event_name -isnot [string] -or
+        $payload.hook_event_name -cne 'Stop' -or $payload.stop_hook_active -isnot [bool] -or $payload.stop_hook_active) { exit 0 }
     $message = $payload.last_assistant_message
     if ($message -isnot [string] -or -not $message.Trim()) { exit 0 }
     $ending = $message.Substring([Math]::Max(0, $message.Length - 500))

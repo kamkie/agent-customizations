@@ -40,7 +40,7 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - `wait` follows the job record, so it also finishes when a completed `-KeepTerminalOpen` job leaves its visible terminal open.
 - Treat arguments, environment values, records, and logs as non-secret.
 - Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen` leaves a completed terminal for the user to close manually.
-- Never replace this controller with a detached/background launch. Use `claude-runner` for Claude session, resume, and review behavior.
+- Never replace this controller with a detached/background launch. To run or resume Claude Code CLI sessions or reviews from another agent, use the `claude-runner` skill where it is installed.
 
 Stop running work that is no longer needed. A job that already ended needs no stop call; one made anyway returns its record unchanged:
 

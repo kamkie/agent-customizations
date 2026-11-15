@@ -8,7 +8,7 @@ Round 1 reviews the whole committed change. Every later round reviews exactly `p
 
 The reviewer may read unchanged files for context, but a new later-round finding is in scope only when the current range introduced it. When the reported line is unchanged, the reviewer must name the changed line that causes the defect. An older finding is also in scope when the focus file explicitly carried it forward.
 
-Reject a new concern about earlier commits or unrelated pre-existing behavior. Do not fix it, carry it forward, or count it as a reason for another round. If the reviewer substantially ignores the range, discard the entire run as invalid; it consumes no budget. Rerun only with a reviewer path that enforces the range, or escalate when none is available.
+A new concern about earlier commits or unrelated pre-existing behavior is out of scope. Do not fix it, carry it forward, or count it as a reason for another round. Report it as pre-existing only when checking its scope showed a real defect that predates the change; otherwise reject it. If the reviewer substantially ignores the range, discard the entire run as invalid; it consumes no budget. Rerun only with a reviewer path that enforces the range, or escalate when none is available.
 
 ## Classify every in-scope finding yourself
 
@@ -19,7 +19,7 @@ Do not accept the reviewer's verdict. Read the changed range and its necessary c
 | confirmed | You verified the range introduced the defect | Fix it with the other occurrences of its kind in the change, or escalate if out of task scope |
 | plausible | Could be range-caused but is not cheaply verifiable | Fix only if small, safe, and obviously harmless |
 | false positive | You can state a one-line reason the alleged defect is wrong | Never "fix" it |
-| review-scope violation | The range did not cause it and it was not carried forward | Reject it; do not modify the change |
+| review-scope violation | The range did not cause it and it was not carried forward | Do not modify the change; report a verified defect that predates the change as pre-existing, reject anything else |
 
 ## Carry only unresolved defects
 
@@ -43,4 +43,4 @@ A successful reviewer run covers only its recorded range and head. For each late
 
 ## Report contract
 
-Provide a concise finding table with severity, location, classification, reasoning/action, and credited fix commit where applicable. Record the reviewed ranges, any substitute reviewer, any later ranges closed by disposition, checks and limitations, rounds used/budget, and the reason to stop or continue. Identify genuine unresolved defects and required user decisions separately from rejected suggestions.
+Provide a concise finding table with severity, location, classification, reasoning/action, and credited fix commit where applicable. Record the reviewed ranges, any substitute reviewer, any later ranges closed by disposition, checks and limitations, rounds used/budget, and the reason to stop or continue. Identify genuine unresolved defects and required user decisions separately from rejected suggestions. List verified pre-existing defects in their own group, each with its location and failure scenario, and state that this change neither caused nor fixed them.

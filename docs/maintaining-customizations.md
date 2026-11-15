@@ -25,6 +25,7 @@ Before editing a repository instruction file, check whether it briefly defines, 
 Include only information an agent needs before changing the repository. Do not duplicate the README or general architecture documentation.
 
 - Before adding a sentence, find the existing rule that should have covered the case and decide why it failed. Prefer tightening, moving, or deleting that rule, or enforcing it with a script or hook, over a new sentence; a second sentence on the same point fails the same way.
+- A correction for an observed agent failure brings the case that reproduces it. Where `scripts/evaluate-instructions.ps1` or `scripts/evaluate-instruction-actions.ps1` compiles the changed source, write the case, run it against the unchanged source and then against the corrected one, and keep it only when the first run fails and the second passes. When no case separates the two, add none and record the attempted case and both results in the pull request.
 - When a pull request that changes instruction wording is already open and no other active task is writing to its branch, add a further correction to it as its own commit instead of opening a pull request per correction. The moved head needs the checks and review `AGENTS.md` requires.
 - Keep a rule only when it is stable, broadly applicable at that instruction scope, and likely to change agent behavior materially.
 - Write direct, testable instructions. State the trigger, required behavior, important boundary, and expected evidence when those are not obvious.

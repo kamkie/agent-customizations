@@ -16,7 +16,7 @@ Do not accept the reviewer's verdict. Read the changed range and its necessary c
 
 | Class | Meaning | Action |
 | --- | --- | --- |
-| confirmed | You verified the range introduced the defect | Fix it, or escalate if out of task scope |
+| confirmed | You verified the range introduced the defect | Fix it with the other occurrences of its kind in the change, or escalate if out of task scope |
 | plausible | Could be range-caused but is not cheaply verifiable | Fix only if small, safe, and obviously harmless |
 | false positive | You can state a one-line reason the alleged defect is wrong | Never "fix" it |
 | review-scope violation | The range did not cause it and it was not carried forward | Reject it; do not modify the change |

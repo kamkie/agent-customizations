@@ -647,6 +647,18 @@
       "prompt": "Triage this project's open issues. You have compared them with live evidence: one issue's fix has already shipped, another duplicates it, and the tracker is writable. Decide the next action."
     },
     {
+      "id": "ticket-referenced-in-repo-delivery",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user asked, 'Fix the parser and take the PR through Ready. The bug is DEMO-18.' The PR is now verified Ready. Jira ticket DEMO-18 tracks that work through PR Ready and is In Progress. You have access to update it. Decide your next action before handoff."
+    },
+    {
+      "id": "ticket-closeout-in-repo-delivery",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "The user asked, 'Fix the parser, take the PR through Ready, and update DEMO-18 to reflect completion.' The PR is now verified Ready. Jira ticket DEMO-18 tracks that work through PR Ready and is In Progress. You have access to update it. Decide your next action before handoff."
+    },
+    {
       "id": "ticket-close-after-handoff",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

@@ -33,6 +33,20 @@ Triage decides what happens to each open issue and what needs attention first. I
 
 A request to triage with updates authorizes those tracker updates and closures, not implementing fixes, merging or deploying; without one, propose them in the report instead of making them. Report what changed, the ranking, and only the decisions the user must make. An issue's own remaining tasks stay in that issue: do not hand them to the user or offer a fix as the next step.
 
+## Jira closeout
+
+Close out Jira only when the user's request or an authorized delivery contract covers the relevant tracker actions. A Jira key supplied for repository delivery is context. Complete the repository workflow under its existing grant.
+
+When closeout is authorized and the tracked work is delivered, including any release or deployment the ticket requires, transition the ticket to Done with the matching resolution and a short closing comment naming what shipped.
+
+When another team owns remaining work under a linked ticket in its queue, close the original ticket once all your work is finished and link the handoff in the closing comment. Verify the transfer of ownership with the linked ticket. Keep the original ticket open while you own work still in its scope.
+
+If your work is split out of scope, close the original once there is a linked follow-up in the user's tracker. Create or link that ticket as needed within the granted tracker actions. When a required action falls outside the grant, keep the original open and report the pending follow-up.
+
+Close a parent project epic in the same step when the grant covers it, it has no open children, and its own description and acceptance criteria are met. Keep standing product epics open unless the work decommissions the product.
+
+A request in another team's queue, such as a service desk, or any ask to another team for access, membership or a change, needs an instruction naming it. Without one, propose it.
+
 ## Reporting blockers
 
 Name the blocked action, observed source, and safe progress. A tool denial does not erase authorization; respect its scope and use only permitted recovery. Never invent gates.
@@ -49,7 +63,7 @@ Create and mutate pull requests with the active GitHub CLI account unless the ta
 
 For authorized integration, default to a merge commit (`git merge --no-ff`) when repository policy is silent. Do not force-push, rebase, squash, or cherry-pick without an instruction for that operation. After merge, fetch the target and verify the result.
 
-Clean up resources and disposable state created by this task before handoff: stop task-created processes, watchers, tunnels and scheduled checks that are no longer needed; leave the session scratchpad alone. During authorized repository delivery, restore task-owned checkouts and remove only verified obsolete task-owned branches, worktrees and scratch output under repository cleanup rules. During read-only work, report relevant pre-existing checkout state without changing it. Preserve user-owned, dirty, active, or unintegrated work. When the work a Jira ticket tracks is done (delivered, and released or deployed where its scope includes that), close the ticket yourself: transition it to Done with the matching resolution and a short closing comment naming what shipped. Never leave finished work in an intermediate status such as Awaiting Release. Work whose ownership has passed to another team, through a linked ticket in that team's queue such as a service desk, is not remaining scope: once all work still yours is finished, close as Done and link the handoff ticket in the closing comment; never hold a ticket open waiting on another team. A ticket in another project does not by itself show such a handoff. In the same step, close a parent project epic once it has no open children left and its own description and acceptance criteria are met; a product epic, the standing epic for one application or product, stays open unless the ticket's work decommissions that product. Work still yours keeps the ticket open; when it is split out of the ticket's scope instead, create and link the follow-up ticket in the user's own tracker rather than offering it, then close. A request in another team's queue, such as a service desk, or any ask to another team for access, membership or a change, needs an instruction naming it; without one, propose it.
+Clean up resources and disposable state created by this task before handoff: stop task-created processes, watchers, tunnels and scheduled checks that are no longer needed; leave the session scratchpad alone. During authorized repository delivery, restore task-owned checkouts and remove only verified obsolete task-owned branches, worktrees and scratch output under repository cleanup rules. During read-only work, report relevant pre-existing checkout state without changing it. Preserve user-owned, dirty, active, or unintegrated work.
 
 For Windows cleanup, verify the absolute target and use `Remove-Item -LiteralPath` without `-Force` by default. If ordinary removal runs but fails only on Hidden or ReadOnly attributes of task-created disposable items, clear those incidental attributes and retry. Preserve System attributes and access controls.
 

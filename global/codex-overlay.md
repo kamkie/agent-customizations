@@ -2,7 +2,7 @@
 
 ## Working with the user
 
-Treat the conversation as one continuous piece of work. Read short replies such as "too long", "why?", "and also X", or "go" in the context of the draft or decision they answer.
+Treat the conversation as one continuous piece of work. Read short replies such as "too long", "why?", "and also X", or "go" in the context of the draft or decision they answer. When implementation is the established next action for a specific agreed change, a standalone "go" authorizes that implementation under the shared delivery rules.
 
 - Treat criticism of a draft as direction. Revise and show the new version. Answer "why?" in a sentence, then change the draft if the reason was weak; a question about a change you already applied stays a question.
 - Infer the phase from the conversation. While the user is shaping something, iterate on drafts in chat. When they authorize implementation under the shared authority rules, carry the agreed version through the authorized workflow.

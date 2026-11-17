@@ -15,10 +15,7 @@ param(
 
     [string]$OutputDirectory,
 
-    # Replacement for Codex's built-in model instructions. The Codex client runs
-    # with --ignore-user-config, so the file is passed explicitly. Defaults to
-    # the manifest's reviewed Codex modelInstructions source, which is the
-    # configuration the shared rules are written against.
+    # Optional prompt for comparisons; the default uses the selected model's built-in instructions.
     [string]$CodexModelInstructionsFile,
     [string]$CodexModel,
     [ValidateSet('none', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
@@ -28,7 +25,7 @@ param(
     [ValidateSet('low', 'medium', 'high', 'xhigh', 'max')]
     [string]$ClaudeEffort,
 
-    # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
+    # Explicit spelling of the default; mutually exclusive with a custom prompt.
     [switch]$StockCodexInstructions
 )
 
@@ -44,10 +41,6 @@ if ($CodexModelInstructionsFile) {
 . (Join-Path $PSScriptRoot 'InstructionEvaluation.Common.ps1')
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $manifest = Get-CustomizationManifest
-if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $null -ne $manifest.targets.codex.PSObject.Properties['modelInstructions']) {
-    $CodexModelInstructionsFile = Join-Path $repositoryRoot ([string]$manifest.targets.codex.modelInstructions.source)
-    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Reviewed Codex model instructions file not found: $CodexModelInstructionsFile" }
-}
 $fixtureRoot = Join-Path $repositoryRoot 'tests\fixtures'
 $fixturePrefix = if ($Suite -eq 'skill-routing') { 'skill-routing' } else { 'instruction-behavior' }
 $casesPath = Join-Path $fixtureRoot "$fixturePrefix-cases.json"
@@ -84,8 +77,7 @@ if (-not $ResponseDirectory) {
     }
 }
 $resolvedOutputDirectory = New-EvaluationRunDirectory $OutputDirectory
-$modelInstructionMode = if ($StockCodexInstructions) { 'stock' } elseif ($PSBoundParameters.ContainsKey('CodexModelInstructionsFile')) { 'custom' } else { 'reviewed' }
-$baseline = Save-EvaluationModelInstructions -RunRoot $resolvedOutputDirectory -Source $CodexModelInstructionsFile -Mode $modelInstructionMode
+$baseline = Save-EvaluationModelInstructions -RunRoot $resolvedOutputDirectory -Source $CodexModelInstructionsFile
 $CodexModelInstructionsFile = $baseline.snapshot
 
 function Write-CompiledInstructions {
@@ -229,6 +221,7 @@ function Read-AgentResponse {
             $arguments = @(
                 'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config',
                 '--sandbox', 'read-only', '--color', 'never', '--json', '--cd', $workspace,
+                '-c', 'project_doc_max_bytes=131072',
                 '--output-schema', $schemaPath, '--output-last-message', $responsePath
             )
             if ($CodexModel) { $arguments += @('--model', $CodexModel) }

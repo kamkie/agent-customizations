@@ -370,7 +370,7 @@
       "deploymentAuthorized": false,
       "blockerSource": "none"
     },
-    "skill-invocation-no-message-authority": {
+    "communication-draft-a": {
       "autonomous": false,
       "primaryAction": "answer-read-only",
       "publicationAuthorized": false,
@@ -378,7 +378,7 @@
       "deploymentAuthorized": false,
       "blockerSource": "none"
     },
-    "explicit-message-authority": {
+    "communication-draft-b": {
       "autonomous": false,
       "primaryAction": "continue-authorized-work",
       "publicationAuthorized": false,

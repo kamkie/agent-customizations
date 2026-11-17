@@ -50,14 +50,15 @@ pwsh ./scripts/status.ps1 -Target Copilot
 
 The status command reports managed files as in sync, missing, different, or extra. It exits with status 1 when it detects drift. Drift is evidence to review; it is not permission to install.
 
+For Codex upgrades, also [check the local model prompt setting](#switch-to-stock-codex-prompts). A clean status can coexist with an active Sol 6.1 override.
+
 Before activation, review the content differences in each drifted instruction file, not only the drift count. Account for live-only guidance in the reviewed sources or obtain explicit authority to discard it before replacing that file. A backup preserves recovery data; it does not make an unreviewed loss acceptable.
 
-Compare both the composed global instructions and any replacement model prompt from the repository root (diff exit code 1 means differences were found):
+Compare the composed global instructions from the repository root (diff exit code 1 means differences were found):
 
 ```powershell
 . ./scripts/AgentCustomization.Common.ps1
 $reviewedHashes = @{}
-$reviewedModelHashes = @{}
 foreach ($targetName in Get-CustomizationTargetNames -Target All) {
     $targetConfig = Get-CustomizationTarget -Name $targetName
     $liveRoot = Resolve-CustomizationHome -TargetName $targetName
@@ -76,16 +77,6 @@ foreach ($targetName in Get-CustomizationTargetNames -Target All) {
         }
     } else {
         Write-Host "$targetName instructions are missing; no live content to compare."
-    }
-    if ($null -ne $targetConfig.PSObject.Properties['modelInstructions']) {
-        $liveModel = Join-Path $liveRoot $targetConfig.modelInstructions.destination
-        $reviewedModelHashes[$targetName] = Get-CustomizationInstructionHash -Path $liveModel
-        if (Test-Path -LiteralPath $liveModel -PathType Leaf) {
-            git diff --no-index -- $targetConfig.modelInstructions.source $liveModel
-            if ($LASTEXITCODE -gt 1) { throw "Cannot compare $targetName model instructions." }
-        } else {
-            Write-Host "$targetName model instructions are missing; no live content to compare."
-        }
     }
 }
 ```
@@ -121,16 +112,14 @@ git status --short --branch
 Install all targets, keeping the hashes from the content comparison above:
 
 ```powershell
-./scripts/install.ps1 -ExpectedInstructionHashes $reviewedHashes `
-    -ExpectedModelInstructionHashes $reviewedModelHashes
+./scripts/install.ps1 -ExpectedInstructionHashes $reviewedHashes
 ```
 
 Install only one target:
 
 ```powershell
 ./scripts/install.ps1 -Target Codex `
-    -ExpectedInstructionHashes @{ codex = $reviewedHashes.codex } `
-    -ExpectedModelInstructionHashes @{ codex = $reviewedModelHashes.codex }
+    -ExpectedInstructionHashes @{ codex = $reviewedHashes.codex }
 ./scripts/install.ps1 -Target Claude `
     -ExpectedInstructionHashes @{ claude = $reviewedHashes.claude }
 ./scripts/install.ps1 -Target Copilot `
@@ -141,11 +130,11 @@ The installer verifies the repository before writing and refuses dirty, detached
 
 Only drifted managed files are replaced. The installer composes each target's ordered shared and overlay instruction sources into its destination file. Existing files are backed up under a timestamped `customization-backups` directory in the selected target home, and the installer checks for remaining drift before it succeeds.
 
-`status.ps1` reports `instructionHash` for the composed instruction file and `modelInstructionHash` for the replacement model prompt. Each is `missing` when its managed file is absent, or `null` with its corresponding `*HashError` when the file cannot be hashed. For a target without a managed model prompt, both model fields are `null` (not applicable). The summary counts the two error kinds separately, and either causes a nonzero exit without erasing the drift report.
+`status.ps1` reports `instructionHash` for each composed instruction file: `missing` when absent, or `null` with `instructionHashError` when hashing fails. A hash error causes a nonzero exit without erasing the drift report.
 
-A hash proves file identity, not content review. `-ExpectedInstructionHashes` must contain exactly the selected targets. A guarded install that selects a managed model prompt also requires `-ExpectedModelInstructionHashes`, containing exactly those selected targets with a model prompt (currently `codex`). Old guarded Codex calls must add this second map; a global instruction hash alone cannot protect the separate base prompt. A model-only guard is rejected. Pass the maps from PowerShell, not as serialized strings to `pwsh -File`. Alternate homes must be the same ones used for comparison.
+A hash proves file identity, not content review. Pass `-ExpectedInstructionHashes` as a PowerShell map with exactly the selected targets, using the same homes as the comparison. Remove the retired `-ExpectedModelInstructionHashes` argument from older deployment commands.
 
-The precondition checks both instruction files for all selected targets before installation and checks each target again before creating its directories or replacing files. A stale model hash therefore prevents changes to global instructions, skills, hooks and other selected targets, including in `-WhatIf`. On mismatch, reread and reconcile the changed content rather than blindly replacing the expected hash. It detects stale snapshots, including a previously missing file appearing, but is not an atomic lock against a writer racing the final filesystem replacement. Coordinate active writers before activation. The options add no deployment authority; omitting both preserves the unguarded installer interface, not an exemption from the content-review requirement above.
+The installer checks all selected instruction files before writing any target, including during preview, and rechecks each target before replacing files. If a file changed or appeared after review, reread and reconcile it before refreshing its hash. This guard is not an atomic lock; coordinate active writers before activation.
 
 ## Apply hook changes
 
@@ -161,24 +150,29 @@ GitHub Copilot has no managed-jobs hook registrations in the manifest; its insta
 
 Claude Code loads each plugin installed under `~/.claude/skills/<name>` as `<name>@skills-dir` in new sessions; `claude plugin list` shows its state. A same-named plugin loaded through `CLAUDE_CODE_PLUGIN_DIRS` or `--plugin-dir` takes precedence, so remove that entry to load the reviewed copy. Status ignores the type declarations Claude Code generates under a plugin's `.claude-plugin/types/`.
 
-## Point Codex at the reviewed model instructions
+## Switch to stock Codex prompts
 
-The Codex target deploys `global/codex-model-instructions.md` to `~/.codex/model-instructions-astra.md` (a legacy destination name). That file replaces Codex's built-in model instructions; it is the stock Sol 6.1 prompt with closing-status and explicit-command authorization overrides. The authorization overrides defer to the effective `AGENTS.md`: questions permit inspection, and implementation requires an explicit command. Messaging and persistence use the stock Sol 6.1 paragraphs.
+New installs use the selected model's built-in instructions. Personal rules come from the shared instructions and Codex overlay in `~/.codex/AGENTS.md`.
 
-The stock baseline comes from `gpt-6.1-sol`'s `model_messages.instructions_template` in the [OpenAI model catalog](https://github.com/openai/codex/blob/b1e72963c3b71a9265a551e54beff078384efed9/codex-rs/models-manager/models.json), with trailing whitespace and the final newline normalized. Re-base it when OpenAI changes that prompt, keeping the clean stock import and our overrides in separate commits so their differences remain reviewable.
-
-Codex only loads it when `~/.codex/config.toml` names it. `config.toml` is not managed by this repository; add the key once, at the top level, before any `[table]` section:
-
-```toml
-model_instructions_file = "C:/Users/<you>/.codex/model-instructions-astra.md"
-```
-
-Status reports the file as `ModelInstructions`; it does not verify the `config.toml` key. The evaluation clients ignore user configuration, so both evaluation scripts pass the manifest's reviewed file explicitly by default; the shared rules are written against that configuration. Pass another file with `-CodexModelInstructionsFile`, or `-StockCodexInstructions` to measure the stock prompt. Use `-CodexModel` and `-CodexReasoningEffort` to test a specific model:
+Inspect the effective Codex home's `config.toml` for a top-level `model_instructions_file` setting. For example, from the repository root:
 
 ```powershell
-pwsh ./scripts/evaluate-instructions.ps1 -Target codex
-pwsh ./scripts/evaluate-instructions.ps1 -Target codex -CodexModel gpt-6.1-sol -CodexReasoningEffort high
-pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -StockCodexInstructions
+. ./scripts/AgentCustomization.Common.ps1
+$configPath = Join-Path (Resolve-CustomizationHome -TargetName codex) 'config.toml'
+if (Test-Path -LiteralPath $configPath -PathType Leaf) {
+    Select-String -LiteralPath $configPath -Pattern '^\s*model_instructions_file\s*='
+}
+```
+
+If the top-level value points to the retired `model-instructions-astra.md` in that home, install the reviewed overlay first. With authority to change the local config, remove only that assignment, recheck the file, and start a fresh Codex session. Keep the model selection, unrelated settings, and other custom pointers. If only installation was authorized, report that the old prompt is still active.
+
+The installer and status command do not manage or inspect the local pointer; a clean status alone does not establish that the switch is active. The old file can stay on disk unreferenced.
+
+Both evaluators ignore the user's `config.toml` and use stock instructions by default. To compare a different prompt, pass `-CodexModelInstructionsFile <path>`; `-StockCodexInstructions` explicitly selects the default.
+
+```powershell
+pwsh ./scripts/evaluate-instructions.ps1 -Target codex -CodexModel gpt-6.2-sol
+pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -CodexModel gpt-6.2-astra
 ```
 
 ## Scope boundary
@@ -186,7 +180,6 @@ pwsh ./scripts/evaluate-instruction-actions.ps1 -Target codex -StockCodexInstruc
 For each selected target, the manifest owns:
 
 - the ordered sources composing the target's global instruction file;
-- the optional replacement model-instructions file for that target;
 - the compatible skills listed for that target;
 - the target's plugins from `plugins/<target>/<name>`, copied into the manifest's plugin destination;
 - the reviewed hook scripts; and

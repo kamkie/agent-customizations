@@ -80,10 +80,9 @@ personal skills from `~/.claude/skills`. Codex uses `~/.codex/AGENTS.md` and
 `~/.codex/skills`. GitHub Copilot uses `~/.copilot/copilot-instructions.md` and
 `~/.copilot/skills`. The manifest composes `global/shared.md` with the applicable
 target overlay during installation, reuses portable skills where possible, and
-keeps tool-specific skills on their compatible target. For Codex it also deploys
-`global/codex-model-instructions.md`, a reviewed replacement for the built-in
-model instructions that `config.toml` must reference (see
-[deployment](docs/deployment.md#point-codex-at-the-reviewed-model-instructions)).
+keeps tool-specific skills on their compatible target. Codex uses each selected
+model's built-in prompt. For an existing installation, see [switch to stock
+Codex prompts](docs/deployment.md#switch-to-stock-codex-prompts).
 
 ## Why deployment is explicit
 

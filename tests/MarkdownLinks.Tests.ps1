@@ -67,13 +67,13 @@ try {
 
     $manifest = Get-CustomizationManifest
     $codex = $manifest.targets.codex
-    $sources = @($codex.instructions.sources[0], $codex.modelInstructions.source,
+    $sources = @($codex.instructions.sources[0], $codex.instructions.sources[-1],
         ('skills/' + $codex.skills[0] + '/references/link-fixture.md'))
     foreach ($source in $sources) {
         Write-Host "Markdown links: injecting a missing link into $source"
         $path = Join-Path $fixture $source
         $original = if (Test-Path -LiteralPath $path) { [IO.File]::ReadAllText($path) } else { '' }
-        [IO.File]::WriteAllText($path, $original + "`n[missing fixture](missing-fixture.md)`n")
+        [IO.File]::WriteAllText($path, "[missing fixture](missing-fixture.md)`n`n" + $original)
         $output = @(& pwsh -NoProfile -File $verifier 2>&1)
         Assert-True ($LASTEXITCODE -eq 1) "Verifier accepted a missing link in $source."
         Assert-True (($output -join ' ') -like "*Missing local Markdown link: $source -> missing-fixture.md*") "Verifier did not identify the source and target in $source."

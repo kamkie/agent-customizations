@@ -78,8 +78,12 @@ pass. CLI failures and invalid/missing envelopes are execution failures,
 separate from a valid response that fails the behavior or protocol contract.
 A valid empty JSON object still reaches the scorer. Logs and requested/effective
 model metadata remain available after failures; absent effective metadata stays
-unknown. The Codex instruction baseline records whether
-the run used stock, reviewed, or custom model instructions; non-stock runs pass
+unknown. Codex ignores the user's config but still reads their personal
+`AGENTS.md`. The test clients allow 128 KiB for that file and the compiled
+project fixture (which can include a skill). Use a signed-in evaluation home
+without personal instructions when they would conflict with the fixture.
+The Codex instruction baseline records whether
+the run used stock (default) or custom model instructions; custom runs pass
 a retained snapshot to the CLI and record its SHA-256, so later source edits do
 not change that run's baseline. Keep the snapshot with its private run evidence.
 Remove only your own disposable runs after

@@ -39,7 +39,9 @@ Close out Jira only when the user's request or an authorized delivery contract c
 
 When closeout is authorized and the tracked work is delivered, including any release or deployment the ticket requires, transition the ticket to Done with the matching resolution and a short closing comment naming what shipped.
 
-When another team owns remaining work under a linked ticket in its queue, close the original ticket once all your work is finished and link the handoff in the closing comment. Verify the transfer of ownership with the linked ticket. Keep the original ticket open while you own work still in its scope. If that work is split out of scope, create and link the follow-up ticket in the user's tracker before closing, within the granted tracker actions.
+When another team owns remaining work under a linked ticket in its queue, close the original ticket once all your work is finished and link the handoff in the closing comment. Verify the transfer of ownership with the linked ticket. Keep the original ticket open while you own work still in its scope.
+
+If your work is split out of scope, close the original once there is a linked follow-up in the user's tracker. Create or link that ticket as needed within the granted tracker actions. When a required action falls outside the grant, keep the original open and report the pending follow-up.
 
 Close a parent project epic in the same step when the grant covers it, it has no open children, and its own description and acceptance criteria are met. Keep standing product epics open unless the work decommissions the product.
 

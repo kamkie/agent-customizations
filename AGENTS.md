@@ -27,11 +27,14 @@ Use **Prepare -> Implement -> Validate -> Review -> Ready** in progress updates,
 
 1. Confirm task scope. Before editing, read this file, `README.md`, `config/manifest.json`, and each changed skill's complete `SKILL.md` and directly required references.
 2. Fetch `origin`; identify current `origin/main`. Record the remote, branch or worktree owner, HEAD, upstream, and `git status --short --branch`.
-3. Start from that verified base in a clean agent-owned `codex/<short-task-slug>`, `claude/<short-task-slug>`, or `copilot/<short-task-slug>` branch/worktree (or, in a Copilot App worktree session, an app-prefixed `<owner>-<short-task-slug>` branch renamed with `rename_branch`). Preserve dirty user checkouts; use an isolated worktree when unrelated changes and ownership are clear. Clarify overlapping agent work or required local inputs before writing. Never reset, stash, overwrite, or absorb unrelated work. Stop on a stale, ambiguous, or mismatched base.
+3. For instruction corrections, look for an open instruction PR for the same outcome before creating a branch. Reuse it only when this task has write ownership of its branch, no other active task is writing to it, and the clean authoring checkout matches the verified remote PR head. Add the correction as its own commit and reapply the [Ready gates](#ready-gate-and-refresh-points) to the new head.
+4. Otherwise, start from verified `origin/main` in a clean agent-owned `codex/<short-task-slug>`, `claude/<short-task-slug>`, or `copilot/<short-task-slug>` branch/worktree (or, in a Copilot App worktree session, an app-prefixed `<owner>-<short-task-slug>` branch renamed with `rename_branch`).
+
+Preserve dirty user checkouts and use an isolated worktree when unrelated changes and ownership are clear. Clarify overlapping agent work or required local inputs before writing. Never reset, stash, overwrite, or absorb unrelated work. Stop on a stale, ambiguous, or mismatched base.
 
 ### Implement, validate, and commit
 
-- Complete the scoped change and directly affected tests/documentation. Keep one coherent problem per PR, except that instruction corrections share an open PR under [maintenance guidance](docs/maintaining-customizations.md#maintain-agent-instructions); preserve the public/private boundary, and separate changes to different skills into separate commits when practical.
+- Complete the scoped change and directly affected tests/documentation. Keep one coherent problem per PR. Preserve the public/private boundary and separate changes to different skills into separate commits when practical.
 - Run `pwsh ./scripts/verify.ps1` and `git diff --check` for every change before committing. Run `pwsh ./scripts/test.ps1` after changes to installation, status, verification, manifest, or other deployment tooling. Run directly affected behavioral checks under [maintenance guidance](docs/maintaining-customizations.md).
 - For reviewed-versus-live drift work, use `pwsh ./scripts/status.ps1`. Drift is evidence, not installation authority.
 - Record validation results, including commands that could not run, observed causes, and remaining risk. Commit intentionally and push; a local commit is intermediate. Validate is complete when applicable checks pass and are recorded.

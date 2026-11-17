@@ -101,9 +101,10 @@ activating it.
 
 An explicit request to implement a repository change defaults to the complete
 branch-to-PR delivery workflow in [`AGENTS.md`](AGENTS.md): validate, commit,
-push, open an agent-authored draft PR, obtain opposite-agent cross-review, triage
-findings, and mark the PR ready. Current-head owner approval then governs a
-guarded merge or auto-merge after required checks pass.
+push, open an agent-authored draft PR, run CI and opposite-agent review in
+parallel, triage findings, and mark the PR ready when its gates pass. For a
+separately authorized merge, follow the
+[current-head merge rules](AGENTS.md#owner-approval-checks-and-merge).
 
 Validate the repository:
 

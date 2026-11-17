@@ -50,6 +50,8 @@ pwsh ./scripts/status.ps1 -Target Copilot
 
 The status command reports managed files as in sync, missing, different, or extra. It exits with status 1 when it detects drift. Drift is evidence to review; it is not permission to install.
 
+For Codex upgrades, also [check the local model prompt setting](#switch-to-stock-codex-prompts). A clean status can coexist with an active Sol 6.1 override.
+
 Before activation, review the content differences in each drifted instruction file, not only the drift count. Account for live-only guidance in the reviewed sources or obtain explicit authority to discard it before replacing that file. A backup preserves recovery data; it does not make an unreviewed loss acceptable.
 
 Compare the composed global instructions from the repository root (diff exit code 1 means differences were found):
@@ -152,7 +154,17 @@ Claude Code loads each plugin installed under `~/.claude/skills/<name>` as `<nam
 
 New installs use the selected model's built-in instructions. Personal rules come from the shared instructions and Codex overlay in `~/.codex/AGENTS.md`.
 
-For an installation that used the Sol 6.1 replacement, install the reviewed overlay during authorized deployment. Then remove the top-level `model_instructions_file` setting from `~/.codex/config.toml` **if it points to the retired `model-instructions-astra.md`**. Keep the model selection and all other settings. Start a fresh Codex session to use the selected model's stock prompt. A different custom pointer is outside this migration.
+Inspect the effective Codex home's `config.toml` for a top-level `model_instructions_file` setting. For example, from the repository root:
+
+```powershell
+. ./scripts/AgentCustomization.Common.ps1
+$configPath = Join-Path (Resolve-CustomizationHome -TargetName codex) 'config.toml'
+if (Test-Path -LiteralPath $configPath -PathType Leaf) {
+    Select-String -LiteralPath $configPath -Pattern '^\s*model_instructions_file\s*='
+}
+```
+
+If the top-level value points to the retired `model-instructions-astra.md` in that home, install the reviewed overlay first. With authority to change the local config, remove only that assignment, recheck the file, and start a fresh Codex session. Keep the model selection, unrelated settings, and other custom pointers. If only installation was authorized, report that the old prompt is still active.
 
 The installer and status command do not manage or inspect the local pointer; a clean status alone does not establish that the switch is active. The old file can stay on disk unreferenced.
 

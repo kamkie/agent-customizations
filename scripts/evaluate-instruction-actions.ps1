@@ -3,10 +3,7 @@ param(
     [ValidateSet('codex', 'claude', 'all')][string]$Target = 'all',
     [string[]]$CaseId,
     [string]$OutputDirectory,
-    # Replacement for Codex's built-in model instructions. The Codex client runs
-    # with --ignore-user-config, so the file is passed explicitly. Defaults to
-    # the manifest's reviewed Codex modelInstructions source, which is the
-    # configuration the shared rules are written against.
+    # Optional prompt for comparisons; the default uses the selected model's built-in instructions.
     [string]$CodexModelInstructionsFile,
     [string]$CodexModel,
     [ValidateSet('none', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
@@ -14,7 +11,7 @@ param(
     [string]$ClaudeModel,
     [ValidateSet('low', 'medium', 'high', 'xhigh', 'max')]
     [string]$ClaudeEffort,
-    # Evaluate Codex against its stock built-in prompt instead of the reviewed file.
+    # Explicit spelling of the default; mutually exclusive with a custom prompt.
     [switch]$StockCodexInstructions
 )
 $ErrorActionPreference = 'Stop'
@@ -32,10 +29,6 @@ $PSNativeCommandUseErrorActionPreference = $false
 . (Join-Path $PSScriptRoot 'InstructionActions.Common.ps1')
 $repo = Get-CustomizationRepositoryRoot
 $manifest = Get-CustomizationManifest
-if (-not $CodexModelInstructionsFile -and -not $StockCodexInstructions -and $null -ne $manifest.targets.codex.PSObject.Properties['modelInstructions']) {
-    $CodexModelInstructionsFile = Join-Path $repo ([string]$manifest.targets.codex.modelInstructions.source)
-    if (-not (Test-Path -LiteralPath $CodexModelInstructionsFile -PathType Leaf)) { throw "Reviewed Codex model instructions file not found: $CodexModelInstructionsFile" }
-}
 $fixtures = Join-Path $repo 'tests/fixtures'
 $cases = (Get-Content (Join-Path $fixtures 'instruction-action-cases.json') -Raw | ConvertFrom-Json).cases
 $expectations = Get-Content (Join-Path $fixtures 'instruction-action-expectations.json') -Raw | ConvertFrom-Json
@@ -52,8 +45,7 @@ foreach ($client in $targets) {
     }
 }
 $runRoot = New-EvaluationRunDirectory $OutputDirectory
-$modelInstructionMode = if ($StockCodexInstructions) { 'stock' } elseif ($PSBoundParameters.ContainsKey('CodexModelInstructionsFile')) { 'custom' } else { 'reviewed' }
-$baseline = Save-EvaluationModelInstructions -RunRoot $runRoot -Source $CodexModelInstructionsFile -Mode $modelInstructionMode
+$baseline = Save-EvaluationModelInstructions -RunRoot $runRoot -Source $CodexModelInstructionsFile
 $CodexModelInstructionsFile = $baseline.snapshot
 $results = [Collections.Generic.List[object]]::new()
 $configuration = @{codexInstructionBaseline = $baseline; targets = $targets; claudeModel = $ClaudeModel; claudeEffort = $ClaudeEffort; codexModel = $CodexModel; codexReasoningEffort = $CodexReasoningEffort}
@@ -107,6 +99,7 @@ $currentRequest
             if ($agentTarget -eq 'codex') {
                 $arguments = @('exec','--ephemeral','--ignore-user-config','--ignore-rules','--strict-config',
                     '--sandbox','workspace-write','--color','never','--json','--cd',$workspace,
+                    '-c','project_doc_max_bytes=131072',
                     '--output-schema',$schemaPath,'--output-last-message',$responsePath,
                     '-c','approval_policy="never"','-c','web_search="disabled"',
                     '-c','suppress_unstable_features_warning=true',

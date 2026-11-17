@@ -20,9 +20,9 @@ function New-EvaluationRunDirectory {
 }
 
 function Save-EvaluationModelInstructions {
-    param([string]$RunRoot, [string]$Source, [string]$Mode)
-    $baseline = @{mode = $Mode; source = $Source; snapshot = $null; sha256 = $null}
-    if ($Mode -ne 'stock') {
+    param([string]$RunRoot, [string]$Source)
+    $baseline = @{mode = if ($Source) { 'custom' } else { 'stock' }; source = $Source; snapshot = $null; sha256 = $null}
+    if ($Source) {
         $baseline.snapshot = Join-Path $RunRoot 'codex-model-instructions.md'
         [IO.File]::Copy($Source, $baseline.snapshot)
         $baseline.sha256 = (Get-FileHash -LiteralPath $baseline.snapshot -Algorithm SHA256).Hash

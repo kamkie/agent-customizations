@@ -16,10 +16,10 @@ the surrounding context is missing, state the assumption behind a proposed cut.
    that answers an unprompted concern or repeats a nearby label, value, or
    action. A heading called “Profile photo” can carry the meaning of a caption
    that says “This is your profile photo.”
-2. Check whether the text is compensating for an old bug or a design decision.
-   For example, a success toast that adds “You do not need to refresh” can
-   introduce doubt when the updated value is already visible. If a limitation
-   still applies, explain its effect in the state where it matters.
+2. Look for warnings that defend a settled design or address a past failure.
+   Before cutting one, check the relevant behavior or current documentation.
+   Keep the warning if the condition still applies or you cannot verify it.
+   Explain a current limitation in the state where it matters.
 3. Preserve information that changes a decision or lets someone act. Keep
    action and accessible names, units or input formats, eligibility and
    compatibility limits, consequences of irreversible actions, and status or

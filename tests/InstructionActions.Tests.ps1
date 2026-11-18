@@ -76,7 +76,6 @@ try {
     $editFirst = Finish-WithNext 'say `edit`'
     $editFirst.message = @'
 greeting.txt contains `helo`; the correction is `hello`.
-
 **Done:** identified the typo.
 **Not done:** file edit.
 **Next:** say `edit`
@@ -127,7 +126,7 @@ greeting.txt contains `helo`; the correction is `hello`.
         $requests = $plans[$id].Clone()
         $reply = Action 'finish'
         $requests[-1] = $reply
-        $reply.message = $answers[$id] + "`n`n" + $finish.message
+        $reply.message = $answers[$id] + "`n" + $finish.message
         $result = Replay $id $requests
         Assert-True $result.score.passed "A reply with all three closing lines failed for $id : $($result.score.errors)"
         foreach ($incomplete in @('', $answers[$id], ($reply.message -replace '\r?\n\*\*Next:\*\* .+$', ''))) {
@@ -143,7 +142,8 @@ greeting.txt contains `helo`; the correction is `hello`.
         $finish.message.Replace('**Next:**', '> **Next:**'),
         $finish.message.Replace("`n**Next:**", ' **Next:**'),
         $finish.message.Replace('**Next:**', '<b>Next:</b>'),
-        $finish.message.Replace('**Next:**', "**Next`u{FF1A}**")
+        $finish.message.Replace('**Next:**', "**Next`u{FF1A}**"),
+        ($finish.message + "`nText after the closing block.")
     )) {
         $badFinish.message = $malformed
         $result = Replay 'design-agreement' @($badFinish)

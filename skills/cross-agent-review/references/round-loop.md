@@ -31,9 +31,7 @@ Carry credible unresolved findings only when a required later repair review can 
 
 Review the complete range from the last independently reviewed head to current HEAD and classify its effect using the entrypoint's rule. A formatting-only change or a stronger assertion of unchanged behavior can use targeted checks; a production behavior change, an instruction decision change, or uncertain material risk needs scoped re-review. Do not split a risky range into small commits to avoid review.
 
-Three rounds is the cap. After it, close each later repair with targeted validation and a recorded disposition under the round limit, never described as reviewed. A user's explicit request for another round adds one and runs. A confirmed open defect remains a blocker for the repository's Ready gate; report it once with the exact unreviewed range. Do not reset the counter or claim review coverage.
-
-A change limited to documentation or instruction text is the exception: it gets one round. Inspect each later repair, run targeted validation, and record it as closed under the round limit, not as reviewed.
+Three rounds is the default budget; a change limited to documentation or instruction text gets one. Each change the user makes or asks for, and each round the user explicitly requests, adds one round. When necessary re-review remains after the budget, ask the user for one or two more rounds at a time, naming the exact unreviewed range and why; a granted round runs. Inspect each repair without a granted round, run targeted validation, and record it as closed under the round limit, not as reviewed. A confirmed open defect remains a blocker for the repository's Ready gate. Do not reset the counter or claim review coverage.
 
 The reviewer vote is advisory. Record an absent vote and explain a decision that differs from an available vote. Disagreement alone does not require a vote, another paid invocation, or a new approval checkpoint.
 

@@ -25,7 +25,10 @@ the surrounding context is missing, state the assumption behind a proposed cut.
    compatibility limits, consequences of irreversible actions, and status or
    recovery instructions users cannot infer. An empty state should explain
    what is missing and identify the next available action when there is one.
-   Keep applicable legal, safety, and accessibility disclosures.
+   Keep applicable legal, safety, and accessibility disclosures. Before
+   cutting text that labels or describes a control, check how the control gets
+   its accessible name and description. Keep the text if removing it would
+   take away needed information from assistive technology users.
 4. Cut the redundant clause and keep the useful part. When the whole hint is
    redundant and an edit is authorized, remove the hint prop or element and
    any description reference that would point to it. Preserve control behavior

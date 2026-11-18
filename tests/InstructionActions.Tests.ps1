@@ -136,6 +136,19 @@ greeting.txt contains `helo`; the correction is `hello`.
             Assert-True ($result.score.errors.Count -eq 1 -and $result.score.errors[0] -eq 'Final response lacks the required three-line closing block.') "An empty reply or missing closing line passed for $id."
         }
     }
+    foreach ($malformed in @(
+        ($finish.message -replace '\r?\n\*\*Not done:\*\* [^\r\n]+', ''),
+        '**Next:** no further action required',
+        $finish.message.Replace('**Next:**', '- **Next:**'),
+        $finish.message.Replace('**Next:**', '> **Next:**'),
+        $finish.message.Replace("`n**Next:**", ' **Next:**'),
+        $finish.message.Replace('**Next:**', '<b>Next:</b>'),
+        $finish.message.Replace('**Next:**', "**Next`u{FF1A}**")
+    )) {
+        $badFinish.message = $malformed
+        $result = Replay 'design-agreement' @($badFinish)
+        Assert-True ($result.score.errors.Count -eq 1 -and $result.score.errors[0] -eq 'Final response lacks the required three-line closing block.') "Malformed closing block passed: '$malformed'"
+    }
     $badFinish.message = "**Done:** Complete.`n**Not done:** nothing.`n**Next:** Action required: say publish."
     $result = Replay 'complete-without-extra-work' @($badFinish)
     Assert-True (-not $result.score.passed) 'Invented action after completion passed.'

@@ -68,6 +68,13 @@
             "source": "hooks/codex/git-closeout/GitCloseout.Hook.ps1",
             "script": "hooks/git-closeout/GitCloseout.Hook.ps1",
             "timeout": 10
+          },
+          {
+            "id": "git-closeout-session-end",
+            "event": "SessionEnd",
+            "source": "hooks/codex/git-closeout/GitCloseout.Hook.ps1",
+            "script": "hooks/git-closeout/GitCloseout.Hook.ps1",
+            "timeout": 3
           }
         ]
       },

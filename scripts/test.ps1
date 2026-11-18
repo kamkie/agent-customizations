@@ -187,9 +187,11 @@ try {
         Where-Object { $_.command -match 'ManagedHookId "git-closeout-prompt"' })
     $closeoutStop = @($codexHooks.hooks.Stop | ForEach-Object { $_.hooks } |
         Where-Object { $_.command -match 'ManagedHookId "git-closeout-stop"' })
-    if ($closeoutPrompt.Count -ne 1 -or $closeoutStop.Count -ne 1 -or
+    $closeoutEnd = @($codexHooks.hooks.SessionEnd | ForEach-Object { $_.hooks } |
+        Where-Object { $_.command -match 'ManagedHookId "git-closeout-session-end"' })
+    if ($closeoutPrompt.Count -ne 1 -or $closeoutStop.Count -ne 1 -or $closeoutEnd.Count -ne 1 -or
         -not (Test-Path -LiteralPath (Join-Path $codexSandbox 'hooks/git-closeout/GitCloseout.Hook.ps1') -PathType Leaf)) {
-        throw 'Codex hook installation did not register both Git closeout events and install their script.'
+        throw 'Codex hook installation did not register all Git closeout events and install their script.'
     }
     $codexSessionStart = $codexHooks.hooks.SessionStart[0]
     if ([string]$codexSessionStart.matcher -ne '^(startup|resume)$' -or

@@ -31,15 +31,13 @@ Carry credible unresolved findings only when a required later repair review can 
 
 Review the complete range from the last independently reviewed head to current HEAD and classify its effect using the entrypoint's rule. A formatting-only change or a stronger assertion of unchanged behavior can use targeted checks; a production behavior change, an instruction decision change, or uncertain material risk needs scoped re-review. Do not split a risky range into small commits to avoid review.
 
-After the third round, necessary re-review of a repair continues without asking, up to six rounds in total. A user's explicit request for another round adds one and runs. If repairs keep drawing new confirmed findings, or necessary re-review remains after the sixth round, report the exact unreviewed range and ask once. Do not reset the counter or claim review coverage.
-
-A change limited to documentation or instruction text is the exception: it gets one round. Inspect each later repair, run targeted validation, and record it as closed under the one-round limit, not as reviewed.
+Three rounds is the default budget, for every kind of change. Each change the user makes or asks for, and each round the user explicitly requests, adds one round. Spend the remaining budget on necessary re-review without asking. When necessary re-review remains after the budget is spent, ask the user for one or two more rounds at a time, naming the exact unreviewed range and why; a granted round runs, and the outstanding review blocks completion until then. Only for a repair whose further review the user declines, inspect it, run targeted validation, and record it as closed under the round limit, not as reviewed. A confirmed open defect remains a blocker for the repository's Ready gate. Do not reset the counter or claim review coverage.
 
 The reviewer vote is advisory. Record an absent vote and explain a decision that differs from an available vote. Disagreement alone does not require a vote, another paid invocation, or a new approval checkpoint.
 
 ## Account for later commits
 
-A successful reviewer run covers only its recorded range and head. For each later range, record the next independent review, a behavior-neutral disposition, or a one-round-limit disposition, each disposition with the inspected diff, rationale, and relevant validation result. A disposition is not an independent review of that range. Outside the one-round limit, unknown effects or meaningful risk still block completion. The repository owns final Ready, blocking-review, owner-approval, and merge gates.
+A successful reviewer run covers only its recorded range and head. For each later range, record the next independent review, a behavior-neutral disposition, or a round-limit disposition for a validated repair whose further review the user declined, each disposition with the inspected diff, rationale, and relevant validation result. A disposition is not an independent review of that range. A material change that is not a repair keeps its review requirement and blocks completion while it is unmet. Outside a round limit, unknown effects or meaningful risk still block completion. The repository owns final Ready, blocking-review, owner-approval, and merge gates.
 
 ## Report contract
 

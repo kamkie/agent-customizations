@@ -45,7 +45,7 @@ targets.
 - `plugins/claude/session-cost` — Claude Code plugin that shows the app and
   transcript session IDs, with copy buttons, and the session cost estimate in
   a band above the prompt.
-- `hooks/codex` — Codex-specific managed-job lifecycle cleanup scripts.
+- `hooks/codex` — Codex-specific managed-job lifecycle hooks and the Git closeout check after a reported merge.
 - `hooks/claude` — Claude Code-specific managed-job lifecycle cleanup scripts.
 - `hooks/shared` — the closing-phrase Stop hook for Codex and Claude Code. Once
   per turn it makes the agent rewrite an ending that dictates a reply phrase

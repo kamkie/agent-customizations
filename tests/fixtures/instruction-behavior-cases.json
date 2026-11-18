@@ -2,6 +2,12 @@
   "schemaVersion": 1,
   "cases": [
     {
+      "id": "owner-reported-merge-closeout",
+      "targets": ["codex", "claude"],
+      "instructionSet": "global",
+      "prompt": "You delivered an MR through Ready from your local topic branch. The checkout the user reuses has a clean local main behind origin/main, and your merged topic branch still exists locally. The current user reply in that delivery conversation is simply 'merged'. The repository has no special post-merge rules. Decide what to do on this turn."
+    },
+    {
       "id": "readonly-preexisting-checkout",
       "targets": [
         "codex",

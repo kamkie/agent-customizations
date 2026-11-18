@@ -54,6 +54,27 @@
             "source": "hooks/shared/closing-phrase/ClosingPhrase.StopHook.ps1",
             "script": "hooks/closing-phrase/ClosingPhrase.StopHook.ps1",
             "timeout": 10
+          },
+          {
+            "id": "git-closeout-prompt",
+            "event": "UserPromptSubmit",
+            "source": "hooks/codex/git-closeout/GitCloseout.Hook.ps1",
+            "script": "hooks/git-closeout/GitCloseout.Hook.ps1",
+            "timeout": 10
+          },
+          {
+            "id": "git-closeout-stop",
+            "event": "Stop",
+            "source": "hooks/codex/git-closeout/GitCloseout.Hook.ps1",
+            "script": "hooks/git-closeout/GitCloseout.Hook.ps1",
+            "timeout": 10
+          },
+          {
+            "id": "git-closeout-session-end",
+            "event": "SessionEnd",
+            "source": "hooks/codex/git-closeout/GitCloseout.Hook.ps1",
+            "script": "hooks/git-closeout/GitCloseout.Hook.ps1",
+            "timeout": 3
           }
         ]
       },

@@ -61,7 +61,7 @@ Mark Ready automatically when scoped changes, required checks, agent review, fin
 
 Create and mutate pull requests with the active GitHub CLI account unless the target repository defines another actor. When merge or auto-merge is separately authorized and every repository gate passes, perform it with a head-match guard.
 
-For authorized integration, default to a merge commit (`git merge --no-ff`) when repository policy is silent. Do not force-push, rebase, squash, or cherry-pick without an instruction for that operation.
+For authorized integration, default to a merge commit (`git merge --no-ff`) when repository policy is silent. Do not force-push, rebase, squash, or cherry-pick without an instruction for that operation. After a local integration, fetch the target's upstream where applicable and verify the integrated result.
 
 Clean up resources and disposable state created by this task before handoff: stop task-created processes, watchers, tunnels and scheduled checks that are no longer needed; leave the session scratchpad alone. During authorized repository delivery, restore task-owned checkouts and remove only verified obsolete task-owned branches, worktrees and scratch output under repository cleanup rules. During read-only work, report relevant pre-existing checkout state without changing it. Preserve user-owned, dirty, active, or unintegrated work.
 

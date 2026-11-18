@@ -59,6 +59,7 @@
       },
       "skills": [
         "claude-runner",
+        "clean-copy",
         "cross-agent-review",
         "deep-research",
         "dyslexia-friendly-formatter",
@@ -135,6 +136,7 @@
         ]
       },
       "skills": [
+        "clean-copy",
         "cross-agent-review",
         "dyslexia-friendly-formatter",
         "execute-campaign-work-item",
@@ -164,6 +166,7 @@
       },
       "skills": [
         "claude-runner",
+        "clean-copy",
         "cross-agent-review",
         "dyslexia-friendly-formatter",
         "execute-campaign-work-item",

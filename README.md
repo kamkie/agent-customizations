@@ -13,6 +13,8 @@ targets.
   personal guidance composed into each target's installed instruction file.
 - `skills/claude-runner` — resume-safe wrapper for Claude Code CLI, shared by
   Codex and GitHub Copilot.
+- `skills/clean-copy` — remove redundant interface copy while preserving
+  information users need to act, shared by Codex, Claude Code, and GitHub Copilot.
 - `skills/cross-agent-review` — opposite-engine adversarial review with triage,
   credited fix commits, and bounded rounds, shared by Codex, Claude Code, and
   GitHub Copilot.

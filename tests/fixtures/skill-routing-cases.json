@@ -26,6 +26,33 @@
       "prompt": "Run `claude -p` against this repository with a prompt asking it to explain the caching layer, and give me its answer."
     },
     {
+      "id": "copy-form-hints",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Review the labels and help text on our billing form. Flag any helper text the controls already make clear, and suggest what to remove or shorten. Leave the files alone."
+    },
+    {
+      "id": "copy-confirmation-writing",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Write the confirmation dialog for revoking an API key. Requests using the key will immediately fail. The dialog is already part of the flow."
+    },
+    {
+      "id": "copy-empty-state",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Trim the empty state on the invoices screen. It has a No invoices yet heading, a paragraph that says There are currently no invoices, and a Create invoice button."
+    },
+    {
       "id": "cross-review-attack-commit",
       "targets": [
         "codex",
@@ -391,6 +418,15 @@
       ],
       "instructionSet": "skill-catalog",
       "prompt": "Change the primary button color to our brand blue."
+    },
+    {
+      "id": "none-proofread-paragraph",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Proofread the second paragraph of this release announcement for grammar and typos. Preserve its wording wherever possible."
     },
     {
       "id": "none-source-review",

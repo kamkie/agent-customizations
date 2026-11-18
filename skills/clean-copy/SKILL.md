@@ -1,0 +1,39 @@
+---
+name: clean-copy
+description: Write, review, or trim interface copy such as labels, hints, empty states, error text, toasts, and confirmations. Remove text the screen already makes clear and preserve information users need to act. Skip general prose proofreading, visual styling, and decisions about what a feature should do.
+---
+
+# Clean interface copy
+
+Use the visible screen and its relevant states to decide whether each string
+earns its place. Read it beside the control, value, or action it describes. If
+the surrounding context is missing, state the assumption behind a proposed cut.
+
+## Decide what to keep
+
+1. Identify what the user needs to understand, decide, or do at that moment.
+   For new copy, start with that information. For existing copy, flag text
+   that answers an unprompted concern or repeats a nearby label, value, or
+   action. A heading called “Profile photo” can carry the meaning of a caption
+   that says “This is your profile photo.”
+2. Check whether the text is compensating for an old bug or a design decision.
+   For example, a success toast that adds “You do not need to refresh” can
+   introduce doubt when the updated value is already visible. If a limitation
+   still applies, explain its effect in the state where it matters.
+3. Preserve information that changes a decision or lets someone act. Keep
+   action and accessible names, units or input formats, eligibility and
+   compatibility limits, consequences of irreversible actions, and status or
+   recovery instructions users cannot infer. An empty state should explain
+   what is missing and identify the next available action when there is one.
+   Keep applicable legal, safety, and accessibility disclosures.
+4. Cut the redundant clause and keep the useful part. When the whole hint is
+   redundant and an edit is authorized, remove the hint prop or element and
+   any description reference that would point to it. Preserve control behavior
+   and meaningful feedback.
+
+## Deliver the result
+
+For a review, give the location (file and line when available), current text,
+proposed replacement or removal, and a brief reason. Leave copy that passes
+alone. For new copy, give the proposed text in its UI context. For authorized
+edits, check the affected state and any label or description relationship.

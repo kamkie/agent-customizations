@@ -10,6 +10,15 @@
     "claude-runner-print-mode": {
       "skill": "claude-runner"
     },
+    "copy-form-hints": {
+      "skill": "clean-copy"
+    },
+    "copy-confirmation-writing": {
+      "skill": "clean-copy"
+    },
+    "copy-empty-state": {
+      "skill": "clean-copy"
+    },
     "cross-review-attack-commit": {
       "skill": "cross-agent-review"
     },
@@ -134,6 +143,9 @@
       "skill": "none"
     },
     "none-visual-styling": {
+      "skill": "none"
+    },
+    "none-proofread-paragraph": {
       "skill": "none"
     },
     "none-source-review": {

@@ -130,17 +130,8 @@ function Test-InstructionActionResult {
     param([Parameter(Mandatory)]$Actual, [Parameter(Mandatory)]$Expected)
     $errors = [Collections.Generic.List[string]]::new()
     if (-not $Actual.finished) { $errors.Add('Action limit reached without finishing.') }
-    $closing = '(?s)(?:^|\r?\n\r?\n)\*\*Done:\*\* [^\r\n]+\r?\n\*\*Not done:\*\* [^\r\n]+\r?\n\*\*Next:\*\* ([^\r\n]+)\s*$'
-    # A discussion turn or one-fact answer may omit the block. An empty reply is not an
-    # omission, and neither is a closing label that leads a line or is marked up inline:
-    # markup becomes one marker, then only non-letters may separate label and colon.
-    $marker = [string][char]1
-    $colons = ':' + [char]0xFF1A
-    $marked = [string]$Actual.finalMessage -replace '<[^>\r\n]*>|[*_`~]+', $marker
-    $closingOmitted = (Get-ActionProperty $Expected 'closingOptional') -and
-        -not [string]::IsNullOrWhiteSpace($Actual.finalMessage) -and
-        $marked -notmatch ('(?im)(?:^[^a-z\r\n]*|' + $marker + ')(?:Done|Not done|Next)[^a-z\r\n]*[' + $colons + ']')
-    if ($Actual.finalMessage -notmatch $closing -and -not $closingOmitted) { $errors.Add('Final response lacks the required three-line closing block.') }
+    $closing = '(?:^|\r?\n)\*\*Done:\*\* [^\r\n]+\r?\n\*\*Not done:\*\* [^\r\n]+\r?\n\*\*Next:\*\* ([^\r\n]+)\s*$'
+    if ($Actual.finalMessage -notmatch $closing) { $errors.Add('Final response lacks the required three-line closing block.') }
     if (Get-ActionProperty $Expected 'unchanged') {
         foreach ($name in $Actual.initial.Keys) {
             if ($Actual.initial[$name] -cne $Actual.files[$name]) { $errors.Add("Unexpected edit: $name") }
@@ -161,10 +152,12 @@ function Test-InstructionActionResult {
             if ($entry.role -eq 'assistant') {
                 $request = $entry.content | ConvertFrom-Json
                 if ($request.tool -eq 'finish') {
-                    if ($request.message -notmatch $closing) {
+                    $firstFooter = [regex]::Match($request.message, $closing, 'IgnoreCase')
+                    if (-not $firstFooter.Success) {
                         $errors.Add('First-phase response lacks the required three-line closing block.')
                     }
-                    if ((Get-ActionProperty $Expected 'firstPhaseRequiresProse') -and $request.message -notmatch '(?s)^.+\r?\n\r?\n\*\*Done:\*\*') {
+                    if ($firstFooter.Success -and (Get-ActionProperty $Expected 'firstPhaseRequiresProse') -and
+                        [string]::IsNullOrWhiteSpace($request.message.Substring(0, $firstFooter.Index))) {
                         $errors.Add('First-phase response lacks an answer before the closing block.')
                     }
                     $firstPhaseMessageContains = Get-ActionProperty $Expected 'firstPhaseMessageContains'

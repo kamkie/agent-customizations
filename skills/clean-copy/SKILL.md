@@ -1,6 +1,6 @@
 ---
 name: clean-copy
-description: Write, review, or trim interface copy such as labels, hints, empty states, error text, toasts, and confirmations. Remove text the screen already makes clear and preserve information users need to act. Skip general prose proofreading, visual styling, and decisions about what a feature should do.
+description: Write, review, or trim copy for defined interface behavior, including labels, hints, empty states, error text, toasts, and confirmations. Remove text the screen already makes clear and preserve information users need to act. Skip general prose proofreading, visual styling, whole-flow UX reviews, and decisions about what the interface should do.
 ---
 
 # Clean interface copy

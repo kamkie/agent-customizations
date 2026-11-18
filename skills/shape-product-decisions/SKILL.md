@@ -1,6 +1,6 @@
 ---
 name: shape-product-decisions
-description: Shape ambiguous product, UI/UX, or AI-feature requests into an evidence-labeled recommendation and concrete behavior before implementation. Use when deciding whether or what to build, simplifying a flow, choosing AI versus a simpler mechanism, defining user-facing states and copy, or preparing a product handoff. Do not use for standalone research or evidence synthesis, implementation whose behavior is already decided, visual styling alone, code review, browser QA, or open-ended brainstorming without a product decision.
+description: Shape ambiguous product, UI/UX, or AI-feature requests into an evidence-labeled recommendation and concrete behavior before implementation. Use when deciding whether or what to build, simplifying a flow, choosing AI versus a simpler mechanism, defining states and copy as part of a product decision, or preparing a product handoff. Do not use for standalone research, evidence synthesis, or copy work, implementation whose behavior is already decided, visual styling alone, code review, browser QA, or open-ended brainstorming without a product decision.
 ---
 
 # Shape Product Decisions

@@ -39,7 +39,7 @@ The reviewer vote is advisory. Record an absent vote and explain a decision that
 
 ## Account for later commits
 
-A successful reviewer run covers only its recorded range and head. For each later range, record the next independent review, a behavior-neutral disposition, or a round-limit disposition, each disposition with the inspected diff, rationale, and relevant validation result. A disposition is not an independent review of that range. Outside a round limit, unknown effects or meaningful risk still block completion. The repository owns final Ready, blocking-review, owner-approval, and merge gates.
+A successful reviewer run covers only its recorded range and head. For each later range, record the next independent review, a behavior-neutral disposition, or a round-limit disposition for a validated repair, each disposition with the inspected diff, rationale, and relevant validation result. A disposition is not an independent review of that range. A material change that is not a repair keeps its review requirement and blocks completion while it is unmet. Outside a round limit, unknown effects or meaningful risk still block completion. The repository owns final Ready, blocking-review, owner-approval, and merge gates.
 
 ## Report contract
 

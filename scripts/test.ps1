@@ -49,6 +49,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\claude\managed-jobs\tests\ClaudeManagedJobHooks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Claude managed-job hook lifecycle test failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\codex\git-closeout\tests\GitCloseout.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Git closeout hook tests failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\shared\closing-phrase\tests\ClosingPhrase.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Closing-phrase Stop hook test failed.' }
 
@@ -180,6 +182,14 @@ try {
         if (-not $codexHooks.hooks.PSObject.Properties[$event]) {
             throw "Codex hook installation did not register $event."
         }
+    }
+    $closeoutPrompt = @($codexHooks.hooks.UserPromptSubmit | ForEach-Object { $_.hooks } |
+        Where-Object { $_.command -match 'ManagedHookId "git-closeout-prompt"' })
+    $closeoutStop = @($codexHooks.hooks.Stop | ForEach-Object { $_.hooks } |
+        Where-Object { $_.command -match 'ManagedHookId "git-closeout-stop"' })
+    if ($closeoutPrompt.Count -ne 1 -or $closeoutStop.Count -ne 1 -or
+        -not (Test-Path -LiteralPath (Join-Path $codexSandbox 'hooks/git-closeout/GitCloseout.Hook.ps1') -PathType Leaf)) {
+        throw 'Codex hook installation did not register both Git closeout events and install their script.'
     }
     $codexSessionStart = $codexHooks.hooks.SessionStart[0]
     if ([string]$codexSessionStart.matcher -ne '^(startup|resume)$' -or

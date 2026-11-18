@@ -29,7 +29,9 @@ the surrounding context is missing, state the assumption behind a proposed cut.
 4. Cut the redundant clause and keep the useful part. When the whole hint is
    redundant and an edit is authorized, remove the hint prop or element and
    any description reference that would point to it. Preserve control behavior
-   and meaningful feedback.
+   and meaningful feedback. For localized text, check for remaining uses
+   before removing translation keys. Update affected tests to cover the
+   intended copy and behavior.
 
 ## Deliver the result
 

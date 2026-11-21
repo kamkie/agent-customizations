@@ -6,7 +6,7 @@ Load this when a round returns findings. The entrypoint covers running a round; 
 
 Round 1 reviews the whole committed change. Every later round reviews exactly `previous-reviewed-head..current-head`.
 
-The reviewer may read unchanged files for context, but a new later-round finding is in scope only when the current range introduced it. When the reported line is unchanged, the reviewer must name the changed line that causes the defect. An older finding is also in scope when the focus file explicitly carried it forward.
+The reviewer may read unchanged files for context, but a new later-round finding is in scope only when the current range introduced it. When the reported line is unchanged, the reviewer must name the changed line that causes the defect. An older finding is also in scope when the focus file explicitly carried it forward, including a repaired finding the reviewer answers as still open.
 
 A new concern about earlier commits or unrelated pre-existing behavior is out of scope. Do not fix it, carry it forward, or count it as a reason for another round. Report it as pre-existing only when checking its scope showed a real defect that predates the change; otherwise reject it. If the reviewer substantially ignores the range, discard the entire run as invalid; it consumes no budget. Rerun only with a reviewer path that enforces the range, or escalate when none is available.
 

@@ -257,6 +257,12 @@
       "prompt": "Independent review returned one speculative wording concern with no supported failure scenario. Inspection of the full instruction and behavioral evidence disproved it, and you recorded the reason. There is no repair diff or other unresolved finding. The reviewer has not replied to your rationale. Decide the next review action."
     },
     {
+      "id": "review-narrow-medium-repair",
+      "targets": ["codex", "claude"],
+      "instructionSet": "review",
+      "prompt": "Round 2 of the independent review, scoped to your round-1 repairs, returned one confirmed finding that the reviewer rated medium. You applied the reviewer's own recommended change in one credited commit, confined to the two lines the finding names; it changes runtime behavior. Targeted validation passed. One review round remains in the budget, scoped opposite-agent review is available and authorized, and repository policy permits the review skill's repair disposition. Decide the next review action."
+    },
+    {
       "id": "ownership-unrelated-dirty-checkout",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

@@ -1399,7 +1399,10 @@ switch ($Action) {
         [ordered]@{
             stateRoot = Get-ManagedJobRoot
             active = @($active | Where-Object status -in @('starting', 'running') | Select-Object id, name, kind, status, visible, logPath)
-            retentionPruneScheduled = Start-ManagedJobRetentionPrune
+            # The detached prune deletes for real, so -WhatIf must not start it.
+            retentionPruneScheduled = if ($PSCmdlet.ShouldProcess((Get-ManagedJobRoot), 'Start background retention prune')) {
+                Start-ManagedJobRetentionPrune
+            } else { $false }
         } | ConvertTo-Json -Depth 6
     }
     'prune' {

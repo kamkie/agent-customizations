@@ -930,6 +930,10 @@ exit 5
     New-RetentionFixture -Id $recentId -FinishedAtUtc ([datetime]::UtcNow.AddDays(-1).ToString('o')) `
         -WrittenAtUtc ([datetime]::UtcNow.AddDays(-1))
     New-RetentionFixture -Id $rewrittenId -FinishedAtUtc '2000-01-01T00:00:02Z' -WrittenAtUtc ([datetime]::UtcNow)
+    $previewStart = (& $controller session-start -StateRoot $retentionRoot -WhatIf | Out-String) | ConvertFrom-Json
+    Assert-True ($previewStart.retentionPruneScheduled -eq $false -and -not (Test-Path -LiteralPath $retentionLog) -and
+        (Test-Path -LiteralPath (Join-Path $retentionRoot "jobs\$expiredId.json"))) `
+        'A -WhatIf session start should neither schedule a prune nor claim the retention stamp.'
     $retentionStart = (& $controller session-start -StateRoot $retentionRoot | Out-String) | ConvertFrom-Json
     Assert-True ($retentionStart.retentionPruneScheduled -eq $true) 'The first session start should schedule a retention prune.'
     $retentionResult = Wait-RetentionPrune

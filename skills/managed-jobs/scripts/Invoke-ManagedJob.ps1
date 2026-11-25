@@ -217,12 +217,14 @@ function Invoke-ManagedJobReconciliation {
         $null = $referencedIds.Add([IO.Path]::GetFileNameWithoutExtension($file))
     }
     foreach ($referencedId in $referencedIds) {
-        # A reference is written after its record, so a missing record is left
-        # alone rather than guessed at.
+        # Only a terminal record's references are released here; active ones
+        # were reconciled above. A reference is written after its record, so a
+        # missing record is left alone rather than guessed at.
         try {
             $path = Get-ManagedJobFile -Id $referencedId
             if (Test-Path -LiteralPath $path -PathType Leaf) {
-                $null = Update-ReconciledJob -Job (Read-ManagedJob -Path $path)
+                $job = Read-ManagedJob -Path $path
+                if ($job.status -notin @('starting', 'running')) { $null = Update-ReconciledJob -Job $job }
             }
         } catch {}
     }

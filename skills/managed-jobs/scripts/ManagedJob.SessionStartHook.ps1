@@ -13,7 +13,7 @@ try {
     }
 
     $controller = Join-Path $PSScriptRoot 'Invoke-ManagedJob.ps1'
-    $null = & $controller reconcile
+    $null = & $controller session-start
     exit 0
 } catch {
     $message = $_.Exception.GetBaseException().Message

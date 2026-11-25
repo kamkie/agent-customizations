@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory)]
-    [ValidateSet('start', 'list', 'status', 'wait', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'prune')]
+    [ValidateSet('start', 'list', 'status', 'wait', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'session-start', 'prune')]
     [string]$Action,
 
     [string]$Id,
@@ -85,8 +85,13 @@ $claudeHome = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($(
 $isClaudeInstallation = $managedJobHome.Equals($claudeHome, [StringComparison]::OrdinalIgnoreCase)
 
 function Get-AllManagedJobs {
+    # -WrittenBeforeUtc skips, without opening them, records last written at
+    # or after the cutoff. A record's finish time never exceeds its last write,
+    # so every record written before the cutoff is still read and checked.
+    param([Nullable[datetime]]$WrittenBeforeUtc)
     $jobsDirectory = Join-Path (Get-ManagedJobRoot) 'jobs'
     foreach ($file in Get-ChildItem -LiteralPath $jobsDirectory -Filter '*.json' -File -ErrorAction SilentlyContinue) {
+        if ($null -ne $WrittenBeforeUtc -and $file.LastWriteTimeUtc -ge $WrittenBeforeUtc) { continue }
         try { Read-ManagedJob -Path $file.FullName } catch {
             [pscustomobject]@{ id = $file.BaseName; status = 'invalid'; error = $_.Exception.Message; recordPath = $file.FullName }
         }
@@ -195,6 +200,87 @@ function Get-ReconciledActiveManagedJobs {
     # Reads only records that may be active; terminal history stays unopened.
     param([switch]$UpdateCache)
     Get-ManagedJobActiveRecords -UpdateCache:$UpdateCache | ForEach-Object { Update-ReconciledJob -Job $_ }
+}
+
+function Invoke-ManagedJobReconciliation {
+    # Global reconciliation without walking terminal history: active records
+    # come from the terminal-record cache, and stale control files and owner
+    # references are found from their own small directories. Both touch only
+    # what `start` and `prune` already change without the maintenance lock.
+    $active = @(Get-ReconciledActiveManagedJobs -UpdateCache)
+    $root = Get-ManagedJobRoot
+    $referencedIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($file in [IO.Directory]::EnumerateFiles((Join-Path $root 'control'), '*.json')) {
+        $null = $referencedIds.Add([IO.Path]::GetFileNameWithoutExtension($file))
+    }
+    foreach ($file in [IO.Directory]::EnumerateFiles((Join-Path $root 'owners'), '*.ref', [IO.SearchOption]::AllDirectories)) {
+        $null = $referencedIds.Add([IO.Path]::GetFileNameWithoutExtension($file))
+    }
+    foreach ($referencedId in $referencedIds) {
+        # Only a terminal record's references are released here; active ones
+        # were reconciled above. A reference is written after its record, so a
+        # missing record is left alone rather than guessed at.
+        try {
+            $path = Get-ManagedJobFile -Id $referencedId
+            if (Test-Path -LiteralPath $path -PathType Leaf) {
+                $job = Read-ManagedJob -Path $path
+                if ($job.status -notin @('starting', 'running')) { $null = Update-ReconciledJob -Job $job }
+            }
+        } catch {}
+    }
+    return $active
+}
+
+$script:ManagedJobRetentionDays = 14
+$script:ManagedJobRetentionInterval = [timespan]::FromHours(24)
+
+function Start-ManagedJobRetentionPrune {
+    # Schedules at most one retention prune per interval in a hidden, detached
+    # process so the session hook returns at once. The log doubles as the
+    # throttle stamp; it keeps the last run's output.
+    $root = Get-ManagedJobRoot
+    $logPath = Join-Path $root '.retention-prune.log'
+    # Concurrent session starts check and claim the stamp one at a time, so
+    # only the first one in an interval launches a prune. A lock file in the
+    # root itself serializes every spelling of the same directory.
+    $lockPath = Join-Path $root '.retention-schedule.lock'
+    $lock = $null
+    $deadline = [datetime]::UtcNow.AddSeconds(5)
+    while (-not $lock) {
+        try { $lock = [IO.File]::Open($lockPath, 'OpenOrCreate', 'ReadWrite', 'None') } catch [IO.IOException] {
+            if ([datetime]::UtcNow -ge $deadline) { return $false }
+            Start-Sleep -Milliseconds 50
+        }
+    }
+    try {
+        $log = [IO.FileInfo]::new($logPath)
+        if ($log.Exists -and ([datetime]::UtcNow - $log.LastWriteTimeUtc) -lt $script:ManagedJobRetentionInterval) {
+            return $false
+        }
+        [IO.File]::WriteAllText($logPath, "Retention prune scheduled at $([datetime]::UtcNow.ToString('o')).`n")
+        $quote = { param([string]$Text) "'" + $Text.Replace("'", "''") + "'" }
+        $command = '& {0} prune -OlderThanDays {1} -StateRoot {2} *> {3}' -f (& $quote $PSCommandPath),
+            $script:ManagedJobRetentionDays, (& $quote $root), (& $quote $logPath)
+        $startInfo = [Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'pwsh.exe'))
+        # Shell execution inherits no handles, so the hook's output pipes close
+        # when the hook exits instead of when the prune finishes.
+        $startInfo.UseShellExecute = $true
+        $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+        $startInfo.WorkingDirectory = $root
+        $startInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' +
+            [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
+        try {
+            $process = [Diagnostics.Process]::Start($startInfo)
+        } catch {
+            # A prune that never started must not hold the stamp for a day.
+            Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+            throw
+        }
+        if ($process) { $process.Dispose() }
+        return $true
+    } finally {
+        $lock.Dispose()
+    }
 }
 
 function Get-ManagedJobCollection {
@@ -1286,7 +1372,10 @@ switch ($Action) {
     'reconcile' {
         $maintenanceLock = Enter-ManagedJobMaintenanceLock
         try {
-            $jobs = @(Get-AllManagedJobs | ForEach-Object { Update-ReconciledJob -Job $_ })
+            $null = Invoke-ManagedJobReconciliation
+            # Read once more for the summary; reconciliation changed only
+            # formerly active records and references.
+            $jobs = @(Get-AllManagedJobs)
             $selected = Select-ManagedJobs -Jobs $jobs
             $summary = [ordered]@{
                 stateRoot = Get-ManagedJobRoot
@@ -1306,12 +1395,25 @@ switch ($Action) {
             $maintenanceLock.Dispose()
         }
     }
+    'session-start' {
+        # Owned by the installed SessionStart hook. It takes no maintenance
+        # lock, so a running retention prune never fails a session start.
+        $active = @(Invoke-ManagedJobReconciliation)
+        [ordered]@{
+            stateRoot = Get-ManagedJobRoot
+            active = @($active | Where-Object status -in @('starting', 'running') | Select-Object id, name, kind, status, visible, logPath)
+            # The detached prune deletes for real, so -WhatIf must not start it.
+            retentionPruneScheduled = if ($PSCmdlet.ShouldProcess((Get-ManagedJobRoot), 'Start background retention prune')) {
+                Start-ManagedJobRetentionPrune
+            } else { $false }
+        } | ConvertTo-Json -Depth 6
+    }
     'prune' {
         $maintenanceLock = Enter-ManagedJobMaintenanceLock
         try {
             $cutoff = [datetime]::UtcNow.AddDays(-[math]::Abs($OlderThanDays))
             $statusFilter = @($Status)
-            $candidates = @(Get-PruneCandidates -Jobs @(Get-AllManagedJobs) -Cutoff $cutoff -StatusFilter $statusFilter)
+            $candidates = @(Get-PruneCandidates -Jobs @(Get-AllManagedJobs -WrittenBeforeUtc $cutoff) -Cutoff $cutoff -StatusFilter $statusFilter)
 
             $candidateIds = @($candidates | ForEach-Object { $_.id })
             $removed = @()

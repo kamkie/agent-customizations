@@ -240,25 +240,44 @@ function Start-ManagedJobRetentionPrune {
     # throttle stamp; it keeps the last run's output.
     $root = Get-ManagedJobRoot
     $logPath = Join-Path $root '.retention-prune.log'
-    $log = [IO.FileInfo]::new($logPath)
-    if ($log.Exists -and ([datetime]::UtcNow - $log.LastWriteTimeUtc) -lt $script:ManagedJobRetentionInterval) {
-        return $false
+    # Concurrent session starts check and claim the stamp one at a time, so
+    # only the first one in an interval launches a prune.
+    $mutexName = 'Local\managed-jobs-retention-' + [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($root.ToLowerInvariant()))).Substring(0, 32)
+    $mutex = [Threading.Mutex]::new($false, $mutexName)
+    $locked = $false
+    try {
+        try { $locked = $mutex.WaitOne(5000) } catch [Threading.AbandonedMutexException] { $locked = $true }
+        if (-not $locked) { return $false }
+        $log = [IO.FileInfo]::new($logPath)
+        if ($log.Exists -and ([datetime]::UtcNow - $log.LastWriteTimeUtc) -lt $script:ManagedJobRetentionInterval) {
+            return $false
+        }
+        [IO.File]::WriteAllText($logPath, "Retention prune scheduled at $([datetime]::UtcNow.ToString('o')).`n")
+        $quote = { param([string]$Text) "'" + $Text.Replace("'", "''") + "'" }
+        $command = '& {0} prune -OlderThanDays {1} -StateRoot {2} *> {3}' -f (& $quote $PSCommandPath),
+            $script:ManagedJobRetentionDays, (& $quote $root), (& $quote $logPath)
+        $startInfo = [Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'pwsh.exe'))
+        # Shell execution inherits no handles, so the hook's output pipes close
+        # when the hook exits instead of when the prune finishes.
+        $startInfo.UseShellExecute = $true
+        $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+        $startInfo.WorkingDirectory = $root
+        $startInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' +
+            [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
+        try {
+            $process = [Diagnostics.Process]::Start($startInfo)
+        } catch {
+            # A prune that never started must not hold the stamp for a day.
+            Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+            throw
+        }
+        if ($process) { $process.Dispose() }
+        return $true
+    } finally {
+        if ($locked) { $mutex.ReleaseMutex() }
+        $mutex.Dispose()
     }
-    [IO.File]::WriteAllText($logPath, "Retention prune scheduled at $([datetime]::UtcNow.ToString('o')).`n")
-    $quote = { param([string]$Text) "'" + $Text.Replace("'", "''") + "'" }
-    $command = '& {0} prune -OlderThanDays {1} -StateRoot {2} *> {3}' -f (& $quote $PSCommandPath),
-        $script:ManagedJobRetentionDays, (& $quote $root), (& $quote $logPath)
-    $startInfo = [Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'pwsh.exe'))
-    # Shell execution inherits no handles, so the hook's output pipes close
-    # when the hook exits instead of when the prune finishes.
-    $startInfo.UseShellExecute = $true
-    $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
-    $startInfo.WorkingDirectory = $root
-    $startInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' +
-        [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
-    $process = [Diagnostics.Process]::Start($startInfo)
-    if ($process) { $process.Dispose() }
-    return $true
 }
 
 function Get-ManagedJobCollection {

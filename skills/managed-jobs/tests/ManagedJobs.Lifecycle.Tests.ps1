@@ -945,8 +945,25 @@ exit 5
     Assert-True ($throttledStart.retentionPruneScheduled -eq $false) `
         'A session start inside the retention interval should not schedule another prune.'
     (Get-Item -LiteralPath $retentionLog).LastWriteTimeUtc = [datetime]::UtcNow.AddDays(-2)
-    $dueStart = (& $controller session-start -StateRoot $retentionRoot | Out-String) | ConvertFrom-Json
-    Assert-True ($dueStart.retentionPruneScheduled -eq $true) 'A session start after the interval should schedule a prune again.'
+    $concurrentStarts = @(1..4 | ForEach-Object {
+        $startInfo = [Diagnostics.ProcessStartInfo]::new($pwsh)
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $true
+        foreach ($argument in @('-NoProfile', '-File', $controller, 'session-start', '-StateRoot', $retentionRoot)) {
+            $startInfo.ArgumentList.Add($argument)
+        }
+        $process = [Diagnostics.Process]::Start($startInfo)
+        [pscustomobject]@{ process = $process; output = $process.StandardOutput.ReadToEndAsync() }
+    })
+    $scheduledCount = 0
+    foreach ($concurrentStart in $concurrentStarts) {
+        $concurrentStart.process.WaitForExit()
+        $concurrentResult = $concurrentStart.output.GetAwaiter().GetResult() | ConvertFrom-Json
+        if ($concurrentResult.retentionPruneScheduled) { $scheduledCount++ }
+        $concurrentStart.process.Dispose()
+    }
+    Assert-True ($scheduledCount -eq 1) `
+        "Exactly one of several concurrent session starts after the interval should schedule a prune; $scheduledCount did."
     $dueResult = Wait-RetentionPrune
     Assert-True ($dueResult.removedCount -eq 0) 'A repeated retention prune should keep records inside the window.'
 

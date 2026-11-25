@@ -949,11 +949,13 @@ exit 5
     Assert-True ($throttledStart.retentionPruneScheduled -eq $false) `
         'A session start inside the retention interval should not schedule another prune.'
     (Get-Item -LiteralPath $retentionLog).LastWriteTimeUtc = [datetime]::UtcNow.AddDays(-2)
+    # Alternate spellings of the same root must still share one claim.
     $concurrentStarts = @(1..4 | ForEach-Object {
+        $rootSpelling = if ($_ % 2) { $retentionRoot } else { $retentionRoot + '\' }
         $startInfo = [Diagnostics.ProcessStartInfo]::new($pwsh)
         $startInfo.UseShellExecute = $false
         $startInfo.RedirectStandardOutput = $true
-        foreach ($argument in @('-NoProfile', '-File', $controller, 'session-start', '-StateRoot', $retentionRoot)) {
+        foreach ($argument in @('-NoProfile', '-File', $controller, 'session-start', '-StateRoot', $rootSpelling)) {
             $startInfo.ArgumentList.Add($argument)
         }
         $process = [Diagnostics.Process]::Start($startInfo)

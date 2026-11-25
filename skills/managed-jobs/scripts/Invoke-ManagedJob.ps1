@@ -241,14 +241,18 @@ function Start-ManagedJobRetentionPrune {
     $root = Get-ManagedJobRoot
     $logPath = Join-Path $root '.retention-prune.log'
     # Concurrent session starts check and claim the stamp one at a time, so
-    # only the first one in an interval launches a prune.
-    $mutexName = 'Local\managed-jobs-retention-' + [Convert]::ToHexString(
-        [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($root.ToLowerInvariant()))).Substring(0, 32)
-    $mutex = [Threading.Mutex]::new($false, $mutexName)
-    $locked = $false
+    # only the first one in an interval launches a prune. A lock file in the
+    # root itself serializes every spelling of the same directory.
+    $lockPath = Join-Path $root '.retention-schedule.lock'
+    $lock = $null
+    $deadline = [datetime]::UtcNow.AddSeconds(5)
+    while (-not $lock) {
+        try { $lock = [IO.File]::Open($lockPath, 'OpenOrCreate', 'ReadWrite', 'None') } catch [IO.IOException] {
+            if ([datetime]::UtcNow -ge $deadline) { return $false }
+            Start-Sleep -Milliseconds 50
+        }
+    }
     try {
-        try { $locked = $mutex.WaitOne(5000) } catch [Threading.AbandonedMutexException] { $locked = $true }
-        if (-not $locked) { return $false }
         $log = [IO.FileInfo]::new($logPath)
         if ($log.Exists -and ([datetime]::UtcNow - $log.LastWriteTimeUtc) -lt $script:ManagedJobRetentionInterval) {
             return $false
@@ -275,8 +279,7 @@ function Start-ManagedJobRetentionPrune {
         if ($process) { $process.Dispose() }
         return $true
     } finally {
-        if ($locked) { $mutex.ReleaseMutex() }
-        $mutex.Dispose()
+        $lock.Dispose()
     }
 }
 

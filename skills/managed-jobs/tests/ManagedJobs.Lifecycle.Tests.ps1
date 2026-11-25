@@ -892,6 +892,64 @@ exit 5
         'Prune should remove an eligible orphaned record.'
     Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $stateRoot 'jobs') -File).Count -eq 0) 'All isolated terminal fixtures should be pruned.'
 
+    # The session-start hook path starts at most one detached retention prune
+    # per interval, which removes only records that finished and were last
+    # written outside the retention window.
+    $retentionRoot = Join-Path $testRoot 'retention-state'
+    $retentionLog = Join-Path $retentionRoot '.retention-prune.log'
+    $null = New-Item -ItemType Directory -Path (Join-Path $retentionRoot 'jobs'), (Join-Path $retentionRoot 'logs') -Force
+    function New-RetentionFixture {
+        param([string]$Id, [string]$FinishedAtUtc, [datetime]$WrittenAtUtc)
+        $path = Join-Path $retentionRoot "jobs\$Id.json"
+        [ordered]@{
+            schemaVersion = 4; id = $Id; name = $Id; kind = 'test'; status = 'completed'; lifetime = 'persistent'
+            visible = $false; createdAtUtc = $FinishedAtUtc; startedAtUtc = $FinishedAtUtc; finishedAtUtc = $FinishedAtUtc
+            hostPid = 2147483647; hostStartedAtUtc = $FinishedAtUtc; executable = 'fixture'; argumentCount = 0
+            environmentNames = @(); invocationFingerprint = ('7' * 64); workingDirectory = $testRoot
+            logPath = (Join-Path $retentionRoot "logs\$Id.log"); exitCode = 0; error = $null
+        } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $path -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $retentionRoot "logs\$Id.log") -Value 'fixture log' -Encoding utf8
+        (Get-Item -LiteralPath $path).LastWriteTimeUtc = $WrittenAtUtc
+    }
+    function Wait-RetentionPrune {
+        $deadline = [datetime]::UtcNow.AddSeconds(60)
+        $text = ''
+        do {
+            try { $text = [IO.File]::ReadAllText($retentionLog) } catch {}
+            if ($text -match '"removedCount"') {
+                try { return ($text | ConvertFrom-Json) } catch {}
+            }
+            Start-Sleep -Milliseconds 200
+        } while ([datetime]::UtcNow -lt $deadline)
+        throw "The background retention prune did not finish. Log: $text"
+    }
+    $expiredId = '20000101-000000-retention-expired-000001'
+    $recentId = '20000101-000000-retention-recent-000001'
+    $rewrittenId = '20000101-000000-retention-rewritten-000001'
+    New-RetentionFixture -Id $expiredId -FinishedAtUtc '2000-01-01T00:00:02Z' -WrittenAtUtc ([datetime]::UtcNow.AddDays(-30))
+    New-RetentionFixture -Id $recentId -FinishedAtUtc ([datetime]::UtcNow.AddDays(-1).ToString('o')) `
+        -WrittenAtUtc ([datetime]::UtcNow.AddDays(-1))
+    New-RetentionFixture -Id $rewrittenId -FinishedAtUtc '2000-01-01T00:00:02Z' -WrittenAtUtc ([datetime]::UtcNow)
+    $retentionStart = (& $controller session-start -StateRoot $retentionRoot | Out-String) | ConvertFrom-Json
+    Assert-True ($retentionStart.retentionPruneScheduled -eq $true) 'The first session start should schedule a retention prune.'
+    $retentionResult = Wait-RetentionPrune
+    Assert-True ($retentionResult.removedCount -eq 1 -and @($retentionResult.removed) -contains $expiredId) `
+        'Retention should prune only the record that finished and was last written outside its window.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $retentionRoot "jobs\$expiredId.json")) -and
+        -not (Test-Path -LiteralPath (Join-Path $retentionRoot "logs\$expiredId.log"))) `
+        'Retention should remove the expired record and its managed log.'
+    Assert-True ((Test-Path -LiteralPath (Join-Path $retentionRoot "jobs\$recentId.json")) -and
+        (Test-Path -LiteralPath (Join-Path $retentionRoot "jobs\$rewrittenId.json"))) `
+        'Retention should keep records that finished or were written inside its window.'
+    $throttledStart = (& $controller session-start -StateRoot $retentionRoot | Out-String) | ConvertFrom-Json
+    Assert-True ($throttledStart.retentionPruneScheduled -eq $false) `
+        'A session start inside the retention interval should not schedule another prune.'
+    (Get-Item -LiteralPath $retentionLog).LastWriteTimeUtc = [datetime]::UtcNow.AddDays(-2)
+    $dueStart = (& $controller session-start -StateRoot $retentionRoot | Out-String) | ConvertFrom-Json
+    Assert-True ($dueStart.retentionPruneScheduled -eq $true) 'A session start after the interval should schedule a prune again.'
+    $dueResult = Wait-RetentionPrune
+    Assert-True ($dueResult.removedCount -eq 0) 'A repeated retention prune should keep records inside the window.'
+
     [pscustomobject]@{ result = 'passed'; assertions = $assertionCount; isolatedStateRoot = $stateRoot } | ConvertTo-Json
 } finally {
     foreach ($id in @($activeIds)) {

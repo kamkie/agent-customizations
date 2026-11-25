@@ -23,8 +23,10 @@ function Get-ManagedJobRoot {
         $root = Get-ManagedJobAutomaticCleanupRoot
     }
 
+    # Called for every record path, so it uses the idempotent .NET call
+    # rather than five New-Item cmdlet invocations per lookup.
     foreach ($directory in @('jobs', 'logs', 'launch', 'owners', 'control')) {
-        $null = New-Item -ItemType Directory -Path (Join-Path $root $directory) -Force
+        $null = [IO.Directory]::CreateDirectory((Join-Path $root $directory))
     }
     return $root
 }

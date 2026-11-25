@@ -96,6 +96,9 @@ try {
     $startPayload = [ordered]@{
         hook_event_name = 'SessionStart'; session_id = $sessionId; cwd = $testRoot; source = 'startup'
     } | ConvertTo-Json -Compress
+    # A fresh retention stamp keeps hooks on this isolated root from starting a
+    # background prune; the lifecycle tests cover retention itself.
+    Set-Content -LiteralPath (Join-Path $stateRoot '.retention-prune.log') -Value 'test stamp' -Encoding utf8
     $startOutput = ($startPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $sessionStartHook -ManagedHookId managed-jobs-session-start 2>&1 | Out-String)
     Assert-True ([string]::IsNullOrWhiteSpace($startOutput)) 'SessionStart should silently reconcile in its background handler.'
     Assert-True (-not (Test-Path -LiteralPath (Get-ManagedJobControlFile -Id $staleId))) `
@@ -109,14 +112,14 @@ try {
         $contendedHook = Start-SessionStartHookProcess -Payload $startPayload
         if (-not $contendedHook.process.WaitForExit(10000)) {
             try { $contendedHook.process.Kill($true) } catch {}
-            throw 'Contended SessionStart reconciliation did not fail fast.'
+            throw 'SessionStart under a held maintenance lock did not finish promptly.'
         }
         $contendedOutput = $contendedHook.outputTask.GetAwaiter().GetResult()
         $contendedError = $contendedHook.errorTask.GetAwaiter().GetResult()
-        Assert-True ($contendedHook.process.ExitCode -eq 1 -and
+        Assert-True ($contendedHook.process.ExitCode -eq 0 -and
             [string]::IsNullOrWhiteSpace($contendedOutput) -and
-            $contendedError -match 'Another managed-jobs maintenance operation is already running') `
-            'SessionStart reconciliation should fail fast and report lock contention.'
+            [string]::IsNullOrWhiteSpace($contendedError)) `
+            'SessionStart should reconcile without the maintenance lock, so a running prune never fails it.'
     } finally {
         $heldMaintenanceLock.Dispose()
         if ($contendedHook) { $contendedHook.process.Dispose() }

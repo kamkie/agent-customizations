@@ -72,7 +72,7 @@ The gate returns after a 2xx/3xx response and stops only the newly created job o
 
 ## Advanced operations
 
-The installed session hook owns global reconciliation on Codex and Claude Code. Run synchronous `reconcile` only to retry a reported hook failure or after an interrupted session on a target without lifecycle hooks. Preview destructive cleanup with `prune -OlderThanDays 14 -WhatIf`, obtain explicit authorization for the reported scope, then run the same command without `-WhatIf`.
+The installed session hook owns global reconciliation and retention on Codex and Claude Code. It reconciles active records and stale references, then at most once a day starts a hidden background prune of terminal records, and their managed logs, that finished more than 14 days ago; `.retention-prune.log` in the state root holds the last run's result. Run synchronous `reconcile` only to retry a reported hook failure or after an interrupted session on a target without lifecycle hooks. For any other cleanup, preview it with `prune -OlderThanDays <days> -WhatIf`, obtain explicit authorization for the reported scope, then run the same command without `-WhatIf`.
 
 Set `MANAGED_JOBS_ROOT` before starting any agent when Codex, Claude Code, or GitHub Copilot must share a non-default registry. One-off `-StateRoot` overrides are only for persistent jobs; turn and session jobs must remain visible to their cleanup hooks.
 

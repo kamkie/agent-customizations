@@ -50,7 +50,7 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
   & $jobs wait -Id $build.id, $review.id -Summary -TimeoutSeconds 540
   ```
 
-  It returns one record or summary per job, in the order given, once the first of them has ended. A job that has not ended reads `status=running`; wait again on it.
+  It returns one record per job, in the order given, once the first of them has ended; with `-Summary`, every status line comes first and the log tails follow. A job that has not ended reads `status=running`; wait again on it.
 - Keep that tool call pending until it returns. If its transport yields a session ID, wait on that session and, where supported, combine transport waits inside one tool invocation so the model stays idle. Do not make repeated agent-side `status` calls. A background job does not wake an idle agent by itself.
 - `-TimeoutSeconds` bounds a wait. When the bound expires, `wait` returns the current record with `timedOut` set to `true` and leaves the job running. Wait again, or stop the job if it is no longer needed. An unknown id is still an error.
 - `logs -Id <job-id> -LogPattern <regex> -Tail <n>` prints the last matching lines of a log.

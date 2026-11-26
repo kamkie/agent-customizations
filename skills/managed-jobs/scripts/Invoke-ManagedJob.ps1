@@ -443,7 +443,11 @@ function Write-ManagedJobSummary {
         $failure = & $field $job 'error'
         if ($failure) { "error: $failure" }
         if ($active) { "still running; wait again with: wait -Id $($job.id) -Summary -TimeoutSeconds <seconds>" }
-        if ($Tail -le 0) { continue }
+    }
+    if ($Tail -le 0) { return }
+    # Logs follow every status line, so a slow or unreadable log cannot hide
+    # an outcome.
+    foreach ($job in $Outcome) {
         $logPath = [string](& $field $job 'logPath')
         if (-not $logPath) {
             "log of job $($job.id): no log path recorded"
@@ -454,9 +458,18 @@ function Write-ManagedJobSummary {
             continue
         }
         if ($Pattern) {
-            $matching = @(Get-Content -LiteralPath $logPath | Where-Object { $_ -match $Pattern })
-            $lines = @($matching | Select-Object -Last $Tail)
-            "log $logPath (last $($lines.Count) of $($matching.Count) lines matching the pattern)"
+            # Stream the log and keep only the tail, whatever the log's size.
+            $kept = [Collections.Generic.Queue[string]]::new()
+            $matched = 0
+            Get-Content -LiteralPath $logPath | ForEach-Object {
+                if ($_ -match $Pattern) {
+                    $matched++
+                    $kept.Enqueue($_)
+                    if ($kept.Count -gt $Tail) { $null = $kept.Dequeue() }
+                }
+            }
+            $lines = $kept.ToArray()
+            "log $logPath (last $($lines.Count) of $matched lines matching the pattern)"
         } else {
             $lines = @(Get-Content -LiteralPath $logPath -Tail $Tail)
             "log $logPath (last $($lines.Count) lines)"

@@ -281,6 +281,8 @@ try {
         $sparseLines -contains "log of job ${sparseId}: no log path recorded" -and
         @($sparseLines | Where-Object { $_ -match "^job $([regex]::Escape($completedId)) status=completed exit=0 " }).Count -eq 1) `
         "A summary should print placeholders for a record without timestamps, exit code or log path, then the next job. Output: $($sparse.output)"
+    Assert-True (@($sparseLines | Select-Object -First 2 | Where-Object { $_ -match '^job ' }).Count -eq 2) `
+        "Every status line should come before any log. Output: $($sparse.output)"
     Remove-Item -LiteralPath (Get-ManagedJobFile -Id $sparseId) -Force
 
     # logs: a pattern selects lines before the tail is taken.

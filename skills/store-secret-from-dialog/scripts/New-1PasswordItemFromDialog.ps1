@@ -120,12 +120,17 @@ if ($LASTEXITCODE -ne 0) { throw "Could not find the 1Password vault: $Vault" }
 $vaultId = [string]($vaultJson | ConvertFrom-Json).id
 if ($vaultId -notmatch '^[\w-]+$') { throw "Could not read the ID of the 1Password vault: $Vault" }
 
-# `item list` carries no field values, unlike `item get`.
-$existingJson = & $op item list --vault $vaultId --format json @accountArgs | Out-String
-if ($LASTEXITCODE -ne 0) { throw "Could not list items in the 1Password vault: $Vault" }
-if (@($existingJson | ConvertFrom-Json | Where-Object { $_.title -ceq $Title }).Count -gt 0) {
-    throw "A 1Password item with this title already exists in the vault: $Title"
+# `item list` carries no field values, unlike `item get`. Checked before the
+# dialog and again just before the create, because someone else can add the
+# title while the dialog is open. 1Password itself allows duplicate titles.
+function Assert-NewTitle {
+    $existingJson = & $op item list --vault $vaultId --format json @accountArgs | Out-String
+    if ($LASTEXITCODE -ne 0) { throw "Could not list items in the 1Password vault: $Vault" }
+    if (@($existingJson | ConvertFrom-Json | Where-Object { $_.title -ceq $Title }).Count -gt 0) {
+        throw "A 1Password item with this title already exists in the vault: $Title"
+    }
 }
+Assert-NewTitle
 
 if ($FieldValue) {
     $values = [ordered]@{}
@@ -152,6 +157,7 @@ try {
         if ($name -ceq 'password') { $field.purpose = 'PASSWORD' }
         $field
     }
+    Assert-NewTitle
     $template = [ordered]@{ title = $Title; category = 'LOGIN'; fields = @($fields) } |
         ConvertTo-Json -Depth 5
 

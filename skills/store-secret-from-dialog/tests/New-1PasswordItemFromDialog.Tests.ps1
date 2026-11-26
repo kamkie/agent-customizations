@@ -60,7 +60,15 @@ switch ($args[0]) {
     'signin' { exit 0 }
     'vault' { if ($args[2] -eq 'test-vault') { '{"id":"vault-1","name":"test-vault"}'; exit 0 }; exit 1 }
     'item' {
-        if ($args[1] -eq 'list') { Get-Content -LiteralPath (Join-Path $root 'existing.json') -Raw; exit 0 }
+        if ($args[1] -eq 'list') {
+            # A later-listed title simulates someone adding it while the dialog is open.
+            $countFile = Join-Path $root 'list-count.txt'
+            $count = 1 + [int](Get-Content -LiteralPath $countFile -ErrorAction SilentlyContinue)
+            Set-Content -LiteralPath $countFile -Value $count
+            $late = Join-Path $root 'existing-late.json'
+            if ($count -gt 1 -and (Test-Path -LiteralPath $late)) { Get-Content -LiteralPath $late -Raw; exit 0 }
+            Get-Content -LiteralPath (Join-Path $root 'existing.json') -Raw; exit 0
+        }
         if ($args[1] -eq 'create') {
             $stdin = [Console]::In.ReadToEnd()
             Set-Content -LiteralPath (Join-Path $root 'stdin.txt') -Value $stdin
@@ -135,6 +143,13 @@ try {
     $result = Invoke-Dialog @{ Title = 'Service login'; FieldValue = @{ username = (New-Secure 'u'); password = (New-Secure 'p') } }
     Assert-True ($result.Error -match 'already exists') 'An existing title was not refused.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $testRoot 'stdin.txt'))) 'An item was created over an existing title.'
+
+    Reset-FakeOp
+    '[{"id":"new","title":"Raced login"}]' | Set-Content -LiteralPath (Join-Path $testRoot 'existing-late.json')
+    $result = Invoke-Dialog @{ Title = 'Raced login'; FieldValue = @{ username = (New-Secure 'u'); password = (New-Secure 'p') } }
+    Remove-Item -LiteralPath (Join-Path $testRoot 'existing-late.json')
+    Assert-True ($result.Error -match 'already exists') 'A title added while the dialog was open was not refused.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $testRoot 'stdin.txt'))) 'An item was created over a title added while the dialog was open.'
 
     Reset-FakeOp
     $result = Invoke-Dialog @{ Title = 'Empty'; FieldValue = @{ username = (New-Secure 'u'); password = [Security.SecureString]::new() } }

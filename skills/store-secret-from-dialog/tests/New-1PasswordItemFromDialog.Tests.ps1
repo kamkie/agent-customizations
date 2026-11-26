@@ -134,13 +134,18 @@ try {
     Reset-FakeOp
     $throwingOp = Join-Path $testRoot 'op-throws.ps1'
     @'
-if ($args[0] -eq 'item' -and $args[1] -eq 'create') { throw "wrapper failed after write: $(@($input) -join '')" }
+if ($args[0] -eq 'item' -and $args[1] -eq 'create') {
+    $template = @($input) -join "`n"
+    $null = $template | & (Join-Path $env:FAKE_OP_ROOT 'op.cmd') @args
+    throw "wrapper failed after write: $template"
+}
 & (Join-Path $env:FAKE_OP_ROOT 'op.cmd') @args
 exit $LASTEXITCODE
 '@ | Set-Content -LiteralPath $throwingOp
     $result = Invoke-Dialog @{ Title = 'Thrown create'; OpExecutable = $throwingOp; FieldValue = @{ username = (New-Secure 'u'); password = (New-Secure 'Synthetic-Throw-4') } }
     Assert-True ($result.Error -match 'The item may exist: op exit code unknown .*Check vault ID vault-1') "A thrown create was not reported as an unknown outcome: $($result.Error)"
     Assert-True ($result.Error -notmatch 'Synthetic-Throw-4') 'A thrown create leaked a value into the error.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $testRoot 'stdin.txt') -Raw) -match 'Synthetic-Throw-4') 'The throwing wrapper did not complete the write before throwing.'
 
     Reset-FakeOp -CreateMode 'no-vault-id'
     $run = Invoke-DialogProcess -Title 'Partial receipt' -Password 'Synthetic-Echo-3'

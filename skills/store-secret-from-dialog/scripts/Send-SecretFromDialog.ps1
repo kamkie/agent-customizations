@@ -156,8 +156,10 @@ try {
         $process.StandardInput.Write($payload)
         $process.StandardInput.Close()
         $process.WaitForExit()
-        $null = $stdout.Result, $stderr.Result
         $exitCode = $process.ExitCode
+        # A descendant of the receiver can keep its output pipes open after it
+        # exits, so the drain gets a few seconds rather than waiting on them.
+        try { $null = [Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]@($stdout, $stderr), 5000) } catch { }
     } catch {
         # Its message could carry the values.
         $exitCode = 'unknown'

@@ -61,6 +61,15 @@ $stdin = [Console]::In.ReadToEnd()
 [IO.File]::WriteAllText((Join-Path $root 'stdin.txt'), $stdin)
 switch ((Get-Content -LiteralPath (Join-Path $root 'mode.cfg') -Raw).Trim()) {
     'fail-echo' { [Console]::Error.WriteLine("rejected: $stdin"); exit 3 }
+    'linger' {
+        # A descendant that inherits the output pipes and outlives the receiver.
+        $start = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
+        foreach ($a in @('-NoProfile', '-Command', 'Start-Sleep -Seconds 60')) { $start.ArgumentList.Add($a) }
+        $start.UseShellExecute = $false
+        $child = [Diagnostics.Process]::Start($start)
+        Set-Content -LiteralPath (Join-Path $root 'linger-pid.txt') -Value $child.Id
+        exit 0
+    }
     default { "stored: $stdin"; [Console]::Error.WriteLine("note: $stdin"); exit 0 }
 }
 '@ | Set-Content -LiteralPath $receiver
@@ -101,6 +110,14 @@ try {
     Reset-Receiver
     $run = Invoke-HelperProcess -Secret 'Synthetic-Echo-2'
     Assert-True ($run.ExitCode -eq 0 -and $run.Log -notmatch 'Synthetic-Echo-2') 'A successful command leaked the value into the helper streams.'
+
+    Reset-Receiver -Mode 'linger'
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $result = Invoke-Helper @{ FieldValue = @{ secret = (New-Secure 'x') } }
+    $clock.Stop()
+    $lingerPid = Get-Content -LiteralPath (Join-Path $testRoot 'linger-pid.txt') -ErrorAction SilentlyContinue
+    if ($lingerPid) { Stop-Process -Id ([int]$lingerPid) -ErrorAction SilentlyContinue }
+    Assert-True ($null -eq $result.Error -and $clock.Elapsed.TotalSeconds -lt 30) "A descendant holding the output pipes stalled the helper: $($clock.Elapsed.TotalSeconds)s $($result.Error)"
 
     Reset-Receiver
     $result = Invoke-Helper @{ FieldValue = @{ secret = [Security.SecureString]::new() } }

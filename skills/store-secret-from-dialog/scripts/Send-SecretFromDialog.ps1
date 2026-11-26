@@ -112,8 +112,19 @@ foreach ($name in $fieldNames) {
 if (@($fieldNames | Sort-Object -Unique).Count -ne $fieldNames.Count) { throw 'Field names must be unique.' }
 if ($StdinFormat -eq 'Value' -and $fieldNames.Count -ne 1) { throw 'StdinFormat Value needs exactly one field; use Json for several.' }
 
-$arguments = @($ArgumentsJson | ConvertFrom-Json)
-if (@($arguments | Where-Object { $_ -isnot [string] }).Count -gt 0) { throw 'ArgumentsJson must be a JSON array of strings.' }
+# System.Text.Json keeps each string exactly, where ConvertFrom-Json turns
+# timestamp-shaped strings into dates and accepts a bare string.
+try { $document = [Text.Json.JsonDocument]::Parse($ArgumentsJson) } catch { throw 'ArgumentsJson must be a JSON array of strings.' }
+try {
+    $root = $document.RootElement
+    if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Array) { throw 'ArgumentsJson must be a JSON array of strings.' }
+    $arguments = @(foreach ($element in $root.EnumerateArray()) {
+            if ($element.ValueKind -ne [Text.Json.JsonValueKind]::String) { throw 'ArgumentsJson must be a JSON array of strings.' }
+            $element.GetString()
+        })
+} finally {
+    $document.Dispose()
+}
 $command = (Get-Command $Executable -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 # Windows runs batch files through cmd.exe, whose parsing can rewrite the
 # arguments that name the destination.

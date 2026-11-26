@@ -135,8 +135,15 @@ try {
     $result = Invoke-Helper @{ ConcealedField = 'a,b'; FieldValue = @{} }
     Assert-True ($result.Error -match 'exactly one field') 'Value format accepted several fields.'
 
-    $result = Invoke-Helper @{ ArgumentsJson = '[1]'; FieldValue = @{} }
-    Assert-True ($result.Error -match 'array of strings') 'Non-string arguments were accepted.'
+    foreach ($invalid in @('[1]', '"secret"', '{"a":"b"}', 'not json')) {
+        $result = Invoke-Helper @{ ArgumentsJson = $invalid; FieldValue = @{ secret = (New-Secure 'x') } }
+        Assert-True ($result.Error -match 'array of strings') "Invalid ArgumentsJson was accepted: $invalid"
+    }
+
+    Reset-Receiver
+    $result = Invoke-Helper @{ ArgumentsJson = Get-ReceiverArguments @('2026-11-26T10:00:00Z'); FieldValue = @{ secret = (New-Secure 'x') } }
+    $argv = Get-Content -LiteralPath (Join-Path $testRoot 'argv.txt') -Raw
+    Assert-True ($null -eq $result.Error -and $argv.Trim() -ceq '2026-11-26T10:00:00Z') "A timestamp-shaped argument was not passed exactly: $argv $($result.Error)"
 
     $result = Invoke-Helper @{ ConcealedField = 'Bad Name'; FieldValue = @{} }
     Assert-True ($result.Error -match 'Field names need') 'An invalid field name was accepted.'

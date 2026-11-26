@@ -44,6 +44,7 @@
         "deliver-pilot-before-fanout",
         "refresh-live-state",
         "post-merge-local-closeout",
+        "close-superseded-pr",
         "mark-ready-and-verify",
         "keep-draft-and-report",
         "obtain-evidence-yourself",

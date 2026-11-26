@@ -78,6 +78,8 @@
     "review-behavior-repair": {"primaryAction": "run-scoped-review", "blockerSource": "none"},
     "review-rejected-wording": {"primaryAction": "close-review-with-validation", "blockerSource": "none"},
     "review-narrow-medium-repair": {"primaryAction": "close-review-with-validation", "blockerSource": "none"},
+    "review-converging-round-four": {"primaryAction": "run-scoped-review", "blockerSource": "none", "closingQuestion": "none"},
+    "review-nonconverging-round-three": {"primaryAction": ["keep-draft-and-report", "report-blocker", "stop-and-report"], "closingQuestion": ["material-decision", "required-confirmation"]},
     "ownership-unrelated-dirty-checkout": {"primaryAction": "isolate-and-continue", "blockerSource": "none"},
     "ownership-active-overlap": {"primaryAction": "clarify-ownership", "blockerSource": "ambiguity"},
     "blocker-unspecified-tool-policy": {"primaryAction": "report-blocker", "blockerSource": "tool"},

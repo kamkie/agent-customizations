@@ -45,8 +45,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Managed-job controller contract test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\managed-jobs\tests\ManagedJobs.GuardCache.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Managed-job guard cache serialization test failed.' }
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\store-secret-from-dialog\tests\New-1PasswordItemFromDialog.Tests.ps1')
-    if ($LASTEXITCODE -ne 0) { throw 'Secret dialog item-creation tests failed.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\skills\store-secret-from-dialog\tests\Send-SecretFromDialog.Tests.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Secret dialog tests failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\codex\managed-jobs\tests\CodexManagedJobHooks.Tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Codex managed-job hook lifecycle test failed.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot '..\hooks\claude\managed-jobs\tests\ClaudeManagedJobHooks.Tests.ps1')

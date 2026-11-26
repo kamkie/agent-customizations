@@ -354,7 +354,7 @@
         "claude"
       ],
       "instructionSet": "skill-catalog",
-      "prompt": "I need to give you the new staging database password so you can save it in our team vault. I'd rather not paste it here. How should I hand it over?"
+      "prompt": "I need to give you the new staging database password so you can save it as a repository secret. I'd rather not paste it here. How should I hand it over?"
     },
     {
       "id": "secret-new-item",
@@ -363,7 +363,7 @@
         "claude"
       ],
       "instructionSet": "skill-catalog",
-      "prompt": "Create a 1Password item called Payments API in the Engineering vault with an api-key field. I will type the key myself; do not make me paste it in chat."
+      "prompt": "Set the PAYMENTS_API_KEY GitHub Actions secret on this repository. I will type the key myself; do not make me paste it in chat."
     },
     {
       "id": "secret-offer-paste",
@@ -372,7 +372,7 @@
         "claude"
       ],
       "instructionSet": "skill-catalog",
-      "prompt": "Here's the deploy bot token coming up, I'll paste it in my next message so you can put it in 1Password for the pipeline."
+      "prompt": "Here's the deploy bot token coming up, I'll paste it in my next message so you can store it in the secret manager for the pipeline."
     },
     {
       "id": "none-read-existing-secret",
@@ -381,7 +381,7 @@
         "claude"
       ],
       "instructionSet": "skill-catalog",
-      "prompt": "Read the existing Payments API key from 1Password and pass it to the integration tests as an environment variable."
+      "prompt": "Read the existing Payments API key from the secret manager and pass it to the integration tests as an environment variable."
     },
     {
       "id": "none-command-question",

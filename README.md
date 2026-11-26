@@ -37,8 +37,8 @@ targets.
   by Codex, Claude Code, and GitHub Copilot.
 - `skills/shared-term` — a focused collaborative Windows Terminal workflow,
   shared by Codex, Claude Code, and GitHub Copilot.
-- `skills/store-secret-from-dialog` — a masked Windows dialog that stores a secret the
-  user types as a new 1Password item and returns only its `op://` references,
+- `skills/store-secret-from-dialog` — a masked Windows dialog that sends a secret the
+  user types to a command's standard input without it passing through chat,
   shared by Codex, Claude Code, and GitHub Copilot.
 - `skills/teams-graph-connector` — shared Teams reading, history coverage, and
   send-confirmation guidance, with separate Codex Teams app and Claude

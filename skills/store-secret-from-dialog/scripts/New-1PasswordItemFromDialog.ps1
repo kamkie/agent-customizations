@@ -119,6 +119,7 @@ $vaultJson = & $op vault get $Vault --format json @accountArgs | Out-String
 if ($LASTEXITCODE -ne 0) { throw "Could not find the 1Password vault: $Vault" }
 $vaultId = [string]($vaultJson | ConvertFrom-Json).id
 if ($vaultId -notmatch '^[\w-]+$') { throw "Could not read the ID of the 1Password vault: $Vault" }
+Write-Host "Bound vault $Vault to ID $vaultId."
 
 # `item list` carries no field values, unlike `item get`. Checked before the
 # dialog and again just before the create, because someone else can add the
@@ -164,14 +165,19 @@ try {
     # The template reaches op on stdin only. op's output and diagnostics can carry
     # the submitted values, so neither stream leaves this script; only fixed
     # messages and validated references do.
+    # Once op has the template it may have stored the item, so any failure
+    # without a valid receipt is an unknown outcome tied to the bound vault ID.
     $created = $template | & $op item create --vault $vaultId --format json @accountArgs - 2>$null | Out-String
     $createExit = $LASTEXITCODE
-    if ($createExit -ne 0) {
-        throw "1Password item creation failed with op exit code $createExit; nothing was stored."
+    $item = $null
+    if ($createExit -eq 0) {
+        try {
+            $parsed = $created | ConvertFrom-Json -ErrorAction Stop
+            if ([string]$parsed.id -match '^[\w-]+$' -and [string]$parsed.vault.id -match '^[\w-]+$') { $item = $parsed }
+        } catch { $item = $null }
     }
-    try { $item = $created | ConvertFrom-Json -ErrorAction Stop } catch { $item = $null }
-    if (-not $item -or [string]$item.id -notmatch '^[\w-]+$' -or [string]$item.vault.id -notmatch '^[\w-]+$') {
-        throw "op reported success but its response could not be read, so the item may exist. Check the vault for this title before retrying: $Title"
+    if (-not $item) {
+        throw "The item may exist: op exit code $createExit without a readable receipt. Check vault ID $vaultId for this title before retrying: $Title"
     }
     $references = [ordered]@{}
     foreach ($name in $fieldNames) {

@@ -39,10 +39,10 @@ While `$final.timedOut` is `true`, the job is still running, waiting for sign-in
 
 ## Result
 
-Read the outcome with `& $jobs logs -Id $job.id -Tail 40`. The log holds only references and error messages, never values.
+Read the outcome with `& $jobs logs -Id $job.id -Tail 40`. The log holds only the bound vault ID, references and error messages, never values.
 
 - **Exit code 0:** the log ends in JSON with `vaultId`, `itemId` and one `op://<vault-id>/<item-id>/<field>` reference per field. Report the references and record them where the active repository keeps credential locators. Do not read the item back to check it.
-- **Log says the item may exist,** or the job ended `stopped` or `orphaned` without an exit code: the write may have happened. Before any retry, list the vault's item titles with `op item list --vault '<vault>' --format json` (plus `--account '<account>'` if you passed one), which carries no field values, and look for the title. Report what you find; do not open the dialog again if the item is there.
-- **Any other failure:** nothing was stored. Report the logged reason: the user canceled, left a field empty, sign-in failed, the vault was not found, the create failed, or the title already exists. For an existing title, ask for a new title; editing the existing item is outside this skill.
+- **Log says the item may exist,** or the job ended `stopped` or `orphaned` after the log's `Bound vault <vault> to ID <vault-id>.` line: the write may have happened. Before any retry, list titles in that same vault with `op item list --vault '<vault-id>' --format json` (plus `--account '<account>'` if you passed one), which carries no field values, and look for the title. Report what you find. Do not open the dialog again if the item is there, or if that lookup fails; then the outcome stays unknown.
+- **Any other failure:** nothing was stored. Report the logged reason: the user canceled, left a field empty, sign-in failed, the vault was not found, or the title already exists. For an existing title, ask for a new title; editing the existing item is outside this skill.
 
 `-FieldValue` takes a hashtable of `SecureString` values and skips the dialog. It exists for tests; never use it to pass a value the user gave you.

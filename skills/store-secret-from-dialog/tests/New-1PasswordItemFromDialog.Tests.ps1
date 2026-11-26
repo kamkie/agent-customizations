@@ -35,7 +35,7 @@ function Invoke-Dialog([hashtable]$Parameters) {
     $arguments = @{ Vault = 'test-vault'; OpExecutable = $fakeOp }
     foreach ($key in $Parameters.Keys) { $arguments[$key] = $Parameters[$key] }
     try {
-        $output = & $helper @arguments | Out-String
+        $output = & $helper @arguments 6>$null | Out-String
         [pscustomobject]@{ Output = $output; Error = $null }
     } catch {
         [pscustomobject]@{ Output = ''; Error = $_.Exception.Message }
@@ -75,6 +75,7 @@ switch ($args[0]) {
             switch ((Get-Content -LiteralPath (Join-Path $root 'create-mode.cfg') -Raw).Trim()) {
                 'fail-echo' { [Console]::Error.WriteLine("invalid template: $stdin"); exit 1 }
                 'garbage' { "unreadable $stdin"; [Console]::Error.WriteLine("warning: $stdin"); exit 0 }
+                'no-vault-id' { '{"id":"item-1"}'; exit 0 }
                 default { '{"id":"item-1","vault":{"id":"vault-1"},"fields":[{"value":"leaked-if-printed"}]}'; exit 0 }
             }
         }
@@ -119,14 +120,21 @@ try {
     Reset-FakeOp -CreateMode 'fail-echo'
     $run = Invoke-DialogProcess -Title 'Echoed failure' -Password 'Synthetic-Echo-1'
     Assert-True ($run.ExitCode -ne 0) 'A failed create did not fail the helper.'
-    Assert-True ($run.Log -match 'op exit code 1; nothing was stored') "A failed create did not report a fixed message: $($run.Log)"
+    Assert-True ($run.Log -match 'The item may exist: op exit code 1 .*Check vault ID vault-1') "A failed create was not reported as an unknown outcome in the bound vault: $($run.Log)"
+    Assert-True ($run.Log -match 'Bound vault test-vault to ID vault-1\.') 'The log does not record the bound vault ID before the write.'
     Assert-True ($run.Log -notmatch 'Synthetic-Echo-1|svc-user') 'op diagnostics leaked a value into the helper streams.'
 
     Reset-FakeOp -CreateMode 'garbage'
     $run = Invoke-DialogProcess -Title 'Unreadable reply' -Password 'Synthetic-Echo-2'
     Assert-True ($run.ExitCode -ne 0) 'An unreadable create response did not fail the helper.'
-    Assert-True ($run.Log -match 'the item may exist') "An unreadable create response was not reported as an unknown outcome: $($run.Log)"
+    Assert-True ($run.Log -match 'The item may exist: op exit code 0 .*Check vault ID vault-1') "An unreadable create response was not reported as an unknown outcome: $($run.Log)"
     Assert-True ($run.Log -notmatch 'Synthetic-Echo-2|svc-user') 'An unreadable create response leaked a value into the helper streams.'
+
+    Reset-FakeOp -CreateMode 'no-vault-id'
+    $run = Invoke-DialogProcess -Title 'Partial receipt' -Password 'Synthetic-Echo-3'
+    Assert-True ($run.ExitCode -ne 0) 'A receipt without a vault ID did not fail the helper.'
+    Assert-True ($run.Log -match 'The item may exist: op exit code 0 .*Check vault ID vault-1') "A receipt without a vault ID was not reported as an unknown outcome: $($run.Log)"
+    Assert-True ($run.Log -notmatch 'Synthetic-Echo-3|svc-user') 'A receipt without a vault ID leaked a value into the helper streams.'
 
     Reset-FakeOp
     $result = Invoke-Dialog @{

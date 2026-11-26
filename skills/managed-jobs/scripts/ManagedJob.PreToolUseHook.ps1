@@ -24,13 +24,23 @@ try {
         $text -match 'Start-Process|Start-Job|new-tab|watch|bootRun|--background|--bg|(?<![\w-])-p(?![\w-])|/review' -or
         ($text -match 'npm|yarn' -and $text -match 'dev')
     if (-not $mayDeny) {
+        # A hook that is recording a denial holds the cache mutex before it
+        # rewrites the file, so an existing mutex sends this call to the full
+        # guard, which waits for the writer. The mutex name must be built
+        # exactly as ManagedJob.LaunchGuard.ps1 builds it. Cmdlets are avoided
+        # here: loading their module costs more than everything else combined.
         $stateRoot = if ($env:MANAGED_JOBS_ROOT) {
             $env:MANAGED_JOBS_ROOT
         } else {
-            [IO.Path]::Combine([Environment]::GetFolderPath('UserProfile'), '.agent-customizations', 'managed-jobs')
+            [IO.Path]::Combine([Environment]::GetFolderPath('UserProfile'), '.agent-customizations\managed-jobs')
         }
         $guardFile = [IO.Path]::Combine($stateRoot, 'guard', 'denied-launches.json')
-        if ([IO.File]::GetLastWriteTimeUtc($guardFile) -le [datetime]::UtcNow.AddHours(-1)) { exit 0 }
+        $guardLockName = 'Local\managed-jobs-guard-' + [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
+            [Text.Encoding]::UTF8.GetBytes($guardFile.ToLowerInvariant()))).Substring(0, 32)
+        $pendingWriter = $null
+        $writerPresent = [Threading.Mutex]::TryOpenExisting($guardLockName, [ref]$pendingWriter)
+        if ($pendingWriter) { $pendingWriter.Dispose() }
+        if (-not $writerPresent -and [IO.File]::GetLastWriteTimeUtc($guardFile) -le [datetime]::UtcNow.AddHours(-1)) { exit 0 }
     }
 } catch {
     # Any doubt about the shortcut goes to the full guard.

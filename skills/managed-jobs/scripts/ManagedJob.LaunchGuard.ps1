@@ -599,8 +599,10 @@ try {
             # and the last writer erases the other's fingerprint. The wait is short
             # and fails open — on timeout this invocation still reads the cache but
             # skips its own write rather than overwrite another writer's entry.
-            $guardLockName = 'Local\managed-jobs-guard-' + [Convert]::ToHexString(
-                $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($guardFile.ToLowerInvariant()))).Substring(0, 32)
+            # ManagedJob.PreToolUseHook.ps1 looks for this mutex by name, so
+            # both build the name from the same .NET path expression.
+            $guardLockName = 'Local\managed-jobs-guard-' + [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(
+                [IO.Path]::Combine($stateRoot, 'guard', 'denied-launches.json').ToLowerInvariant()))).Substring(0, 32)
             $guardMutex = [Threading.Mutex]::new($false, $guardLockName)
             try {
                 $guardLocked = $guardMutex.WaitOne($guardWaitMilliseconds)

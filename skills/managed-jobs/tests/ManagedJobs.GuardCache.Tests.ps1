@@ -46,11 +46,13 @@ $commandCount = 6
 $commands = @(0..($commandCount - 1) | ForEach-Object { "python -m guard_cache_server_$_" })
 
 $denyScript = {
-    param([string]$Pwsh, [string]$HookScript, [string]$Command)
+    param([string]$Pwsh, [string]$HookScript, [string]$Command, [bool]$Background = $true)
     $ErrorActionPreference = 'Stop'
+    $toolInput = [ordered]@{ command = $Command }
+    if ($Background) { $toolInput.run_in_background = $true }
     $payload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'Bash'
-        tool_input = [ordered]@{ command = $Command; run_in_background = $true }
+        tool_input = $toolInput
     } | ConvertTo-Json -Compress
     $output = ($payload | & $Pwsh -NoProfile -ExecutionPolicy Bypass -File $HookScript | Out-String)
     return [pscustomobject]@{ command = $Command; output = $output }
@@ -63,7 +65,7 @@ try {
     $env:MANAGED_JOBS_ROOT = $testRoot
     $env:MANAGED_JOBS_GUARD_BARRIER = $barrierFile
 
-    $pool = [runspacefactory]::CreateRunspacePool(1, $commandCount)
+    $pool = [runspacefactory]::CreateRunspacePool(1, $commandCount + 1)
     $pool.Open()
     foreach ($command in $commands) {
         $shell = [powershell]::Create()
@@ -79,7 +81,28 @@ try {
         if ($ready -lt $commandCount) { Start-Sleep -Milliseconds 20 }
     } while ($ready -lt $commandCount -and [datetime]::UtcNow -lt $readyDeadline)
     Assert-True ($ready -eq $commandCount) "Every hook process should reach the guard barrier, found $ready of $commandCount."
+
+    # While those denials are pending, the cache file does not exist yet. A
+    # foreground check made now must still reach the full guard, which waits
+    # for the writers, rather than leave through the entry script's shortcut.
+    # Reaching the guard shows as one more readiness marker.
+    $pendingShell = [powershell]::Create()
+    $pendingShell.RunspacePool = $pool
+    $null = $pendingShell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).
+        AddArgument('python -m guard_cache_pending_check').AddArgument($false)
+    $pendingHandle = [pscustomobject]@{ shell = $pendingShell; async = $pendingShell.BeginInvoke() }
+    $handles += $pendingHandle
+    $pendingDeadline = [datetime]::UtcNow.AddSeconds(15)
+    do {
+        $ready = @(Get-ChildItem -LiteralPath $testRoot -Force -File -Filter 'barrier.ready-*').Count
+        if ($ready -le $commandCount -and -not $pendingHandle.async.IsCompleted) { Start-Sleep -Milliseconds 20 }
+    } while ($ready -le $commandCount -and -not $pendingHandle.async.IsCompleted -and [datetime]::UtcNow -lt $pendingDeadline)
+    $ready = @(Get-ChildItem -LiteralPath $testRoot -Force -File -Filter 'barrier.ready-*').Count
+    Assert-True ($ready -eq $commandCount + 1) 'A foreground check made while a denial is being recorded should reach the full guard.'
     $null = New-Item -ItemType File -Path $barrierFile -Force
+    $null = $pendingShell.EndInvoke($pendingHandle.async)
+    $pendingShell.Dispose()
+    $handles = @($handles | Where-Object { $_ -ne $pendingHandle })
 
     $failures = [Collections.Generic.List[string]]::new()
     foreach ($handle in $handles) {

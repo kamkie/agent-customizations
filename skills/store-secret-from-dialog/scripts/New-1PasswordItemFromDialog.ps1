@@ -9,6 +9,9 @@ param(
     [Parameter(Mandatory)]
     [string]$Title,
 
+    # 1Password account (sign-in address, email or ID). Omit to use op's default account.
+    [string]$Account,
+
     # Field names; a comma-separated string also works, so `pwsh -File` can pass several.
     [string[]]$TextField = @('username'),
 
@@ -25,7 +28,7 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 
 function Read-SecretDialog {
-    param([string]$Title, [string[]]$TextField, [string[]]$ConcealedField)
+    param([string]$Vault, [string]$Title, [string[]]$TextField, [string[]]$ConcealedField)
 
     if (-not $IsWindows) { throw 'The secret input dialog requires Windows.' }
     Add-Type -AssemblyName System.Windows.Forms
@@ -41,7 +44,7 @@ public static extern void SetCurrentProcessExplicitAppUserModelID(string appId);
     [SecretFromDialog.Native]::SetCurrentProcessExplicitAppUserModelID('AgentCustomizations.SecretDialog')
 
     $form = [Windows.Forms.Form]::new()
-    $form.Text = "New 1Password item: $Title"
+    $form.Text = "New 1Password item in ${Vault}: $Title"
     $form.Icon = [Drawing.SystemIcons]::Shield
     $form.ShowInTaskbar = $true
     $form.FormBorderStyle = 'FixedDialog'
@@ -105,11 +108,20 @@ if (@($fieldNames | Sort-Object -Unique).Count -ne $fieldNames.Count) {
 }
 
 $op = (Get-Command $OpExecutable -CommandType Application, ExternalScript -ErrorAction Stop).Source
-& $op signin | Out-Null
+$accountArgs = if ($Account) { @('--account', $Account) } else { @() }
+& $op signin @accountArgs | Out-Null
 if ($LASTEXITCODE -ne 0) { throw '1Password sign-in failed.' }
 
+# Bind the vault to its ID before the dialog opens. If op's default account
+# changes meanwhile, the create then fails instead of writing to another
+# account's vault of the same name.
+$vaultJson = & $op vault get $Vault --format json @accountArgs | Out-String
+if ($LASTEXITCODE -ne 0) { throw "Could not find the 1Password vault: $Vault" }
+$vaultId = [string]($vaultJson | ConvertFrom-Json).id
+if ($vaultId -notmatch '^[\w-]+$') { throw "Could not read the ID of the 1Password vault: $Vault" }
+
 # `item list` carries no field values, unlike `item get`.
-$existingJson = & $op item list --vault $Vault --format json | Out-String
+$existingJson = & $op item list --vault $vaultId --format json @accountArgs | Out-String
 if ($LASTEXITCODE -ne 0) { throw "Could not list items in the 1Password vault: $Vault" }
 if (@($existingJson | ConvertFrom-Json | Where-Object { $_.title -ceq $Title }).Count -gt 0) {
     throw "A 1Password item with this title already exists in the vault: $Title"
@@ -124,7 +136,7 @@ if ($FieldValue) {
         $values[$name] = [Net.NetworkCredential]::new('', $FieldValue[$name]).Password
     }
 } else {
-    $values = Read-SecretDialog -Title $Title -TextField $TextField -ConcealedField $ConcealedField
+    $values = Read-SecretDialog -Vault $Vault -Title $Title -TextField $TextField -ConcealedField $ConcealedField
 }
 
 try {
@@ -146,7 +158,7 @@ try {
     # The template reaches op on stdin only. op's output and diagnostics can carry
     # the submitted values, so neither stream leaves this script; only fixed
     # messages and validated references do.
-    $created = $template | & $op item create --vault $Vault --format json - 2>$null | Out-String
+    $created = $template | & $op item create --vault $vaultId --format json @accountArgs - 2>$null | Out-String
     $createExit = $LASTEXITCODE
     if ($createExit -ne 0) {
         throw "1Password item creation failed with op exit code $createExit; nothing was stored."

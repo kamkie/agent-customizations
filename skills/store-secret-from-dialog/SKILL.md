@@ -11,6 +11,7 @@ Never ask for a secret value in chat, in a captured terminal prompt, in a file o
 
 - Creating the item is a 1Password write. The user's request must cover the exact vault, item title and purpose. Follow the active repository's credential rules for which vault to use and how `op` may be run.
 - Pick field names of lowercase letters, digits, `_` or `-`, starting with a letter. Text fields show what is typed; concealed fields are masked. Separate several names with commas. The defaults are `username` (text) and `password` (concealed).
+- When the user has more than one 1Password account, add `'-Account', '<account>'` to the arguments below. The script binds the vault to its ID before the dialog opens, so a later change of op's default account fails the write instead of redirecting it.
 - The script refuses a title that already exists in the vault and never edits an item.
 
 ## Run

@@ -32,8 +32,10 @@ function Reset-FakeOp([string[]]$ExistingTitles = @(), [string]$CreateMode = 'ok
 }
 
 function Invoke-Dialog([hashtable]$Parameters) {
+    $arguments = @{ Vault = 'test-vault'; OpExecutable = $fakeOp }
+    foreach ($key in $Parameters.Keys) { $arguments[$key] = $Parameters[$key] }
     try {
-        $output = & $helper -Vault 'test-vault' -OpExecutable $fakeOp @Parameters | Out-String
+        $output = & $helper @arguments | Out-String
         [pscustomobject]@{ Output = $output; Error = $null }
     } catch {
         [pscustomobject]@{ Output = ''; Error = $_.Exception.Message }
@@ -56,6 +58,7 @@ $root = $env:FAKE_OP_ROOT
 Add-Content -LiteralPath (Join-Path $root 'argv.txt') -Value ($args -join ' ')
 switch ($args[0]) {
     'signin' { exit 0 }
+    'vault' { if ($args[2] -eq 'test-vault') { '{"id":"vault-1","name":"test-vault"}'; exit 0 }; exit 1 }
     'item' {
         if ($args[1] -eq 'list') { Get-Content -LiteralPath (Join-Path $root 'existing.json') -Raw; exit 0 }
         if ($args[1] -eq 'create') {
@@ -87,12 +90,23 @@ try {
     Assert-True ($result.Output -notmatch 'S3cret-value|svc-user|leaked-if-printed') 'Output contains a field value.'
     $argv = Get-Content -LiteralPath (Join-Path $testRoot 'argv.txt') -Raw
     Assert-True ($argv -notmatch 'S3cret-value|svc-user') 'A value reached op through its arguments.'
+    Assert-True ($argv -match '(?m)^item list --vault vault-1 ' -and $argv -match '(?m)^item create --vault vault-1 ') 'List and create did not use the bound vault ID.'
     $template = Get-Content -LiteralPath (Join-Path $testRoot 'stdin.txt') -Raw | ConvertFrom-Json
     $password = $template.fields | Where-Object id -eq 'password'
     $username = $template.fields | Where-Object id -eq 'username'
     Assert-True ($template.title -ceq 'Service login' -and $template.category -eq 'LOGIN') 'Template header is wrong.'
     Assert-True ($password.value -ceq 'S3cret-value' -and $password.type -eq 'CONCEALED' -and $password.purpose -eq 'PASSWORD') 'Password field is wrong.'
     Assert-True ($username.value -ceq 'svc-user' -and $username.type -eq 'STRING' -and $username.purpose -eq 'USERNAME') 'Username field is wrong.'
+
+    Reset-FakeOp
+    $result = Invoke-Dialog @{ Title = 'Bound'; Account = 'team.example.com'; FieldValue = @{ username = (New-Secure 'u'); password = (New-Secure 'p') } }
+    Assert-True ($null -eq $result.Error) "Account-bound creation failed: $($result.Error)"
+    $argvLines = @(Get-Content -LiteralPath (Join-Path $testRoot 'argv.txt'))
+    Assert-True ($argvLines.Count -ge 4 -and @($argvLines | Where-Object { $_ -notmatch '--account team\.example\.com' }).Count -eq 0) 'An op call did not carry the bound account.'
+
+    Reset-FakeOp
+    $result = Invoke-Dialog @{ Title = 'Nowhere'; Vault = 'missing-vault'; FieldValue = @{ username = (New-Secure 'u'); password = (New-Secure 'p') } }
+    Assert-True ($result.Error -match 'Could not find the 1Password vault') 'A missing vault was not refused.'
 
     Reset-FakeOp -CreateMode 'fail-echo'
     $run = Invoke-DialogProcess -Title 'Echoed failure' -Password 'Synthetic-Echo-1'

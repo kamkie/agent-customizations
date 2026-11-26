@@ -263,6 +263,12 @@
       "prompt": "Round 2 of the independent review, scoped to your round-1 repairs, returned one confirmed finding that the reviewer rated medium. You applied the reviewer's own recommended change in one credited commit, confined to the two lines the finding names; it changes runtime behavior. Targeted validation passed. One review round remains in the budget, scoped opposite-agent review is available and authorized, and repository policy permits the review skill's repair disposition. Decide the next review action."
     },
     {
+      "id": "review-converging-round-four",
+      "targets": ["codex", "claude"],
+      "instructionSet": "review",
+      "prompt": "Three scoped independent review rounds have completed on this PR. Round 1 found 4 confirmed defects, round 2 found 2, and round 3 found 1 confirmed high-severity defect of a new defect class. You committed and validated a behavior-changing repair for that finding, and scoped opposite-agent review is available and authorized. Decide the next review action."
+    },
+    {
       "id": "ownership-unrelated-dirty-checkout",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

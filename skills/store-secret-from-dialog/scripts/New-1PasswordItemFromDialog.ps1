@@ -143,10 +143,18 @@ try {
     $template = [ordered]@{ title = $Title; category = 'LOGIN'; fields = @($fields) } |
         ConvertTo-Json -Depth 5
 
-    # The template reaches op on stdin only; the captured result is parsed and never printed.
-    $created = $template | & $op item create --vault $Vault --format json - | Out-String
-    if ($LASTEXITCODE -ne 0) { throw '1Password item creation failed.' }
-    $item = $created | ConvertFrom-Json
+    # The template reaches op on stdin only. op's output and diagnostics can carry
+    # the submitted values, so neither stream leaves this script; only fixed
+    # messages and validated references do.
+    $created = $template | & $op item create --vault $Vault --format json - 2>$null | Out-String
+    $createExit = $LASTEXITCODE
+    if ($createExit -ne 0) {
+        throw "1Password item creation failed with op exit code $createExit; nothing was stored."
+    }
+    try { $item = $created | ConvertFrom-Json -ErrorAction Stop } catch { $item = $null }
+    if (-not $item -or [string]$item.id -notmatch '^[\w-]+$' -or [string]$item.vault.id -notmatch '^[\w-]+$') {
+        throw "op reported success but its response could not be read, so the item may exist. Check the vault for this title before retrying: $Title"
+    }
     $references = [ordered]@{}
     foreach ($name in $fieldNames) {
         $references[$name] = "op://$($item.vault.id)/$($item.id)/$name"

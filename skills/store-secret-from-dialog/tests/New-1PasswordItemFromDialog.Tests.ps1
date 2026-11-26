@@ -6,7 +6,9 @@ $ErrorActionPreference = 'Stop'
 
 $helper = Join-Path $PSScriptRoot '..\scripts\New-1PasswordItemFromDialog.ps1'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('store-secret-from-dialog-tests-' + [guid]::NewGuid().ToString('N'))
-$fakeOp = Join-Path $testRoot 'op.ps1'
+# A .cmd wrapper makes the fake a native process, so its stdin and stderr behave like op's.
+$fakeOp = Join-Path $testRoot 'op.cmd'
+$fakeImplementation = Join-Path $testRoot 'op-impl.ps1'
 $oldRoot = $env:FAKE_OP_ROOT
 $assertions = 0
 
@@ -22,22 +24,33 @@ function New-Secure([string]$Value) {
     $secure
 }
 
-function Reset-FakeOp([string[]]$ExistingTitles = @()) {
+function Reset-FakeOp([string[]]$ExistingTitles = @(), [string]$CreateMode = 'ok') {
     Get-ChildItem -LiteralPath $testRoot -Filter '*.txt' | Remove-Item
     $items = @($ExistingTitles | ForEach-Object { @{ id = 'old'; title = $_ } })
     ConvertTo-Json -InputObject $items | Set-Content -LiteralPath (Join-Path $testRoot 'existing.json')
+    Set-Content -LiteralPath (Join-Path $testRoot 'create-mode.cfg') -Value $CreateMode
 }
 
 function Invoke-Dialog([hashtable]$Parameters) {
     try {
-        $output = & $helper -Vault 'test-vault' -OpExecutable $fakeOp @Parameters 6>&1 | Out-String
+        $output = & $helper -Vault 'test-vault' -OpExecutable $fakeOp @Parameters | Out-String
         [pscustomobject]@{ Output = $output; Error = $null }
     } catch {
         [pscustomobject]@{ Output = ''; Error = $_.Exception.Message }
     }
 }
 
+# Runs the helper as its own process and returns both streams together, as a managed-job log holds them.
+function Invoke-DialogProcess([string]$Title, [string]$Password) {
+    $command = "& '$helper' -Vault 'test-vault' -Title '$Title' -OpExecutable '$fakeOp' " +
+        "-FieldValue @{ username = (ConvertTo-SecureString 'svc-user' -AsPlainText -Force); " +
+        "password = (ConvertTo-SecureString '$Password' -AsPlainText -Force) }"
+    $output = & pwsh -NoProfile -Command $command 2>&1 | Out-String
+    [pscustomobject]@{ ExitCode = $LASTEXITCODE; Log = $output }
+}
+
 $null = New-Item -ItemType Directory -Path $testRoot
+"@pwsh -NoProfile -File `"%~dp0op-impl.ps1`" %*`r`n@exit /b %ERRORLEVEL%" | Set-Content -LiteralPath $fakeOp -Encoding ascii
 @'
 $root = $env:FAKE_OP_ROOT
 Add-Content -LiteralPath (Join-Path $root 'argv.txt') -Value ($args -join ' ')
@@ -46,14 +59,18 @@ switch ($args[0]) {
     'item' {
         if ($args[1] -eq 'list') { Get-Content -LiteralPath (Join-Path $root 'existing.json') -Raw; exit 0 }
         if ($args[1] -eq 'create') {
-            ($input | Out-String) | Set-Content -LiteralPath (Join-Path $root 'stdin.txt')
-            '{"id":"item-1","vault":{"id":"vault-1"},"fields":[{"value":"leaked-if-printed"}]}'
-            exit 0
+            $stdin = [Console]::In.ReadToEnd()
+            Set-Content -LiteralPath (Join-Path $root 'stdin.txt') -Value $stdin
+            switch ((Get-Content -LiteralPath (Join-Path $root 'create-mode.cfg') -Raw).Trim()) {
+                'fail-echo' { [Console]::Error.WriteLine("invalid template: $stdin"); exit 1 }
+                'garbage' { "unreadable $stdin"; [Console]::Error.WriteLine("warning: $stdin"); exit 0 }
+                default { '{"id":"item-1","vault":{"id":"vault-1"},"fields":[{"value":"leaked-if-printed"}]}'; exit 0 }
+            }
         }
     }
 }
 exit 9
-'@ | Set-Content -LiteralPath $fakeOp
+'@ | Set-Content -LiteralPath $fakeImplementation
 
 try {
     $env:FAKE_OP_ROOT = $testRoot
@@ -76,6 +93,18 @@ try {
     Assert-True ($template.title -ceq 'Service login' -and $template.category -eq 'LOGIN') 'Template header is wrong.'
     Assert-True ($password.value -ceq 'S3cret-value' -and $password.type -eq 'CONCEALED' -and $password.purpose -eq 'PASSWORD') 'Password field is wrong.'
     Assert-True ($username.value -ceq 'svc-user' -and $username.type -eq 'STRING' -and $username.purpose -eq 'USERNAME') 'Username field is wrong.'
+
+    Reset-FakeOp -CreateMode 'fail-echo'
+    $run = Invoke-DialogProcess -Title 'Echoed failure' -Password 'Synthetic-Echo-1'
+    Assert-True ($run.ExitCode -ne 0) 'A failed create did not fail the helper.'
+    Assert-True ($run.Log -match 'op exit code 1; nothing was stored') "A failed create did not report a fixed message: $($run.Log)"
+    Assert-True ($run.Log -notmatch 'Synthetic-Echo-1|svc-user') 'op diagnostics leaked a value into the helper streams.'
+
+    Reset-FakeOp -CreateMode 'garbage'
+    $run = Invoke-DialogProcess -Title 'Unreadable reply' -Password 'Synthetic-Echo-2'
+    Assert-True ($run.ExitCode -ne 0) 'An unreadable create response did not fail the helper.'
+    Assert-True ($run.Log -match 'the item may exist') "An unreadable create response was not reported as an unknown outcome: $($run.Log)"
+    Assert-True ($run.Log -notmatch 'Synthetic-Echo-2|svc-user') 'An unreadable create response leaked a value into the helper streams.'
 
     Reset-FakeOp
     $result = Invoke-Dialog @{

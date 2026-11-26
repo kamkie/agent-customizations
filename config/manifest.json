@@ -90,6 +90,7 @@
         "orchestrate-work-campaigns",
         "shape-product-decisions",
         "shared-term",
+        "store-secret-from-dialog",
         "teams-graph-connector",
         "ux-review"
       ]
@@ -165,6 +166,7 @@
         "orchestrate-work-campaigns",
         "shape-product-decisions",
         "shared-term",
+        "store-secret-from-dialog",
         "teams-graph-connector"
       ],
       "plugins": {
@@ -194,7 +196,8 @@
         "managed-jobs",
         "orchestrate-work-campaigns",
         "shape-product-decisions",
-        "shared-term"
+        "shared-term",
+        "store-secret-from-dialog"
       ]
     }
   }

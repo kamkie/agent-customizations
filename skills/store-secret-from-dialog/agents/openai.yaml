@@ -1,0 +1,4 @@
+interface:
+  display_name: "Store Secret from Dialog"
+  short_description: "Store a user-typed secret in 1Password through a masked dialog"
+  default_prompt: "Use $store-secret-from-dialog to have me type a new secret into a masked dialog and store it in 1Password."

@@ -46,7 +46,7 @@ $commandCount = 6
 $commands = @(0..($commandCount - 1) | ForEach-Object { "python -m guard_cache_server_$_" })
 
 $denyScript = {
-    param([string]$Pwsh, [string]$HookScript, [string]$Command, [bool]$Background = $true)
+    param([string]$Pwsh, [string]$HookScript, [string]$Command, [bool]$Background, [string]$StateRoot)
     $ErrorActionPreference = 'Stop'
     $toolInput = [ordered]@{ command = $Command }
     if ($Background) { $toolInput.run_in_background = $true }
@@ -54,7 +54,23 @@ $denyScript = {
         hook_event_name = 'PreToolUse'; tool_name = 'Bash'
         tool_input = $toolInput
     } | ConvertTo-Json -Compress
-    $output = ($payload | & $Pwsh -NoProfile -ExecutionPolicy Bypass -File $HookScript | Out-String)
+    # The environment is shared by every runspace of this process, so each hook
+    # process gets its own spelling of the state root through its start info.
+    $start = [Diagnostics.ProcessStartInfo]::new($Pwsh)
+    foreach ($argument in '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $HookScript) { $start.ArgumentList.Add($argument) }
+    $start.UseShellExecute = $false
+    $start.RedirectStandardInput = $true
+    $start.RedirectStandardOutput = $true
+    $start.Environment['MANAGED_JOBS_ROOT'] = $StateRoot
+    $process = [Diagnostics.Process]::Start($start)
+    try {
+        $process.StandardInput.Write($payload)
+        $process.StandardInput.Close()
+        $output = $process.StandardOutput.ReadToEnd()
+        $process.WaitForExit()
+    } finally {
+        $process.Dispose()
+    }
     return [pscustomobject]@{ command = $Command; output = $output }
 }
 
@@ -67,10 +83,14 @@ try {
 
     $pool = [runspacefactory]::CreateRunspacePool(1, $commandCount + 1)
     $pool.Open()
-    foreach ($command in $commands) {
+    # Half of the hook processes name the state root with forward slashes. Both
+    # spellings are one cache file, so they must also share one mutex.
+    $forwardRoot = $testRoot.Replace('\', '/')
+    for ($index = 0; $index -lt $commands.Count; $index++) {
         $shell = [powershell]::Create()
         $shell.RunspacePool = $pool
-        $null = $shell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).AddArgument($command)
+        $null = $shell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).AddArgument($commands[$index]).
+            AddArgument($true).AddArgument($(if ($index % 2) { $forwardRoot } else { $testRoot }))
         $handles += [pscustomobject]@{ shell = $shell; async = $shell.BeginInvoke() }
     }
     # Wait until every hook process has entered the transaction, then release the
@@ -89,7 +109,7 @@ try {
     $pendingShell = [powershell]::Create()
     $pendingShell.RunspacePool = $pool
     $null = $pendingShell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).
-        AddArgument('python -m guard_cache_pending_check').AddArgument($false)
+        AddArgument('python -m guard_cache_pending_check').AddArgument($false).AddArgument($forwardRoot)
     $pendingHandle = [pscustomobject]@{ shell = $pendingShell; async = $pendingShell.BeginInvoke() }
     $handles += $pendingHandle
     $pendingDeadline = [datetime]::UtcNow.AddSeconds(15)

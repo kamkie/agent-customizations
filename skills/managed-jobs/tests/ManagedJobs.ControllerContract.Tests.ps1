@@ -229,6 +229,64 @@ try {
     Assert-True ((Get-ManagedJobActiveRecords).id -contains $runningId) `
         'The active fixture should still be reported after a real launch.'
 
+    # run: start, wait, and print the outcome with the end of the log in one call.
+    $ran = @(& $controller run -StateRoot $stateRoot -Name 'contract run' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', '1..5 | ForEach-Object { "line $_" }; "marker run-ok"; exit 3') `
+        -WorkingDirectory $testRoot -Lifetime Persistent -TimeoutSeconds 60 -LogPattern 'line [45]|marker')
+    Assert-True ($ran[0] -match '^job \S+ status=failed exit=3 seconds=\d+ timedOut=False$') `
+        "A run should print one status line with the job's exit code. Output: $($ran -join ' | ')"
+    Assert-True ($ran[1] -match 'last 3 of 3 lines matching the pattern' -and $ran[-1] -eq 'marker run-ok' -and
+        $ran -contains 'line 4' -and $ran -notcontains 'line 1') `
+        "A run should print only the log lines its pattern selects. Output: $($ran -join ' | ')"
+
+    # A run whose bound expires leaves the job running and says how to wait on.
+    $slowRun = @(& $controller run -StateRoot $stateRoot -Name 'contract slow run' -Executable $pwsh `
+        -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 28') -WorkingDirectory $testRoot `
+        -Lifetime Persistent -TimeoutSeconds 1 -Tail 0)
+    Assert-True ($slowRun[0] -match '^job (?<id>\S+) status=(?:starting|running) exit=- seconds=\d+ timedOut=True$') `
+        "An expired run should report the job as still running. Output: $($slowRun -join ' | ')"
+    $startedId = $Matches['id']
+    Assert-True ($slowRun.Count -eq 2 -and $slowRun[1] -eq "still running; wait again with: wait -Id $startedId -Summary -TimeoutSeconds <seconds>") `
+        "An expired run should name the wait that continues it, and -Tail 0 should print no log. Output: $($slowRun -join ' | ')"
+
+    # wait with several ids returns when the first of them has ended.
+    $anyTimer = [Diagnostics.Stopwatch]::StartNew()
+    $any = @((& $controller wait -StateRoot $stateRoot -Id $startedId, $completedId -TimeoutSeconds 20 | Out-String) | ConvertFrom-Json)
+    $anyTimer.Stop()
+    Assert-True ($any.Count -eq 2 -and $any[0].id -eq $startedId -and $any[0].status -eq 'running' -and
+        $any[1].id -eq $completedId -and $any[1].status -eq 'completed' -and
+        $any[0].timedOut -eq $false -and $any[1].timedOut -eq $false) `
+        'A wait on several ids should return every record, in the order asked, once one job has ended.'
+    Assert-True ($anyTimer.Elapsed.TotalSeconds -lt 15) 'A wait on several ids must not wait for the job that is still running.'
+    $noneEnded = @((& $controller wait -StateRoot $stateRoot -Id $startedId, $runningId -TimeoutSeconds 1 | Out-String) | ConvertFrom-Json)
+    Assert-True ($noneEnded.Count -eq 2 -and @($noneEnded | Where-Object { $_.timedOut -eq $true }).Count -eq 2) `
+        'A wait on several running jobs should mark each of them timed out when the bound expires.'
+    $summarized = Invoke-ControllerProcess -Arguments @('wait', '-Id', "$startedId,$completedId", '-Summary', '-Tail', '0')
+    $summaryLines = @($summarized.output -split "`r?`n" | Where-Object { $_ -match '^job ' })
+    Assert-True ($summarized.exitCode -eq 0 -and $summaryLines.Count -eq 2 -and
+        $summaryLines[0] -match "^job $([regex]::Escape($startedId)) status=running " -and
+        $summaryLines[1] -match "^job $([regex]::Escape($completedId)) status=completed exit=0 ") `
+        "A comma-separated id list should work from another process, and -Summary should print one line per job. Output: $($summarized.output)"
+    & $controller stop -StateRoot $stateRoot -Id $startedId | Out-Null
+    $startedId = $null
+
+    # logs: a pattern selects lines before the tail is taken.
+    $selected = @(& $controller logs -StateRoot $stateRoot -Id (($ran[0] -split ' ')[1]) -LogPattern '^line' -Tail 2)
+    Assert-True (($selected -join ',') -eq 'line 4,line 5') "A log pattern should apply before the tail. Output: $($selected -join ',')"
+
+    # The new parameters are rejected where they mean nothing.
+    foreach ($rejected in @(
+        @{ arguments = @('status', '-Id', "$completedId,$failedId"); message = 'valid only for wait' },
+        @{ arguments = @('list', '-Summary'); message = '-Summary is valid only for wait' },
+        @{ arguments = @('status', '-LogPattern', 'x'); message = '-LogPattern is valid only for' },
+        @{ arguments = @('logs', '-Id', $completedId, '-LogPattern', 'x', '-Follow'); message = 'cannot be combined with -Follow' },
+        @{ arguments = @('stop', '-Id', $completedId, '-TimeoutSeconds', '5'); message = 'valid only for wait and run' }
+    )) {
+        $rejection = Invoke-ControllerProcess -Arguments $rejected.arguments
+        Assert-True ($rejection.exitCode -ne 0 -and $rejection.output -match [regex]::Escape($rejected.message)) `
+            "The controller should reject: $($rejected.arguments -join ' '). Output: $($rejection.output)"
+    }
+
     [pscustomobject]@{ result = 'passed'; assertions = $assertionCount } | ConvertTo-Json
 } finally {
     if ($startedId) {

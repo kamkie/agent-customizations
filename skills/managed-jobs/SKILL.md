@@ -15,6 +15,23 @@ if ([string]::IsNullOrWhiteSpace($repo)) { $repo = (Get-Location).Path }
 
 ## Run and inspect
 
+For finite work the next step waits on, such as a build, a test run, or a script, use `run`. It starts the job, waits, and prints one status line and the end of the log:
+
+```powershell
+& $jobs run -Name build -Executable dotnet -Arguments @('build') -WorkingDirectory $repo `
+    -TimeoutSeconds 540 -Tail 20
+```
+
+```text
+job <job-id> status=completed exit=0 seconds=42 timedOut=False
+log <log-path> (last 20 lines)
+```
+
+- Check `status` and `exit` on that line before treating the work as successful; a non-zero exit reads `status=failed`. `-Tail <n>` sets how many log lines follow, 20 by default and none with `0`. `-LogPattern <regex>` keeps only the matching lines before that tail is taken.
+- `-TimeoutSeconds` bounds the wait and defaults to 100; keep it below the tool-call timeout. When it expires the line reads `status=running timedOut=True` and the job keeps running. Continue with `wait -Id <job-id> -Summary -TimeoutSeconds <seconds>`, which prints the same summary and takes the same `-Tail` and `-LogPattern`, or stop the job if it is no longer needed.
+
+For work that runs beside other work, such as a server, a watcher, or several jobs at once, use `start`. It returns the job record at once:
+
 ```powershell
 $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
     -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
@@ -26,17 +43,17 @@ $job = (& $jobs start -Name api -Executable dotnet -Arguments @('run') `
 - Default long work to hidden supervised execution. On targets with installed lifecycle hooks (Codex and Claude Code), the startup hook reconciles global state asynchronously; do not run `reconcile` around normal starts.
 - `Auto` uses the current agent turn when ownership is available (`CODEX_THREAD_ID` or `CLAUDE_CODE_SESSION_ID`), and resolves to `persistent` on targets without installed lifecycle hooks (GitHub Copilot). Use `-Lifetime Session` only across turns when session ownership is active, and `Persistent` across sessions or on targets without lifecycle hooks (stopping started jobs explicitly before finishing, and running `reconcile` after an interrupted session).
 - Use the returned job instead of a global `list`; target `status` when needed. `list` prints a JSON array; narrow it with `-Status` and `-Name`, and add `-Table` only for a person to read.
-- Use `wait -Id <job-id>` when the next step needs process completion. It blocks until the job is completed, failed, stopped, or orphaned and returns the final record, including `exitCode` when the host recorded one. Check that status and exit code before treating the work as successful; an orphan may have no exit code.
-- Keep that tool call pending until it returns. If its transport yields a session ID, wait on that session and, where supported, combine transport waits inside one tool invocation so the model stays idle. Do not make repeated agent-side `status` calls. A background job does not wake an idle agent by itself.
-- For finite work, use `-TimeoutSeconds` to bound the wait:
+- Use `wait -Id <job-id>` when the next step needs a started job to end. It blocks until the job is completed, failed, stopped, or orphaned and returns the final record as JSON, including `exitCode` when the host recorded one; with `-Summary` it prints the status line and log tail of `run` instead. Check that status and exit code before treating the work as successful; an orphan may have no exit code.
+- To act on whichever of several jobs ends first, pass their ids together:
 
   ```powershell
-  $build = (& $jobs start -Name build -Executable dotnet -Arguments @('build') `
-      -WorkingDirectory $repo | Out-String) | ConvertFrom-Json
-  $final = (& $jobs wait -Id $build.id -TimeoutSeconds 600 | Out-String) | ConvertFrom-Json
+  & $jobs wait -Id $build.id, $review.id -Summary -TimeoutSeconds 540
   ```
 
-  When the bound expires, `wait` returns the current record with `timedOut` set to `true` and leaves the job running. Wait again, or stop the job if it is no longer needed. An unknown id is still an error.
+  It returns one record or summary per job, in the order given, once the first of them has ended. A job that has not ended reads `status=running`; wait again on it.
+- Keep that tool call pending until it returns. If its transport yields a session ID, wait on that session and, where supported, combine transport waits inside one tool invocation so the model stays idle. Do not make repeated agent-side `status` calls. A background job does not wake an idle agent by itself.
+- `-TimeoutSeconds` bounds a wait. When the bound expires, `wait` returns the current record with `timedOut` set to `true` and leaves the job running. Wait again, or stop the job if it is no longer needed. An unknown id is still an error.
+- `logs -Id <job-id> -LogPattern <regex> -Tail <n>` prints the last matching lines of a log.
 - `wait` follows the job record, so it also finishes when a completed `-KeepTerminalOpen` job leaves its visible terminal open.
 - Treat arguments, environment values, records, and logs as non-secret.
 - Add `-Visible` only when the user asks to watch output. `-KeepTerminalOpen` leaves a completed terminal for the user to close manually.

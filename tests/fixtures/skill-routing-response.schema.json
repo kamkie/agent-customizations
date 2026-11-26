@@ -19,6 +19,7 @@
         "orchestrate-work-campaigns",
         "shape-product-decisions",
         "shared-term",
+        "store-secret-from-dialog",
         "teams-graph-connector",
         "ux-review",
         "none"

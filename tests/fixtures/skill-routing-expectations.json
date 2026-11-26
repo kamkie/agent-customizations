@@ -121,6 +121,18 @@
     "ux-states": {
       "skill": "ux-review"
     },
+    "secret-handover": {
+      "skill": "store-secret-from-dialog"
+    },
+    "secret-new-item": {
+      "skill": "store-secret-from-dialog"
+    },
+    "secret-offer-paste": {
+      "skill": "store-secret-from-dialog"
+    },
+    "none-read-existing-secret": {
+      "skill": "none"
+    },
     "none-command-question": {
       "skill": "none"
     },

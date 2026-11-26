@@ -348,6 +348,42 @@
       "prompt": "Exercise the settings page changes on this branch in a real browser, including empty, error, and narrow-viewport states, and give a UX verdict."
     },
     {
+      "id": "secret-handover",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "I need to give you the new staging database password so you can save it as a repository secret. I'd rather not paste it here. How should I hand it over?"
+    },
+    {
+      "id": "secret-new-item",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Set the PAYMENTS_API_KEY GitHub Actions secret on this repository. I will type the key myself; do not make me paste it in chat."
+    },
+    {
+      "id": "secret-offer-paste",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Here's the deploy bot token coming up, I'll paste it in my next message so you can store it in the secret manager for the pipeline."
+    },
+    {
+      "id": "none-read-existing-secret",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Read the existing Payments API key from the secret manager and pass it to the integration tests as an environment variable."
+    },
+    {
       "id": "none-command-question",
       "targets": [
         "codex",

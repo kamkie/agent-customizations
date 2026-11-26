@@ -1,0 +1,4 @@
+interface:
+  display_name: "Store Secret from Dialog"
+  short_description: "Send a user-typed secret to a command's stdin through a masked dialog"
+  default_prompt: "Use $store-secret-from-dialog to have me type a new secret into a masked dialog and store it with the right command."

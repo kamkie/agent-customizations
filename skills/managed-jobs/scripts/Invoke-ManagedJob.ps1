@@ -420,27 +420,46 @@ function Write-ManagedJobSummary {
         return [datetime]::Parse([string]$Value, [Globalization.CultureInfo]::InvariantCulture,
             [Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
     }
+    # A record written by another version can lack a field. Strict mode would
+    # throw on reading it, so a missing value is read as null and printed as '-'.
+    $field = {
+        param($Record, [string]$Name)
+        $property = $Record.PSObject.Properties[$Name]
+        if ($property) { $property.Value }
+    }
     foreach ($job in $Outcome) {
-        $active = $job.status -in @('starting', 'running')
-        $from = & $toUtc $(if ($job.startedAtUtc) { $job.startedAtUtc } else { $job.createdAtUtc })
-        $to = if ($active) { [datetime]::UtcNow } else { & $toUtc $job.finishedAtUtc }
-        $seconds = if ($from -and $to) { [int][Math]::Max(0, ($to - $from).TotalSeconds) } else { '-' }
-        $exitCode = if ($null -ne $job.exitCode) { $job.exitCode } else { '-' }
-        "job $($job.id) status=$($job.status) exit=$exitCode seconds=$seconds timedOut=$([bool]$job.timedOut)"
-        if ($job.error) { "error: $($job.error)" }
+        $status = & $field $job 'status'
+        $active = $status -in @('starting', 'running')
+        $seconds = '-'
+        try {
+            $startedAt = & $field $job 'startedAtUtc'
+            $from = & $toUtc $(if ($startedAt) { $startedAt } else { & $field $job 'createdAtUtc' })
+            $to = if ($active) { [datetime]::UtcNow } else { & $toUtc (& $field $job 'finishedAtUtc') }
+            if ($from -and $to) { $seconds = [int][Math]::Max(0, ($to - $from).TotalSeconds) }
+        } catch {}
+        $exitCode = & $field $job 'exitCode'
+        if ($null -eq $exitCode) { $exitCode = '-' }
+        "job $($job.id) status=$status exit=$exitCode seconds=$seconds timedOut=$([bool](& $field $job 'timedOut'))"
+        $failure = & $field $job 'error'
+        if ($failure) { "error: $failure" }
         if ($active) { "still running; wait again with: wait -Id $($job.id) -Summary -TimeoutSeconds <seconds>" }
         if ($Tail -le 0) { continue }
-        if (-not (Test-Path -LiteralPath $job.logPath -PathType Leaf)) {
-            "log $($job.logPath) (not written yet)"
+        $logPath = [string](& $field $job 'logPath')
+        if (-not $logPath) {
+            "log of job $($job.id): no log path recorded"
+            continue
+        }
+        if (-not (Test-Path -LiteralPath $logPath -PathType Leaf)) {
+            "log $logPath (not written yet)"
             continue
         }
         if ($Pattern) {
-            $matching = @(Get-Content -LiteralPath $job.logPath | Where-Object { $_ -match $Pattern })
+            $matching = @(Get-Content -LiteralPath $logPath | Where-Object { $_ -match $Pattern })
             $lines = @($matching | Select-Object -Last $Tail)
-            "log $($job.logPath) (last $($lines.Count) of $($matching.Count) lines matching the pattern)"
+            "log $logPath (last $($lines.Count) of $($matching.Count) lines matching the pattern)"
         } else {
-            $lines = @(Get-Content -LiteralPath $job.logPath -Tail $Tail)
-            "log $($job.logPath) (last $($lines.Count) lines)"
+            $lines = @(Get-Content -LiteralPath $logPath -Tail $Tail)
+            "log $logPath (last $($lines.Count) lines)"
         }
         $lines
     }

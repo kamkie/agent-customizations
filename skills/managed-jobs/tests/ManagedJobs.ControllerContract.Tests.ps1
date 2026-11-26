@@ -270,6 +270,19 @@ try {
     & $controller stop -StateRoot $stateRoot -Id $startedId | Out-Null
     $startedId = $null
 
+    # A record that lacks optional fields still summarizes, and does not hide
+    # the job listed after it.
+    $sparseId = '20000101-000000-contract-sparse-000001'
+    [ordered]@{ schemaVersion = 3; id = $sparseId; name = 'contract sparse'; status = 'completed' } |
+        ConvertTo-Json | Set-Content -LiteralPath (Get-ManagedJobFile -Id $sparseId) -Encoding utf8
+    $sparse = Invoke-ControllerProcess -Arguments @('wait', '-Id', "$sparseId,$completedId", '-Summary')
+    $sparseLines = @($sparse.output -split "`r?`n" | Where-Object { $_ })
+    Assert-True ($sparse.exitCode -eq 0 -and $sparseLines -contains "job $sparseId status=completed exit=- seconds=- timedOut=False" -and
+        $sparseLines -contains "log of job ${sparseId}: no log path recorded" -and
+        @($sparseLines | Where-Object { $_ -match "^job $([regex]::Escape($completedId)) status=completed exit=0 " }).Count -eq 1) `
+        "A summary should print placeholders for a record without timestamps, exit code or log path, then the next job. Output: $($sparse.output)"
+    Remove-Item -LiteralPath (Get-ManagedJobFile -Id $sparseId) -Force
+
     # logs: a pattern selects lines before the tail is taken.
     $selected = @(& $controller logs -StateRoot $stateRoot -Id (($ran[0] -split ' ')[1]) -LogPattern '^line' -Tail 2)
     Assert-True (($selected -join ',') -eq 'line 4,line 5') "A log pattern should apply before the tail. Output: $($selected -join ',')"

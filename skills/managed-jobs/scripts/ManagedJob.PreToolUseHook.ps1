@@ -14,10 +14,12 @@ try {
     $text = $payloadText.Replace('\\', [string][char]0) -replace '\\[nrtbf]', ' ' -replace '\\/', '/' -replace '\\"|''', ''
     # The full guard can deny only a background request, a command holding one
     # of the launch words, or a rerun of a launch denied within the hour, which
-    # rewrote the cache file. A \u escape could spell a launch word, so it also
-    # takes the full guard. The word list must cover every trigger in
-    # Get-CommandTrigger; a word that matches too often only costs time.
-    $mayDeny = $text.Contains('\u') -or
+    # rewrote the cache file. A \u escape could spell a launch word, and the
+    # full guard's string comparisons ignore characters such as a soft hyphen
+    # inside one, so an escape or any non-ASCII character also takes the full
+    # guard. The word list must cover every trigger in Get-CommandTrigger; a
+    # word that matches too often only costs time.
+    $mayDeny = $text.Contains('\u') -or $payloadText -match '[^\x00-\x7F]' -or
         $text -match 'run_in_background(?!"\s*:\s*(?:false|null)\b)' -or
         $text -match 'Start-Process|Start-Job|new-tab|watch|bootRun|--background|--bg|(?<![\w-])-p(?![\w-])|/review' -or
         ($text -match 'npm|yarn' -and $text -match 'dev')

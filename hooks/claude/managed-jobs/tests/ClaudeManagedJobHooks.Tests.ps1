@@ -269,6 +269,36 @@ try {
     } | ConvertTo-Json -Compress
     $explicitForegroundOutput = ($explicitForegroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
     Assert-True ([string]::IsNullOrWhiteSpace($explicitForegroundOutput)) 'A call that declines background execution explicitly is an ordinary foreground command.'
+
+    # The entry script loads the full guard only when a denial is possible. The
+    # guard's barrier seam leaves a marker file whenever the guard runs, which
+    # shows the routing whatever the decision is. The guard's comparisons ignore
+    # a soft hyphen or a zero-width joiner inside a launch word, so a payload
+    # with any non-ASCII character must reach it.
+    $routeBarrier = Join-Path $testRoot 'route-barrier'
+    $null = New-Item -ItemType File -Path $routeBarrier -Force
+    $env:MANAGED_JOBS_ROOT = Join-Path $testRoot 'route-state'
+    $env:MANAGED_JOBS_GUARD_BARRIER = $routeBarrier
+    try {
+        foreach ($route in @(
+            @{ command = 'git status'; guard = $false; why = 'An ordinary ASCII command with no recent denial cannot be denied and should skip the full guard' },
+            @{ command = 'npm run dev'; guard = $true; why = 'A command holding launch words should reach the full guard' },
+            @{ command = "git commit -m caf$([char]0xE9)"; guard = $true; why = 'A command with a non-ASCII character should reach the full guard' },
+            @{ command = "wt.exe new$([char]0x200D)-tab pwsh"; guard = $true; why = 'A launch word holding a zero-width joiner should reach the full guard' }
+        )) {
+            Get-ChildItem -LiteralPath $testRoot -File -Filter 'route-barrier.ready-*' | Remove-Item -Force
+            $routePayload = [ordered]@{
+                hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+                tool_input = [ordered]@{ command = $route.command }
+            } | ConvertTo-Json -Compress
+            $null = ($routePayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+            $reachedGuard = @(Get-ChildItem -LiteralPath $testRoot -File -Filter 'route-barrier.ready-*').Count -gt 0
+            Assert-True ($reachedGuard -eq $route.guard) "$($route.why): $($route.command)"
+        }
+    } finally {
+        $env:MANAGED_JOBS_ROOT = $stateRoot
+        Remove-Item Env:MANAGED_JOBS_GUARD_BARRIER -ErrorAction SilentlyContinue
+    }
     foreach ($pathMention in @(
         'mkdir -p "C:/Users/example/AppData/Local/Temp/claude/session/scratchpad"; cp a.txt b.txt',
         'cat ~/.claude/skills/cross-agent-review/references/reviewer-stance.md',

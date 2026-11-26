@@ -277,12 +277,10 @@ try {
     # with any non-ASCII character must reach it.
     $routeBarrier = Join-Path $testRoot 'route-barrier'
     $null = New-Item -ItemType File -Path $routeBarrier -Force
-    $env:MANAGED_JOBS_ROOT = Join-Path $testRoot 'route-state'
     $env:MANAGED_JOBS_GUARD_BARRIER = $routeBarrier
+    $routeIndex = 0
     try {
         foreach ($route in @(
-            # The cases that skip the guard come first: a denial below records
-            # itself, and every call within the next hour then takes the guard.
             @{ command = 'git status'; guard = $false; why = 'An ordinary ASCII command with no recent denial cannot be denied and should skip the full guard' },
             @{ command = "echo one`ttwo`r`nGet-ChildItem C:\temp\new"; guard = $false; why = 'Tabs, line breaks and backslashes alone should not load the full guard' },
             @{ command = 'npm run dev'; guard = $true; why = 'A command holding launch words should reach the full guard' },
@@ -291,6 +289,10 @@ try {
             @{ command = "wt.exe new$([char]0x7F)-tab pwsh"; guard = $true; why = 'A launch word holding a delete character should reach the full guard' },
             @{ command = "Start-Pro$([char]8)cess notepad"; guard = $true; why = 'A launch word holding a backspace should reach the full guard' }
         )) {
+            # Each case gets an empty state root: a denial records itself, and
+            # every call within the next hour would take the guard for that
+            # reason alone.
+            $env:MANAGED_JOBS_ROOT = Join-Path $testRoot "route-state-$(($routeIndex++))"
             Get-ChildItem -LiteralPath $testRoot -File -Filter 'route-barrier.ready-*' | Remove-Item -Force
             $routePayload = [ordered]@{
                 hook_event_name = 'PreToolUse'; tool_name = 'Bash'

@@ -269,6 +269,12 @@
       "prompt": "Three scoped independent review rounds have completed on this PR. Round 1 found 4 confirmed defects, round 2 found 2, and round 3 found 1 confirmed high-severity defect of a new defect class. You committed and validated a behavior-changing repair for that finding, and scoped opposite-agent review is available and authorized. Decide the next review action."
     },
     {
+      "id": "review-nonconverging-round-three",
+      "targets": ["codex", "claude"],
+      "instructionSet": "review",
+      "prompt": "Three scoped independent review rounds have completed on this PR with no user-added rounds. Round 1 found 3 confirmed defects, round 2 found 3 confirmed defects, and round 3 found 3 confirmed high-severity defects including the same quoting defect class repaired in round 1. You committed and validated a behavior-changing repair for those findings, and scoped opposite-agent review is available and authorized. Decide the next review action."
+    },
+    {
       "id": "ownership-unrelated-dirty-checkout",
       "targets": ["codex", "claude"],
       "instructionSet": "global",

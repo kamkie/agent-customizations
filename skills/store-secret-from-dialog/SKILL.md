@@ -29,13 +29,13 @@ $job = (& $jobs start -Name secret-dialog -Executable pwsh -Arguments @(
     ) -WorkingDirectory (Get-Location).Path | Out-String) | ConvertFrom-Json
 ```
 
-Tell the user that the dialog is open (it may first show a 1Password sign-in approval) and which fields to fill. Then wait for it:
+Tell the user that the dialog is opening, titled `New 1Password item in <vault>: <item-title>`, possibly after a 1Password sign-in approval. Ask them to select it (it has its own taskbar button) and click into each field before typing, since Windows may leave keyboard focus in the window they were using. Name the fields to fill. Then wait for it:
 
 ```powershell
 $final = (& $jobs wait -Id $job.id -TimeoutSeconds 540 | Out-String) | ConvertFrom-Json
 ```
 
-While `$final.timedOut` is `true`, the dialog is still open: run the same `wait` again. Do not stop the job unless the user abandons the entry.
+While `$final.timedOut` is `true`, the job is still running, waiting for sign-in or for the user: run the same `wait` again. Do not stop the job unless the user abandons the entry.
 
 ## Result
 

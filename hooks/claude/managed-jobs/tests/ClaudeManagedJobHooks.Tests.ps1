@@ -211,7 +211,7 @@ try {
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'The launch guard should deny a natively backgrounded command.'
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'foreground') 'The deny reason should rule out the foreground-with-timeout fallback.'
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match '^Denied: run_in_background=true\.') 'A background denial should name run_in_background as its trigger.'
-    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'Invoke-ManagedJob\.ps1.* start -Name .* wait -Id ') 'The deny reason should carry the managed-job start and wait replacement.'
+    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'Invoke-ManagedJob\.ps1'' run -Name .* wait -Id ') 'The deny reason should carry the managed-job run and wait replacement.'
     $detachedPayload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
         tool_input = [ordered]@{ command = "Start-Process pwsh -ArgumentList '-File','engine.ps1'" }
@@ -263,6 +263,12 @@ try {
     } | ConvertTo-Json -Compress
     $foregroundOutput = ($foregroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
     Assert-True ([string]::IsNullOrWhiteSpace($foregroundOutput)) 'The launch guard should stay silent for an ordinary foreground command.'
+    $explicitForegroundPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+        tool_input = [ordered]@{ command = 'git status'; run_in_background = $false }
+    } | ConvertTo-Json -Compress
+    $explicitForegroundOutput = ($explicitForegroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($explicitForegroundOutput)) 'A call that declines background execution explicitly is an ordinary foreground command.'
     foreach ($pathMention in @(
         'mkdir -p "C:/Users/example/AppData/Local/Temp/claude/session/scratchpad"; cp a.txt b.txt',
         'cat ~/.claude/skills/cross-agent-review/references/reviewer-stance.md',
@@ -368,7 +374,16 @@ try {
         @{ command = "cat > review.txt <<EOF`n`$(claude -p hello)`nEOF"; trigger = 'claude -p' },
         @{ command = "echo `"`$(printf ')'; claude -p hello)`""; trigger = 'claude -p' },
         @{ command = "echo `"`$(printf `")`"; claude -p hello)`""; trigger = 'claude -p' },
-        @{ command = "cat > review.txt <<EOF`n`$(printf ')'; claude -p hello)`nEOF"; trigger = 'claude -p' }
+        @{ command = "cat > review.txt <<EOF`n`$(printf ')'; claude -p hello)`nEOF"; trigger = 'claude -p' },
+        # The entry script decides from the JSON text whether to load the full
+        # guard: words joined across quotes, JSON whitespace escapes, and
+        # backslashes before a launch word must all still reach it.
+        @{ command = 'Start-"Process" notepad'; trigger = 'Start-Process' },
+        @{ command = '"np"m run "de"v'; trigger = 'npm run dev' },
+        @{ command = "claude`t-p hello"; trigger = 'claude -p' },
+        @{ command = "claude \`n-p hello"; trigger = 'claude -p' },
+        @{ command = 'C:\tools\npm.cmd run dev'; trigger = 'npm run dev' },
+        @{ command = '& C:\bin\new\wt.exe new-tab pwsh'; trigger = 'wt new-tab' }
     )) {
         $launchPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

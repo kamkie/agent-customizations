@@ -37,7 +37,7 @@ Resolve `teamId` with `teams_list_teams` and `channelId` with `teams_list_channe
 
 ## Write bindings
 
-Discover the connector's send, reply, or create-chat action and inspect its schema for the exact target IDs and text parameters. Do not substitute Codex action names. Apply the shared explicit request and target/text confirmation boundary before any write, and report unavailable actions as unavailable.
+Discover the connector's send, reply, or create-chat action and inspect its schema for the exact target IDs and text parameters. Do not substitute Codex action names. Apply the shared explicit request and target/text confirmation boundary before any write. When no write action exists, the connector returns missing permission (such as `ChatMessage.Send`), or repository policy forbids sending, stop immediately without probing Azure CLI tokens or browser tabs, report the missing write capability, and output a paste-ready draft in the target chat's language.
 
 ## Waiting after throttling
 

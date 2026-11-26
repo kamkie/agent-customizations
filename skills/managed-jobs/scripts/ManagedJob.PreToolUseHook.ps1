@@ -10,16 +10,16 @@ try {
     # Undo JSON string escaping far enough to compare words: an escaped
     # backslash becomes a character no word contains, a whitespace escape
     # becomes a space, and quotes disappear, as they do when a shell joins a
-    # quoted word.
-    $text = $payloadText.Replace('\\', [string][char]0) -replace '\\[nrtbf]', ' ' -replace '\\/', '/' -replace '\\"|''', ''
+    # quoted word. Any backslash left after that is another escape.
+    $text = $payloadText.Replace('\\', [string][char]0) -replace '\\[nrt]', ' ' -replace '\\/', '/' -replace '\\"|''', ''
     # The full guard can deny only a background request, a command holding one
-    # of the launch words, or a rerun of a launch denied within the hour, which
-    # rewrote the cache file. A \u escape could spell a launch word, and the
-    # full guard's string comparisons ignore characters such as a soft hyphen
-    # inside one, so an escape or any non-ASCII character also takes the full
+    # of the launch words, or a rerun of a launch denied within the hour. Its
+    # string comparisons ignore characters such as a soft hyphen or a control
+    # character inside a launch word, so a payload with anything but printable
+    # ASCII and JSON whitespace, or with any other escape, also takes the full
     # guard. The word list must cover every trigger in Get-CommandTrigger; a
     # word that matches too often only costs time.
-    $mayDeny = $text.Contains('\u') -or $payloadText -match '[^\x00-\x7F]' -or
+    $mayDeny = $payloadText -cmatch '[^\x20-\x7E\r\n\t]' -or $text.Contains('\') -or
         $text -match 'run_in_background(?!"\s*:\s*(?:false|null)\b)' -or
         $text -match 'Start-Process|Start-Job|new-tab|watch|bootRun|--background|--bg|(?<![\w-])-p(?![\w-])|/review' -or
         ($text -match 'npm|yarn' -and $text -match 'dev')

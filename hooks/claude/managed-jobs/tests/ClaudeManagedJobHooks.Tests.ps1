@@ -281,10 +281,15 @@ try {
     $env:MANAGED_JOBS_GUARD_BARRIER = $routeBarrier
     try {
         foreach ($route in @(
+            # The cases that skip the guard come first: a denial below records
+            # itself, and every call within the next hour then takes the guard.
             @{ command = 'git status'; guard = $false; why = 'An ordinary ASCII command with no recent denial cannot be denied and should skip the full guard' },
+            @{ command = "echo one`ttwo`r`nGet-ChildItem C:\temp\new"; guard = $false; why = 'Tabs, line breaks and backslashes alone should not load the full guard' },
             @{ command = 'npm run dev'; guard = $true; why = 'A command holding launch words should reach the full guard' },
             @{ command = "git commit -m caf$([char]0xE9)"; guard = $true; why = 'A command with a non-ASCII character should reach the full guard' },
-            @{ command = "wt.exe new$([char]0x200D)-tab pwsh"; guard = $true; why = 'A launch word holding a zero-width joiner should reach the full guard' }
+            @{ command = "wt.exe new$([char]0x200D)-tab pwsh"; guard = $true; why = 'A launch word holding a zero-width joiner should reach the full guard' },
+            @{ command = "wt.exe new$([char]0x7F)-tab pwsh"; guard = $true; why = 'A launch word holding a delete character should reach the full guard' },
+            @{ command = "Start-Pro$([char]8)cess notepad"; guard = $true; why = 'A launch word holding a backspace should reach the full guard' }
         )) {
             Get-ChildItem -LiteralPath $testRoot -File -Filter 'route-barrier.ready-*' | Remove-Item -Force
             $routePayload = [ordered]@{
@@ -413,7 +418,11 @@ try {
         @{ command = "claude`t-p hello"; trigger = 'claude -p' },
         @{ command = "claude \`n-p hello"; trigger = 'claude -p' },
         @{ command = 'C:\tools\npm.cmd run dev'; trigger = 'npm run dev' },
-        @{ command = '& C:\bin\new\wt.exe new-tab pwsh'; trigger = 'wt new-tab' }
+        @{ command = '& C:\bin\new\wt.exe new-tab pwsh'; trigger = 'wt new-tab' },
+        # The full guard's comparisons ignore a control character inside a
+        # launch word; the entry script must hand such a payload to it.
+        @{ command = "wt.exe new$([char]0x7F)-tab pwsh"; trigger = 'wt new-tab' },
+        @{ command = "wt.exe new$([char]8)-tab pwsh"; trigger = 'wt new-tab' }
     )) {
         $launchPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

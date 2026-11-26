@@ -119,7 +119,6 @@ $vaultJson = & $op vault get $Vault --format json @accountArgs | Out-String
 if ($LASTEXITCODE -ne 0) { throw "Could not find the 1Password vault: $Vault" }
 $vaultId = [string]($vaultJson | ConvertFrom-Json).id
 if ($vaultId -notmatch '^[\w-]+$') { throw "Could not read the ID of the 1Password vault: $Vault" }
-Write-Host "Bound vault $Vault to ID $vaultId."
 
 # `item list` carries no field values, unlike `item get`. Checked before the
 # dialog and again just before the create, because someone else can add the
@@ -168,6 +167,8 @@ try {
     # Once op has the template it may have stored the item, so any failure
     # without a valid receipt is an unknown outcome tied to the bound vault ID.
     # An error thrown here is swallowed too: its message could carry the values.
+    # Recovery keys on this line: without it, op never received the values.
+    Write-Host "Sending the item to op in vault ID $vaultId."
     $createExit = 'unknown'
     $item = $null
     try {

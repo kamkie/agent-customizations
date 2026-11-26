@@ -121,7 +121,7 @@ try {
     $run = Invoke-DialogProcess -Title 'Echoed failure' -Password 'Synthetic-Echo-1'
     Assert-True ($run.ExitCode -ne 0) 'A failed create did not fail the helper.'
     Assert-True ($run.Log -match 'The item may exist: op exit code 1 .*Check vault ID vault-1') "A failed create was not reported as an unknown outcome in the bound vault: $($run.Log)"
-    Assert-True ($run.Log -match 'Bound vault test-vault to ID vault-1\.') 'The log does not record the bound vault ID before the write.'
+    Assert-True ($run.Log -match '(?m)^Sending the item to op in vault ID vault-1\.') 'The log does not record the bound vault ID before the write.'
     Assert-True ($run.Log -notmatch 'Synthetic-Echo-1|svc-user') 'op diagnostics leaked a value into the helper streams.'
 
     Reset-FakeOp -CreateMode 'garbage'
@@ -158,6 +158,10 @@ exit $LASTEXITCODE
     Assert-True ($null -eq $result.Error) "Comma-separated fields failed: $($result.Error)"
     $names = @((Get-Content -LiteralPath (Join-Path $testRoot 'stdin.txt') -Raw | ConvertFrom-Json).fields.id) -join ','
     Assert-True ($names -eq 'account,region,api-key') "Comma-separated fields were not split: $names"
+
+    Reset-FakeOp -ExistingTitles 'Before write'
+    $run = Invoke-DialogProcess -Title 'Before write' -Password 'p'
+    Assert-True ($run.ExitCode -ne 0 -and $run.Log -notmatch 'Sending the item to op') 'A failure before the write logged the write marker.'
 
     Reset-FakeOp -ExistingTitles 'Service login'
     $result = Invoke-Dialog @{ Title = 'Service login'; FieldValue = @{ username = (New-Secure 'u'); password = (New-Secure 'p') } }

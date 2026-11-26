@@ -10,7 +10,7 @@ Never ask for a secret value in chat, in a captured terminal prompt, in a file o
 ## Before running
 
 - Creating the item is a 1Password write. The user's request must cover the exact vault, item title and purpose. Follow the active repository's credential rules for which vault to use and how `op` may be run.
-- Pick field names of lowercase letters, digits, `_` or `-`, starting with a letter. Text fields show what is typed; concealed fields are masked. Separate several names with commas. The defaults are `username` (text) and `password` (concealed).
+- Pick field names of lowercase letters, digits, `_` or `-`, starting with a letter. Text fields show what is typed; concealed fields are masked. Pass several names as one comma-separated argument, such as `'-TextField', 'username,account-id'`. The defaults are `username` (text) and `password` (concealed).
 - When the user has more than one 1Password account, add `'-Account', '<account>'` to the arguments below. The script binds the vault to its ID before the dialog opens, so a later change of op's default account fails the write instead of redirecting it.
 - The script refuses a title that already exists in the vault, checking before the dialog and again just before the write, and never edits an item. 1Password allows duplicate titles, so a writer elsewhere can still add the same title in the moment between that check and the write.
 
@@ -39,10 +39,11 @@ While `$final.timedOut` is `true`, the job is still running, waiting for sign-in
 
 ## Result
 
-Read the outcome with `& $jobs logs -Id $job.id -Tail 40` and `$final.status` and `$final.exitCode`. The log holds only the bound vault ID, references and error messages, never values.
+Read the outcome with `& $jobs logs -Id $job.id -Tail 40` and `$final.status` and `$final.exitCode`. The log holds only vault and item IDs, references and error messages, never values.
 
 - **Exit code 0:** the log ends in JSON with `vaultId`, `itemId` and one `op://<vault-id>/<item-id>/<field>` reference per field. Report the references and record them where the active repository keeps credential locators. Do not read the item back to check it.
-- **Nothing stored:** the job failed with one of the helper's checks that run before op receives any value: input canceled, no value entered, invalid or duplicate field names, sign-in failed, vault not found or its ID unreadable, items could not be listed, or the title already exists. Report the reason. For an existing title, ask for a new title; editing the existing item is outside this skill.
-- **Anything else is an unknown outcome:** `The item may exist`, any other error, or a job that ended `stopped` or `orphaned` or without an exit code. The write may have happened. Find the bound vault ID in the full log with `Select-String -LiteralPath $final.logPath -Pattern '^Bound vault .+ to ID ([\w-]+)\.$'`. Before any retry, list titles in that vault with `op item list --vault '<vault-id>' --format json` (plus `--account '<account>'` if you passed one), which carries no field values, and look for the title. Report what you find. If the item is there, the ID line is missing, or the lookup fails, do not open the dialog again; report the outcome as unknown.
+- **Any other ending:** the script logs `Sending the item to op in vault ID <vault-id>.` immediately before op receives the values. Search the full log for it with `Select-String -LiteralPath $final.logPath -Pattern '^Sending the item to op in vault ID ([\w-]+)\.$'`.
+  - **No such line:** nothing was stored. Report the logged reason, such as canceled input, an empty field, an existing title or `op` not found. For an existing title, ask for a new title; editing the existing item is outside this skill.
+  - **Line present:** the write may have happened, whatever the error or job status. List titles in that vault ID with `op item list --vault '<vault-id>' --format json` (plus `--account '<account>'` if you passed one), which carries no field values, and report whether the title is there. If it is there or the lookup fails, report the outcome as unknown and do not open the dialog again. If the lookup shows it absent, ask the user before opening the dialog again.
 
 `-FieldValue` takes a hashtable of `SecureString` values and skips the dialog. It exists for tests; never use it to pass a value the user gave you.

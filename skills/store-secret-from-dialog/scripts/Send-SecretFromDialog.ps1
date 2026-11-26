@@ -115,6 +115,11 @@ if ($StdinFormat -eq 'Value' -and $fieldNames.Count -ne 1) { throw 'StdinFormat 
 $arguments = @($ArgumentsJson | ConvertFrom-Json)
 if (@($arguments | Where-Object { $_ -isnot [string] }).Count -gt 0) { throw 'ArgumentsJson must be a JSON array of strings.' }
 $command = (Get-Command $Executable -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+# Windows runs batch files through cmd.exe, whose parsing can rewrite the
+# arguments that name the destination.
+if ([IO.Path]::GetExtension($command) -in @('.cmd', '.bat')) {
+    throw "The receiving command must be a native executable, not a batch file: $command"
+}
 
 if ($FieldValue) {
     $values = [ordered]@{}

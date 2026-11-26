@@ -10,7 +10,7 @@ Never ask for a secret value in chat, in a captured terminal prompt, in a file o
 ## Before running
 
 - Sending the secret is a write to its destination. The user's request must cover the destination, the secret's name there and its purpose. Follow the active repository's credential rules for which store and command to use and how that command may be run.
-- Pick a receiving command that reads the secret from stdin, for example `gh secret set <name>` or `docker login --password-stdin`. A command that takes a secret only as an argument does not qualify: arguments are visible to other processes.
+- Pick a receiving command that reads the secret from stdin, for example `gh secret set <name>` or `docker login --password-stdin`. A command that takes a secret only as an argument does not qualify: arguments are visible to other processes. It must be a native executable; the script refuses `.cmd` and `.bat` wrappers, because `cmd.exe` can rewrite their arguments.
 - Fields are lowercase letters, digits, `_` or `-`, starting with a letter. Concealed fields are masked; text fields show what is typed. Pass several names as one comma-separated argument, such as `'-TextField', 'username'` with `'-ConcealedField', 'password,otp-seed'`.
 - `-StdinFormat Value`, the default, sends one field's raw value with no trailing newline. `-StdinFormat Json` sends one object mapping each field name to its value.
 

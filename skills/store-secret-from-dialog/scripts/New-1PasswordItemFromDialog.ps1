@@ -167,15 +167,17 @@ try {
     # messages and validated references do.
     # Once op has the template it may have stored the item, so any failure
     # without a valid receipt is an unknown outcome tied to the bound vault ID.
-    $created = $template | & $op item create --vault $vaultId --format json @accountArgs - 2>$null | Out-String
-    $createExit = $LASTEXITCODE
+    # An error thrown here is swallowed too: its message could carry the values.
+    $createExit = 'unknown'
     $item = $null
-    if ($createExit -eq 0) {
-        try {
+    try {
+        $created = $template | & $op item create --vault $vaultId --format json @accountArgs - 2>$null | Out-String
+        $createExit = $LASTEXITCODE
+        if ($createExit -eq 0) {
             $parsed = $created | ConvertFrom-Json -ErrorAction Stop
             if ([string]$parsed.id -match '^[\w-]+$' -and [string]$parsed.vault.id -match '^[\w-]+$') { $item = $parsed }
-        } catch { $item = $null }
-    }
+        }
+    } catch { $item = $null }
     if (-not $item) {
         throw "The item may exist: op exit code $createExit without a readable receipt. Check vault ID $vaultId for this title before retrying: $Title"
     }

@@ -39,10 +39,10 @@ While `$final.timedOut` is `true`, the job is still running, waiting for sign-in
 
 ## Result
 
-Read the outcome with `& $jobs logs -Id $job.id -Tail 40`. The log holds only the bound vault ID, references and error messages, never values.
+Read the outcome with `& $jobs logs -Id $job.id -Tail 40` and `$final.status` and `$final.exitCode`. The log holds only the bound vault ID, references and error messages, never values.
 
 - **Exit code 0:** the log ends in JSON with `vaultId`, `itemId` and one `op://<vault-id>/<item-id>/<field>` reference per field. Report the references and record them where the active repository keeps credential locators. Do not read the item back to check it.
-- **Log says the item may exist,** or the job ended `stopped` or `orphaned` after the log's `Bound vault <vault> to ID <vault-id>.` line: the write may have happened. Before any retry, list titles in that same vault with `op item list --vault '<vault-id>' --format json` (plus `--account '<account>'` if you passed one), which carries no field values, and look for the title. Report what you find. Do not open the dialog again if the item is there, or if that lookup fails; then the outcome stays unknown.
-- **Any other failure:** nothing was stored. Report the logged reason: the user canceled, left a field empty, sign-in failed, the vault was not found, or the title already exists. For an existing title, ask for a new title; editing the existing item is outside this skill.
+- **Nothing stored:** the job failed with one of the helper's checks that run before op receives any value: input canceled, no value entered, invalid or duplicate field names, sign-in failed, vault not found or its ID unreadable, items could not be listed, or the title already exists. Report the reason. For an existing title, ask for a new title; editing the existing item is outside this skill.
+- **Anything else is an unknown outcome:** `The item may exist`, any other error, or a job that ended `stopped` or `orphaned` or without an exit code. The write may have happened. Find the bound vault ID in the full log with `Select-String -LiteralPath $final.logPath -Pattern '^Bound vault .+ to ID ([\w-]+)\.$'`. Before any retry, list titles in that vault with `op item list --vault '<vault-id>' --format json` (plus `--account '<account>'` if you passed one), which carries no field values, and look for the title. Report what you find. If the item is there, the ID line is missing, or the lookup fails, do not open the dialog again; report the outcome as unknown.
 
 `-FieldValue` takes a hashtable of `SecureString` values and skips the dialog. It exists for tests; never use it to pass a value the user gave you.

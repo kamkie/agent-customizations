@@ -130,6 +130,18 @@ try {
     Assert-True ($run.Log -match 'The item may exist: op exit code 0 .*Check vault ID vault-1') "An unreadable create response was not reported as an unknown outcome: $($run.Log)"
     Assert-True ($run.Log -notmatch 'Synthetic-Echo-2|svc-user') 'An unreadable create response leaked a value into the helper streams.'
 
+    # A PowerShell wrapper around op can complete the write and then throw.
+    Reset-FakeOp
+    $throwingOp = Join-Path $testRoot 'op-throws.ps1'
+    @'
+if ($args[0] -eq 'item' -and $args[1] -eq 'create') { throw "wrapper failed after write: $(@($input) -join '')" }
+& (Join-Path $env:FAKE_OP_ROOT 'op.cmd') @args
+exit $LASTEXITCODE
+'@ | Set-Content -LiteralPath $throwingOp
+    $result = Invoke-Dialog @{ Title = 'Thrown create'; OpExecutable = $throwingOp; FieldValue = @{ username = (New-Secure 'u'); password = (New-Secure 'Synthetic-Throw-4') } }
+    Assert-True ($result.Error -match 'The item may exist: op exit code unknown .*Check vault ID vault-1') "A thrown create was not reported as an unknown outcome: $($result.Error)"
+    Assert-True ($result.Error -notmatch 'Synthetic-Throw-4') 'A thrown create leaked a value into the error.'
+
     Reset-FakeOp -CreateMode 'no-vault-id'
     $run = Invoke-DialogProcess -Title 'Partial receipt' -Password 'Synthetic-Echo-3'
     Assert-True ($run.ExitCode -ne 0) 'A receipt without a vault ID did not fail the helper.'

@@ -60,18 +60,23 @@ $n = 1
 $round = "<exchange-folder>/round-$n"
 $member = '<member-name>'
 $workdir = '<repository root when the brief names repository files, otherwise the exchange folder>'
-$codex = (Get-Command codex.cmd, codex.exe -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+$exe = (Get-Command codex.exe -ErrorAction SilentlyContinue).Source
+$entry = @()
+if (-not $exe) {
+    $exe = (Get-Command node.exe).Source
+    $entry = @(Join-Path (Split-Path (Get-Command codex.cmd).Source) 'node_modules/@openai/codex/bin/codex.js')
+}
 $prompt = "You are the $member panelist. Read $round/brief.md and reply in the format it asks for. Your final message is your reply."
-& $jobs start -Name "panel-$member-r$n" -Executable $codex -WorkingDirectory $workdir -Lifetime Session `
-    -Arguments @('exec', '-m', '<model-id>', '-s', 'read-only', '-C', $workdir, '-o', "$round/reply-$member.md", $prompt)
+& $jobs start -Name "panel-$member-r$n" -Executable $exe -WorkingDirectory $workdir -Lifetime Session `
+    -Arguments ($entry + @('exec', '-m', '<model-id>', '-s', 'read-only', '-C', $workdir, '-o', "$round/reply-$member.md", $prompt))
 ```
 
-Add `--skip-git-repo-check` when `$workdir` is not inside a Git repository. The job log prints `sandbox:` and `session id:` lines. On every run, confirm the first reads `read-only` and stop a member where it does not. Keep the second: later rounds resume that thread. Run the same lines with the new `$n` and this call, where `exec resume` takes no `-s` or `-C` option:
+Never launch through the `codex.cmd` shim: `cmd` rewrites `%name%` tokens in paths and prompts. Add `--skip-git-repo-check` when `$workdir` is not inside a Git repository. The job log prints `sandbox:` and `session id:` lines. On every run, confirm the first reads `read-only` and stop a member where it does not. Keep the second: later rounds resume that thread. Run the same lines with the new `$n` and this call, where `exec resume` takes no `-s` or `-C` option:
 
 ```powershell
-& $jobs start -Name "panel-$member-r$n" -Executable $codex -WorkingDirectory $workdir -Lifetime Session `
-    -Arguments @('exec', 'resume', '-m', '<model-id>', '-c', 'sandbox_mode=read-only',
-        '-o', "$round/reply-$member.md", '<session-id>', $prompt)
+& $jobs start -Name "panel-$member-r$n" -Executable $exe -WorkingDirectory $workdir -Lifetime Session `
+    -Arguments ($entry + @('exec', 'resume', '-m', '<model-id>', '-c', 'sandbox_mode=read-only',
+        '-o', "$round/reply-$member.md", '<session-id>', $prompt))
 ```
 
 Give any other CLI the same contract: a pinned model, enforced read-only access, and the reply captured to the member's file.

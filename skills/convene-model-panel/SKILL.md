@@ -16,7 +16,7 @@ Progress line to reuse in updates: `Panel: <members> | part <name> v<version> | 
 1. Read the active repository's and the user's instructions; they outrank this skill. A panel does not satisfy a review gate a repository defines, such as an opposite-agent review, unless that repository says so. Its approval authorizes nothing: publishing, sending, and merging keep their own rules.
 2. Take the members from the user's words or from higher-precedence instructions, and keep the count and the providers they give. Where a provider is named without a model, use that provider's strongest current model, tell the user the final list, and launch without waiting. Where no member, count, or provider is given, propose three members across the providers this session can reach and wait for the user's yes: the list decides the cost and which providers receive the brief. Never add a member or a provider the user did not name or accept. When the named panel cannot be assembled, say what is missing before launching anything. Resolve each name to the identifier or alias the runtime that will run it accepts: the subagent or session tool's model choices, or that CLI's own model list or configuration. Never guess one; ask the user when a name does not resolve.
 3. The coordinator does not vote. A member on the coordinator's own model runs in a fresh context.
-4. Tell the user the approval rule and the round limit before round 1. Unless the user states another rule or number: a part is approved when every member but at most one approves the same version and every BLOCKING change is applied or rejected with a recorded reason, with at most three rounds per part. Every round counts toward the limit. A request to revise until the panel approves does not remove it.
+4. Before the first review round, tell the user the approval rule and the round limit. Unless the user states another rule or number: a part is approved when every member but at most one approves the same version and every BLOCKING change is applied or rejected with a recorded reason, with at most three rounds per part. Every round counts toward the limit. A request to revise until the panel approves does not remove it.
 5. Choose an exchange folder that every member can read and Git does not track: an ignored folder inside the repository (confirm with `git check-ignore`) or a scratch folder outside it. Use one folder per round: `round-<n>/brief.md` and `round-<n>/reply-<member>.md`.
 6. Fix what you already know is wrong before a round. Split large work into parts a member can judge in one read.
 
@@ -43,7 +43,7 @@ Write each as: replace "<old>" with "<new>", or name the place and what goes wro
 Give changes, not a rewrite.
 ```
 
-When the user wants options instead of a verdict, run a propose round: ask each member for a fixed number of options in one fixed structure, with no verdict. Merge the replies into one candidate list without attribution, then refine that list in review rounds.
+When the user wants options or opinions instead of approval, run a propose round: ask each member for a fixed number of options in one fixed structure, with no verdict. Merge the replies into one candidate list without attribution and report it. Stop there unless the user also asked to have the options refined or approved; only then continue with review rounds. The verdict, approval, and round-limit rules apply to review rounds only.
 
 ## Launch the members
 
@@ -85,7 +85,8 @@ Give any other CLI the same contract: a pinned model, enforced read-only access,
 
 - Confirm each member started from its job log or session within the first minutes; diagnose one that did not instead of waiting.
 - Do not wait idle. Read each reply as it lands and check its claims against the draft and the facts. Leave the brief and every file the members are reading unchanged until all of them have replied or failed.
-- Take a verdict only from the `VERDICT` line. Ignore whatever follows the requested items; a CLI member's final message often carries closing text of its own. A reply with no verdict line is not a vote: ask that member once to restate it, by message or by resuming its thread. That is not a new round.
+- Ignore whatever follows the requested items in a reply; a CLI member's final message often carries closing text of its own.
+- In a review round, take a verdict only from the `VERDICT` line. A reply with no verdict line is not a vote: ask that member once to restate it, by message or by resuming its thread. That is not a new round.
 - When a member cannot be reached after one retry, tell the user at once and never substitute another model. Continue while at least two members remain, counting the missing member as not approving, and try it again in the next round. Otherwise stop and ask.
 
 ## Decide and revise

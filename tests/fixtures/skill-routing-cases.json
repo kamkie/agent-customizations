@@ -516,6 +516,15 @@
       "prompt": "Send a subagent to find where the retry limit is configured in this repository and report the file and line."
     },
     {
+      "id": "none-split-implementation",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Have Opus write the migration script and have GPT write its tests, each in its own session, then tell me when both are done."
+    },
+    {
       "id": "none-multi-file-change",
       "targets": [
         "codex",

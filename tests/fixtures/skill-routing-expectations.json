@@ -178,6 +178,9 @@
     "none-subagent-search": {
       "skill": "none"
     },
+    "none-split-implementation": {
+      "skill": "none"
+    },
     "none-multi-file-change": {
       "skill": "none"
     }

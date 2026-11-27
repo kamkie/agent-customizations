@@ -49,9 +49,9 @@ When the user wants options or opinions instead of approval, run a propose round
 
 Start every member of a round in parallel with the same brief. No member reads another member's reply. The launch prompt is one plain line: the member's role, the brief path, and how to deliver the reply. Everything else belongs in the brief.
 
-Give each member the narrowest access its runtime offers, and never rely on wording in the brief for it.
+Give each member the narrowest access its runtime offers, and never rely on wording in the brief for it. A member can change files when it is a subagent with a shell tool, a session, or a CLI that cannot enforce read-only access. Launch such a member only when the user's request named that form for it or the user has accepted it: mark it as not read-only in the member list, ask there, and wait. In a round with such a member, put copies of the files under review in the round folder, name only those copies in the brief, and record a hash of the brief and of each copy before any member starts.
 
-**A member on a model this harness runs:** start a subagent pinned to that model, of a type limited to read tools (no edit, write, or shell tool) when the harness has one. Its final message is its reply; save it as the member's reply file yourself. For later rounds, message the same subagent. Start a session per member only when the user asks for sessions, and have each session write its own reply file. A subagent with a shell tool and any session can change files. Launch such a member only when the user's request named that form for it or the user has accepted it: mark it as not read-only in the member list, ask there, and wait. In a round with such a member, put copies of the files under review in the round folder, name only those copies in the brief, and record a hash of the brief and of each copy at launch.
+**A member on a model this harness runs:** start a subagent pinned to that model, of a type limited to read tools (no edit, write, or shell tool) when the harness has one. Its final message is its reply; save it as the member's reply file yourself. For later rounds, message the same subagent. Start a session per member only when the user asks for sessions, and have each session write its own reply file.
 
 **A member on another provider's CLI:** run it under `managed-jobs` with session lifetime, read-only, with its final message captured as the reply file. Load `managed-jobs` for `$jobs`. With the Codex CLI:
 
@@ -79,13 +79,13 @@ Never launch through the `codex.cmd` shim: `cmd` rewrites `%name%` tokens in pat
         '-o', "$round/reply-$member.md", '<session-id>', $prompt))
 ```
 
-Give any other CLI the same contract: a pinned model, enforced read-only access, and the reply captured to the member's file. A CLI that cannot enforce read-only access is unavailable as a member until the user accepts it for that member; ask and wait before launching it.
+Give any other CLI the same contract: a pinned model, enforced read-only access, and the reply captured to the member's file. A CLI that cannot enforce read-only access is a member that can change files.
 
 ## Run the round
 
 - Confirm each member started from its job log or session within the first minutes; diagnose one that did not instead of waiting.
 - Do not wait idle. Read each reply as it lands and check its claims against the draft and the facts. Leave the brief and every file the members are reading unchanged until all of them have replied or failed.
-- In a round of either kind with a member that is not read-only, compare the recorded hashes once every member has finished and before you use any reply. On a mismatch, discard the round and tell the user. Do not restore or change any file.
+- In a round of either kind with a member that can change files, compare the recorded hashes once every member has finished and before you use any reply. On a mismatch, discard the round and tell the user. Do not restore or change any file.
 - Ignore whatever follows the requested items in a reply; a CLI member's final message often carries closing text of its own.
 - In a review round, take a verdict only from the `VERDICT` line. A reply with no verdict line is not a vote: ask that member once to restate it, by message or by resuming its thread. That is not a new round.
 - When a member cannot be reached after one retry, tell the user at once and never substitute another model. Continue while at least two members remain, counting the missing member as not approving, and try it again in the next round. Otherwise stop and ask.

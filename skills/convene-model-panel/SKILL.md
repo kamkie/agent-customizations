@@ -38,7 +38,7 @@ Include:
 Reply format for a review round:
 
 ```text
-Start with one line per part: VERDICT <part>: APPROVE or VERDICT <part>: CHANGES.
+Start with one line per part: VERDICT <part> <version>: APPROVE or VERDICT <part> <version>: CHANGES.
 Then give at most five changes. Mark each BLOCKING (you will not approve without it) or TASTE (optional).
 Write each as: replace "<old>" with "<new>", or name the place and what goes wrong there. Add one sentence of why.
 Give changes, not a rewrite.
@@ -88,7 +88,8 @@ Give any other CLI the same contract: a pinned model, read-only access, and the 
 - The user's rulings and the stated facts outrank the panel. Reject a change that contradicts one and report it as kept against panel advice. When several members dispute the same ruling, tell the user; do not overturn it.
 - Check a proposed change against the facts before applying it. Do not apply a change that brings in a fact the brief did not supply.
 - Hold the scope to what the brief asked. Park suggestions that widen the work and list them in the report.
-- A vote belongs to the version it read. An APPROVE covers that version plus that member's own changes applied as written. Any other change reopens the part: run a confirmation round on the new version whose brief shows what changed and asks only for a verdict and BLOCKING changes. A member that said CHANGES votes again in that round. A reply to a superseded version is input, never a vote.
+- A vote belongs to the exact version it names. Any change to a part, including one an approving member suggested, clears every vote on it: run a confirmation round on the new version whose brief shows what changed and asks only for a verdict and BLOCKING changes. Every member votes again in that round. A verdict that names any version other than the current brief's is input, never a vote.
+- Leave an approved version as approved. Apply a remaining TASTE change only together with a confirmation round.
 - A part is done when the approval rule holds for one version. Then open the next part. One round may carry the confirmation of one part and the first read of the next, each with its own verdict line.
 - At the round limit without approval, stop revising. Give the user the last version the members read, each member's verdict and open BLOCKING changes, and your recommendation. Never run rounds until everyone is satisfied.
 

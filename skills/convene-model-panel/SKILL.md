@@ -31,8 +31,7 @@ Include:
 - the user's rulings: decisions already made that members must not reopen;
 - the facts members may rely on, and that they must not add facts of their own;
 - the draft itself, or the exact files to read;
-- from round 2, what changed since the last version, without naming the member who asked;
-- that the member changes no file other than a reply file its launch line names, opens nothing the brief does not name, and starts no other agent; and
+- from round 2, what changed since the last version, without naming the member who asked; and
 - the reply format.
 
 Reply format for a review round:
@@ -48,9 +47,11 @@ When the user wants options instead of a verdict, run a propose round: ask each 
 
 ## Launch the members
 
-Start every member of a round in parallel with the same brief. No member reads another member's reply. The launch prompt is one plain line: the member's role, the brief path, and where the reply goes. Everything else belongs in the brief.
+Start every member of a round in parallel with the same brief. No member reads another member's reply. The launch prompt is one plain line: the member's role, the brief path, and how to deliver the reply. Everything else belongs in the brief.
 
-**A member on a model this harness runs:** start a subagent pinned to that model. Start a session per member instead when the user asked for sessions or wants to follow the members. The member writes its own reply file. For later rounds, message the same subagent or session.
+Make each member read-only through its runtime, not through wording in the brief. A runtime that cannot enforce that makes the member unavailable unless the user accepts it for that member.
+
+**A member on a model this harness runs:** start a subagent of a type that has no edit or write tools, pinned to that model. Its final message is its reply; save it as the member's reply file yourself. For later rounds, message the same subagent. Start a session per member only when the user asks for sessions. A session's tools are not read-only, so say that when you list the members, and have each session write its own reply file.
 
 **A member on another provider's CLI:** run it under `managed-jobs` with session lifetime, read-only, with its final message captured as the reply file. Load `managed-jobs` for `$jobs`. With the Codex CLI:
 
@@ -73,7 +74,7 @@ Add `--skip-git-repo-check` when `$workdir` is not inside a Git repository. The 
         '-o', "$round/reply-$member.md", '<session-id>', $prompt)
 ```
 
-Give any other CLI the same contract: a pinned model, read-only access, and the reply captured to the member's file. If a CLI cannot run read-only, tell the user before launching it.
+Give any other CLI the same contract: a pinned model, enforced read-only access, and the reply captured to the member's file.
 
 ## Run the round
 

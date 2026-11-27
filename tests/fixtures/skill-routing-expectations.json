@@ -19,6 +19,15 @@
     "copy-empty-state": {
       "skill": "clean-copy"
     },
+    "panel-review-rounds": {
+      "skill": "convene-model-panel"
+    },
+    "panel-council-design": {
+      "skill": "convene-model-panel"
+    },
+    "panel-propose-options": {
+      "skill": "convene-model-panel"
+    },
     "cross-review-attack-commit": {
       "skill": "cross-agent-review"
     },
@@ -161,6 +170,12 @@
       "skill": "none"
     },
     "none-source-review": {
+      "skill": "none"
+    },
+    "none-single-second-opinion": {
+      "skill": "none"
+    },
+    "none-subagent-search": {
       "skill": "none"
     },
     "none-multi-file-change": {

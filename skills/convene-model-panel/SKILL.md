@@ -103,3 +103,5 @@ After each round, send the progress line and what you changed. At the end, repor
 Call a version approved by the panel only when the approval rule holds for exactly that version.
 
 Stop panel jobs that are still running. Leave member sessions open for the user to archive. Keep the exchange folder until the user has the result, and do not commit or publish it. A brief goes to every member's provider, so put in it only the private material the task needs.
+
+Some round rules adapt the tstack `council` skill under the MIT License; see [tstack-license.md](references/tstack-license.md).

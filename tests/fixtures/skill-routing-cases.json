@@ -518,11 +518,10 @@
     {
       "id": "none-split-implementation",
       "targets": [
-        "codex",
         "claude"
       ],
       "instructionSet": "skill-catalog",
-      "prompt": "Have Opus write the migration script and have GPT write its tests, each in its own session, then tell me when both are done."
+      "prompt": "Delegate the migration script to one model and its unit tests to a different model, then merge what the two of them produce."
     },
     {
       "id": "none-multi-file-change",

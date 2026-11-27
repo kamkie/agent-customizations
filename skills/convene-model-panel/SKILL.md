@@ -49,9 +49,9 @@ When the user wants options or opinions instead of approval, run a propose round
 
 Start every member of a round in parallel with the same brief. No member reads another member's reply. The launch prompt is one plain line: the member's role, the brief path, and how to deliver the reply. Everything else belongs in the brief.
 
-Make each member read-only through its runtime, not through wording in the brief. A runtime that cannot enforce that makes the member unavailable unless the user accepts it for that member.
+Give each member the narrowest access its runtime offers, and never rely on wording in the brief for it.
 
-**A member on a model this harness runs:** start a subagent of a type that has no edit or write tools, pinned to that model. Its final message is its reply; save it as the member's reply file yourself. For later rounds, message the same subagent. Start a session per member only when the user asks for sessions. A session's tools are not read-only, so say that when you list the members, and have each session write its own reply file.
+**A member on a model this harness runs:** start a subagent pinned to that model, of a type limited to read tools (no edit, write, or shell tool) when the harness has one. Its final message is its reply; save it as the member's reply file yourself. For later rounds, message the same subagent. Start a session per member only when the user asks for sessions, and have each session write its own reply file. A subagent with a shell tool and any session can change files. Name those members as not read-only when you list the panel. For a round they take part in, record a hash of the brief and of every file under review at launch, and confirm the hashes are unchanged before you count a vote. If one changed, restore the file, discard the round, and tell the user.
 
 **A member on another provider's CLI:** run it under `managed-jobs` with session lifetime, read-only, with its final message captured as the reply file. Load `managed-jobs` for `$jobs`. With the Codex CLI:
 
@@ -79,7 +79,7 @@ Never launch through the `codex.cmd` shim: `cmd` rewrites `%name%` tokens in pat
         '-o', "$round/reply-$member.md", '<session-id>', $prompt))
 ```
 
-Give any other CLI the same contract: a pinned model, enforced read-only access, and the reply captured to the member's file.
+Give any other CLI the same contract: a pinned model, enforced read-only access, and the reply captured to the member's file. A CLI that cannot enforce read-only access is unavailable as a member until the user accepts it for that member; ask and wait before launching it.
 
 ## Run the round
 

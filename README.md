@@ -15,6 +15,9 @@ targets.
   Codex and GitHub Copilot.
 - `skills/clean-copy` — remove redundant interface copy while preserving
   information users need to act, shared by Codex, Claude Code, and GitHub Copilot.
+- `skills/convene-model-panel` — a panel of named models that propose or
+  review in rounds as read-only panelists, with version-bound approval and a
+  round limit, coordinated from Claude Code.
 - `skills/cross-agent-review` — opposite-engine adversarial review with triage,
   credited fix commits, and bounded rounds, shared by Codex, Claude Code, and
   GitHub Copilot.

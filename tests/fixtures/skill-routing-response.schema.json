@@ -10,6 +10,7 @@
       "enum": [
         "claude-runner",
         "clean-copy",
+        "convene-model-panel",
         "cross-agent-review",
         "deep-research",
         "dyslexia-friendly-formatter",

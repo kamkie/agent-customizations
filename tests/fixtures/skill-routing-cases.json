@@ -53,6 +53,30 @@
       "prompt": "Trim the empty state on the invoices screen. It has a No invoices yet heading, a paragraph that says There are currently no invoices, and a Create invoice button."
     },
     {
+      "id": "panel-review-rounds",
+      "targets": [
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Put together a panel of Opus, GPT and Gemini to review my conference talk abstract in rounds, and keep revising it until most of them approve."
+    },
+    {
+      "id": "panel-council-design",
+      "targets": [
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Convene a council of three different models to critique the caching design in docs/design.md, and show me where they agree and where they split."
+    },
+    {
+      "id": "panel-propose-options",
+      "targets": [
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "I want four models to each come up with their own solutions to our on-call rota problem independently. Merge their ideas into one list, then have them refine it."
+    },
+    {
       "id": "cross-review-attack-commit",
       "targets": [
         "codex",
@@ -472,6 +496,32 @@
       ],
       "instructionSet": "skill-catalog",
       "prompt": "Review the React code in this pull request for correctness bugs."
+    },
+    {
+      "id": "none-single-second-opinion",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Ask one other model for a quick second opinion on whether this database index is worth adding. Just relay its answer."
+    },
+    {
+      "id": "none-subagent-search",
+      "targets": [
+        "codex",
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Send a subagent to find where the retry limit is configured in this repository and report the file and line."
+    },
+    {
+      "id": "none-split-implementation",
+      "targets": [
+        "claude"
+      ],
+      "instructionSet": "skill-catalog",
+      "prompt": "Delegate the migration script to one model and its unit tests to a different model, then merge what the two of them produce."
     },
     {
       "id": "none-multi-file-change",

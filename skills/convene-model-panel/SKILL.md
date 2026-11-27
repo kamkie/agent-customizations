@@ -29,7 +29,7 @@ Include:
 - the task, what this round covers, and what it leaves for later rounds;
 - a version label for each part under review;
 - the user's rulings: decisions already made that members must not reopen;
-- the facts members may rely on, and that they must not add facts of their own;
+- the facts members may rely on;
 - the draft itself, or the exact files to read;
 - from round 2, what changed since the last version, without naming the member who asked; and
 - the reply format.

@@ -211,7 +211,7 @@ try {
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecision -eq 'deny') 'The launch guard should deny a natively backgrounded command.'
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'foreground') 'The deny reason should rule out the foreground-with-timeout fallback.'
     Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match '^Denied: run_in_background=true\.') 'A background denial should name run_in_background as its trigger.'
-    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'Invoke-ManagedJob\.ps1.* start -Name .* wait -Id ') 'The deny reason should carry the managed-job start and wait replacement.'
+    Assert-True ($backgroundDecision.hookSpecificOutput.permissionDecisionReason -match 'Invoke-ManagedJob\.ps1'' run -Name .* wait -Id ') 'The deny reason should carry the managed-job run and wait replacement.'
     $detachedPayload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'PowerShell'
         tool_input = [ordered]@{ command = "Start-Process pwsh -ArgumentList '-File','engine.ps1'" }
@@ -263,6 +263,49 @@ try {
     } | ConvertTo-Json -Compress
     $foregroundOutput = ($foregroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
     Assert-True ([string]::IsNullOrWhiteSpace($foregroundOutput)) 'The launch guard should stay silent for an ordinary foreground command.'
+    $explicitForegroundPayload = [ordered]@{
+        hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+        tool_input = [ordered]@{ command = 'git status'; run_in_background = $false }
+    } | ConvertTo-Json -Compress
+    $explicitForegroundOutput = ($explicitForegroundPayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+    Assert-True ([string]::IsNullOrWhiteSpace($explicitForegroundOutput)) 'A call that declines background execution explicitly is an ordinary foreground command.'
+
+    # The entry script loads the full guard only when a denial is possible. The
+    # guard's barrier seam leaves a marker file whenever the guard runs, which
+    # shows the routing whatever the decision is. The guard's comparisons ignore
+    # a soft hyphen or a zero-width joiner inside a launch word, so a payload
+    # with any non-ASCII character must reach it.
+    $routeBarrier = Join-Path $testRoot 'route-barrier'
+    $null = New-Item -ItemType File -Path $routeBarrier -Force
+    $env:MANAGED_JOBS_GUARD_BARRIER = $routeBarrier
+    $routeIndex = 0
+    try {
+        foreach ($route in @(
+            @{ command = 'git status'; guard = $false; why = 'An ordinary ASCII command with no recent denial cannot be denied and should skip the full guard' },
+            @{ command = "echo one`ttwo`r`nGet-ChildItem C:\temp\new"; guard = $false; why = 'Tabs, line breaks and backslashes alone should not load the full guard' },
+            @{ command = 'npm run dev'; guard = $true; why = 'A command holding launch words should reach the full guard' },
+            @{ command = "git commit -m caf$([char]0xE9)"; guard = $true; why = 'A command with a non-ASCII character should reach the full guard' },
+            @{ command = "wt.exe new$([char]0x200D)-tab pwsh"; guard = $true; why = 'A launch word holding a zero-width joiner should reach the full guard' },
+            @{ command = "wt.exe new$([char]0x7F)-tab pwsh"; guard = $true; why = 'A launch word holding a delete character should reach the full guard' },
+            @{ command = "Start-Pro$([char]8)cess notepad"; guard = $true; why = 'A launch word holding a backspace should reach the full guard' }
+        )) {
+            # Each case gets an empty state root: a denial records itself, and
+            # every call within the next hour would take the guard for that
+            # reason alone.
+            $env:MANAGED_JOBS_ROOT = Join-Path $testRoot "route-state-$(($routeIndex++))"
+            Get-ChildItem -LiteralPath $testRoot -File -Filter 'route-barrier.ready-*' | Remove-Item -Force
+            $routePayload = [ordered]@{
+                hook_event_name = 'PreToolUse'; tool_name = 'Bash'
+                tool_input = [ordered]@{ command = $route.command }
+            } | ConvertTo-Json -Compress
+            $null = ($routePayload | & $pwsh -NoProfile -ExecutionPolicy Bypass -File $launchGuard | Out-String)
+            $reachedGuard = @(Get-ChildItem -LiteralPath $testRoot -File -Filter 'route-barrier.ready-*').Count -gt 0
+            Assert-True ($reachedGuard -eq $route.guard) "$($route.why): $($route.command)"
+        }
+    } finally {
+        $env:MANAGED_JOBS_ROOT = $stateRoot
+        Remove-Item Env:MANAGED_JOBS_GUARD_BARRIER -ErrorAction SilentlyContinue
+    }
     foreach ($pathMention in @(
         'mkdir -p "C:/Users/example/AppData/Local/Temp/claude/session/scratchpad"; cp a.txt b.txt',
         'cat ~/.claude/skills/cross-agent-review/references/reviewer-stance.md',
@@ -368,7 +411,20 @@ try {
         @{ command = "cat > review.txt <<EOF`n`$(claude -p hello)`nEOF"; trigger = 'claude -p' },
         @{ command = "echo `"`$(printf ')'; claude -p hello)`""; trigger = 'claude -p' },
         @{ command = "echo `"`$(printf `")`"; claude -p hello)`""; trigger = 'claude -p' },
-        @{ command = "cat > review.txt <<EOF`n`$(printf ')'; claude -p hello)`nEOF"; trigger = 'claude -p' }
+        @{ command = "cat > review.txt <<EOF`n`$(printf ')'; claude -p hello)`nEOF"; trigger = 'claude -p' },
+        # The entry script decides from the JSON text whether to load the full
+        # guard: words joined across quotes, JSON whitespace escapes, and
+        # backslashes before a launch word must all still reach it.
+        @{ command = 'Start-"Process" notepad'; trigger = 'Start-Process' },
+        @{ command = '"np"m run "de"v'; trigger = 'npm run dev' },
+        @{ command = "claude`t-p hello"; trigger = 'claude -p' },
+        @{ command = "claude \`n-p hello"; trigger = 'claude -p' },
+        @{ command = 'C:\tools\npm.cmd run dev'; trigger = 'npm run dev' },
+        @{ command = '& C:\bin\new\wt.exe new-tab pwsh'; trigger = 'wt new-tab' },
+        # The full guard's comparisons ignore a control character inside a
+        # launch word; the entry script must hand such a payload to it.
+        @{ command = "wt.exe new$([char]0x7F)-tab pwsh"; trigger = 'wt new-tab' },
+        @{ command = "wt.exe new$([char]8)-tab pwsh"; trigger = 'wt new-tab' }
     )) {
         $launchPayload = [ordered]@{
             hook_event_name = 'PreToolUse'; tool_name = 'Bash'

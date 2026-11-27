@@ -46,13 +46,31 @@ $commandCount = 6
 $commands = @(0..($commandCount - 1) | ForEach-Object { "python -m guard_cache_server_$_" })
 
 $denyScript = {
-    param([string]$Pwsh, [string]$HookScript, [string]$Command)
+    param([string]$Pwsh, [string]$HookScript, [string]$Command, [bool]$Background, [string]$StateRoot)
     $ErrorActionPreference = 'Stop'
+    $toolInput = [ordered]@{ command = $Command }
+    if ($Background) { $toolInput.run_in_background = $true }
     $payload = [ordered]@{
         hook_event_name = 'PreToolUse'; tool_name = 'Bash'
-        tool_input = [ordered]@{ command = $Command; run_in_background = $true }
+        tool_input = $toolInput
     } | ConvertTo-Json -Compress
-    $output = ($payload | & $Pwsh -NoProfile -ExecutionPolicy Bypass -File $HookScript | Out-String)
+    # The environment is shared by every runspace of this process, so each hook
+    # process gets its own spelling of the state root through its start info.
+    $start = [Diagnostics.ProcessStartInfo]::new($Pwsh)
+    foreach ($argument in '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $HookScript) { $start.ArgumentList.Add($argument) }
+    $start.UseShellExecute = $false
+    $start.RedirectStandardInput = $true
+    $start.RedirectStandardOutput = $true
+    $start.Environment['MANAGED_JOBS_ROOT'] = $StateRoot
+    $process = [Diagnostics.Process]::Start($start)
+    try {
+        $process.StandardInput.Write($payload)
+        $process.StandardInput.Close()
+        $output = $process.StandardOutput.ReadToEnd()
+        $process.WaitForExit()
+    } finally {
+        $process.Dispose()
+    }
     return [pscustomobject]@{ command = $Command; output = $output }
 }
 
@@ -63,12 +81,16 @@ try {
     $env:MANAGED_JOBS_ROOT = $testRoot
     $env:MANAGED_JOBS_GUARD_BARRIER = $barrierFile
 
-    $pool = [runspacefactory]::CreateRunspacePool(1, $commandCount)
+    $pool = [runspacefactory]::CreateRunspacePool(1, $commandCount + 1)
     $pool.Open()
-    foreach ($command in $commands) {
+    # Half of the hook processes name the state root with forward slashes. Both
+    # spellings are one cache file, so they must also share one mutex.
+    $forwardRoot = $testRoot.Replace('\', '/')
+    for ($index = 0; $index -lt $commands.Count; $index++) {
         $shell = [powershell]::Create()
         $shell.RunspacePool = $pool
-        $null = $shell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).AddArgument($command)
+        $null = $shell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).AddArgument($commands[$index]).
+            AddArgument($true).AddArgument($(if ($index % 2) { $forwardRoot } else { $testRoot }))
         $handles += [pscustomobject]@{ shell = $shell; async = $shell.BeginInvoke() }
     }
     # Wait until every hook process has entered the transaction, then release the
@@ -79,7 +101,28 @@ try {
         if ($ready -lt $commandCount) { Start-Sleep -Milliseconds 20 }
     } while ($ready -lt $commandCount -and [datetime]::UtcNow -lt $readyDeadline)
     Assert-True ($ready -eq $commandCount) "Every hook process should reach the guard barrier, found $ready of $commandCount."
+
+    # While those denials are pending, the cache file does not exist yet. A
+    # foreground check made now must still reach the full guard, which waits
+    # for the writers, rather than leave through the entry script's shortcut.
+    # Reaching the guard shows as one more readiness marker.
+    $pendingShell = [powershell]::Create()
+    $pendingShell.RunspacePool = $pool
+    $null = $pendingShell.AddScript($denyScript).AddArgument($pwsh).AddArgument($hookScript).
+        AddArgument('python -m guard_cache_pending_check').AddArgument($false).AddArgument($forwardRoot)
+    $pendingHandle = [pscustomobject]@{ shell = $pendingShell; async = $pendingShell.BeginInvoke() }
+    $handles += $pendingHandle
+    $pendingDeadline = [datetime]::UtcNow.AddSeconds(15)
+    do {
+        $ready = @(Get-ChildItem -LiteralPath $testRoot -Force -File -Filter 'barrier.ready-*').Count
+        if ($ready -le $commandCount -and -not $pendingHandle.async.IsCompleted) { Start-Sleep -Milliseconds 20 }
+    } while ($ready -le $commandCount -and -not $pendingHandle.async.IsCompleted -and [datetime]::UtcNow -lt $pendingDeadline)
+    $ready = @(Get-ChildItem -LiteralPath $testRoot -Force -File -Filter 'barrier.ready-*').Count
+    Assert-True ($ready -eq $commandCount + 1) 'A foreground check made while a denial is being recorded should reach the full guard.'
     $null = New-Item -ItemType File -Path $barrierFile -Force
+    $null = $pendingShell.EndInvoke($pendingHandle.async)
+    $pendingShell.Dispose()
+    $handles = @($handles | Where-Object { $_ -ne $pendingHandle })
 
     $failures = [Collections.Generic.List[string]]::new()
     foreach ($handle in $handles) {

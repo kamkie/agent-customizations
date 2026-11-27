@@ -1,10 +1,12 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory)]
-    [ValidateSet('start', 'list', 'status', 'wait', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'session-start', 'prune')]
+    [ValidateSet('start', 'run', 'list', 'status', 'wait', 'wait-ready', 'logs', 'capture', 'send-input', 'send-key', 'stop', 'cleanup', 'reconcile', 'session-start', 'prune')]
     [string]$Action,
 
-    [string]$Id,
+    # Bound as -Id. The script reads $Id (one id) and $jobIds (all of them).
+    [Alias('Id')]
+    [string[]]$RequestedId,
     [string]$Name,
     [string]$Kind = 'generic',
     [string]$Executable,
@@ -24,8 +26,11 @@ param(
     [uri]$ReadinessUri,
     [ValidateRange(1, 600)]
     [int]$ReadinessTimeoutSeconds = 30,
+    [ValidateRange(0, [int]::MaxValue)]
     [int]$Tail = 100,
     [switch]$Follow,
+    [string]$LogPattern,
+    [switch]$Summary,
     [ValidateRange(1, 86400)]
     [Nullable[int]]$TimeoutSeconds,
     [AllowEmptyString()]
@@ -43,10 +48,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# -Id takes several ids, as an array or separated by commas or spaces, only
+# for wait. Every other action works on $Id, the single id.
+$jobIds = @($RequestedId | ForEach-Object { $_ -split '[\s,]+' } | Where-Object { $_ } | Select-Object -Unique)
+if ($Action -ne 'wait' -and $jobIds.Count -gt 1) {
+    throw 'Several -Id values are valid only for wait.'
+}
+$Id = if ($jobIds.Count -gt 0) { $jobIds[0] } else { $null }
 $readinessParametersUsed = $PSBoundParameters.ContainsKey('ReadinessUri') -or
     $PSBoundParameters.ContainsKey('ReadinessTimeoutSeconds')
-if ($Action -notin @('start', 'wait-ready') -and $readinessParametersUsed) {
-    throw '-ReadinessUri and -ReadinessTimeoutSeconds are valid only for start and wait-ready.'
+if ($Action -notin @('start', 'run', 'wait-ready') -and $readinessParametersUsed) {
+    throw '-ReadinessUri and -ReadinessTimeoutSeconds are valid only for start, run, and wait-ready.'
 }
 if ($Action -ne 'start' -and $PSBoundParameters.ContainsKey('SharedTerminal')) {
     throw '-SharedTerminal is valid only for start.'
@@ -63,8 +75,17 @@ if ($Action -ne 'send-key' -and $PSBoundParameters.ContainsKey('Key')) {
 if ($Action -ne 'capture' -and $PSBoundParameters.ContainsKey('MaxLines')) {
     throw '-MaxLines is valid only for capture.'
 }
-if ($Action -ne 'wait' -and $PSBoundParameters.ContainsKey('TimeoutSeconds')) {
-    throw '-TimeoutSeconds is valid only for wait.'
+if ($Action -notin @('wait', 'run') -and $PSBoundParameters.ContainsKey('TimeoutSeconds')) {
+    throw '-TimeoutSeconds is valid only for wait and run.'
+}
+if ($Action -ne 'wait' -and $Summary) {
+    throw '-Summary is valid only for wait; run always prints a summary.'
+}
+if ($LogPattern -and -not ($Action -in @('run', 'logs') -or ($Action -eq 'wait' -and $Summary))) {
+    throw '-LogPattern is valid only for run, logs, and wait -Summary.'
+}
+if ($LogPattern -and $Follow) {
+    throw '-LogPattern cannot be combined with -Follow.'
 }
 if ($Table -and ($Action -notin @('list', 'status') -or $Id -or $Json)) {
     throw '-Table is valid only for list, or status without -Id, and cannot be combined with -Json.'
@@ -345,13 +366,16 @@ function Add-ManagedJobWaitOutcome {
 }
 
 function Wait-ManagedJobCompletion {
+    # Returns one outcome per id, in the order given, as soon as any of the
+    # jobs has ended or the bound expires.
     param(
-        [Parameter(Mandatory)][string]$JobId,
+        [Parameter(Mandatory)][string[]]$JobId,
         [Nullable[int]]$TimeoutSeconds
     )
 
-    $path = Get-ManagedJobFile -Id $JobId
-    $watcher = [IO.FileSystemWatcher]::new((Split-Path -Parent $path), (Split-Path -Leaf $path))
+    $paths = @($JobId | ForEach-Object { Get-ManagedJobFile -Id $_ })
+    $filter = if ($paths.Count -eq 1) { Split-Path -Leaf $paths[0] } else { '*.json' }
+    $watcher = [IO.FileSystemWatcher]::new((Split-Path -Parent $paths[0]), $filter)
     $watcher.NotifyFilter = [IO.NotifyFilters]::FileName -bor [IO.NotifyFilters]::LastWrite
     $elapsed = [Diagnostics.Stopwatch]::StartNew()
     try {
@@ -359,17 +383,17 @@ function Wait-ManagedJobCompletion {
         while ($true) {
             # Subscribe before reading. A write between the read and the blocking
             # wait is still covered by the bounded reconciliation wakeup.
-            $job = Update-ReconciledJob -Job (Read-ManagedJob -Path $path)
-            if ($job.status -notin @('starting', 'running')) {
-                return Add-ManagedJobWaitOutcome -Job $job -TimedOut $false
+            $jobs = @($paths | ForEach-Object { Update-ReconciledJob -Job (Read-ManagedJob -Path $_) })
+            if (@($jobs | Where-Object { $_.status -notin @('starting', 'running') }).Count -gt 0) {
+                return @($jobs | ForEach-Object { Add-ManagedJobWaitOutcome -Job $_ -TimedOut $false })
             }
             $waitMilliseconds = 1000
             if ($null -ne $TimeoutSeconds) {
                 $remainingMilliseconds = ($TimeoutSeconds * 1000) - $elapsed.Elapsed.TotalMilliseconds
                 if ($remainingMilliseconds -le 0) {
                     # Expiry is an expected outcome of a bounded wait, not an
-                    # error: the job is still running and the caller decides.
-                    return Add-ManagedJobWaitOutcome -Job $job -TimedOut $true
+                    # error: the jobs are still running and the caller decides.
+                    return @($jobs | ForEach-Object { Add-ManagedJobWaitOutcome -Job $_ -TimedOut $true })
                 }
                 $waitMilliseconds = [Math]::Max(1, [Math]::Min(1000, [int][Math]::Ceiling($remainingMilliseconds)))
             }
@@ -378,6 +402,79 @@ function Wait-ManagedJobCompletion {
     } finally {
         $elapsed.Stop()
         $watcher.Dispose()
+    }
+}
+
+function Write-ManagedJobSummary {
+    # The text form of a wait outcome: one status line per job, then the end
+    # of its log, so a caller needs no JSON parsing and no separate logs call.
+    param(
+        [Parameter(Mandatory)][object[]]$Outcome,
+        [Parameter(Mandatory)][int]$Tail,
+        [string]$Pattern
+    )
+    $toUtc = {
+        param($Value)
+        if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) { return $null }
+        if ($Value -is [datetime]) { return $Value.ToUniversalTime() }
+        return [datetime]::Parse([string]$Value, [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    }
+    # A record written by another version can lack a field. Strict mode would
+    # throw on reading it, so a missing value is read as null and printed as '-'.
+    $field = {
+        param($Record, [string]$Name)
+        $property = $Record.PSObject.Properties[$Name]
+        if ($property) { $property.Value }
+    }
+    foreach ($job in $Outcome) {
+        $status = & $field $job 'status'
+        $active = $status -in @('starting', 'running')
+        $seconds = '-'
+        try {
+            $startedAt = & $field $job 'startedAtUtc'
+            $from = & $toUtc $(if ($startedAt) { $startedAt } else { & $field $job 'createdAtUtc' })
+            $to = if ($active) { [datetime]::UtcNow } else { & $toUtc (& $field $job 'finishedAtUtc') }
+            if ($from -and $to) { $seconds = [int][Math]::Max(0, ($to - $from).TotalSeconds) }
+        } catch {}
+        $exitCode = & $field $job 'exitCode'
+        if ($null -eq $exitCode) { $exitCode = '-' }
+        "job $($job.id) status=$status exit=$exitCode seconds=$seconds timedOut=$([bool](& $field $job 'timedOut'))"
+        $failure = & $field $job 'error'
+        if ($failure) { "error: $failure" }
+        if ($active) { "still running; wait again with: wait -Id $($job.id) -Summary -TimeoutSeconds <seconds>" }
+    }
+    if ($Tail -le 0) { return }
+    # Logs follow every status line, so a slow or unreadable log cannot hide
+    # an outcome.
+    foreach ($job in $Outcome) {
+        $logPath = [string](& $field $job 'logPath')
+        if (-not $logPath) {
+            "log of job $($job.id): no log path recorded"
+            continue
+        }
+        if (-not (Test-Path -LiteralPath $logPath -PathType Leaf)) {
+            "log $logPath (not written yet)"
+            continue
+        }
+        if ($Pattern) {
+            # Stream the log and keep only the tail, whatever the log's size.
+            $kept = [Collections.Generic.Queue[string]]::new()
+            $matched = 0
+            Get-Content -LiteralPath $logPath | ForEach-Object {
+                if ($_ -match $Pattern) {
+                    $matched++
+                    $kept.Enqueue($_)
+                    if ($kept.Count -gt $Tail) { $null = $kept.Dequeue() }
+                }
+            }
+            $lines = $kept.ToArray()
+            "log $logPath (last $($lines.Count) of $matched lines matching the pattern)"
+        } else {
+            $lines = @(Get-Content -LiteralPath $logPath -Tail $Tail)
+            "log $logPath (last $($lines.Count) lines)"
+        }
+        $lines
     }
 }
 
@@ -1189,6 +1286,23 @@ switch ($Action) {
         }
         $jobOutput | ConvertTo-Json -Depth 12
     }
+    'run' {
+        # One call for work the caller waits on: start it, wait up to the
+        # bound, then print the outcome and the end of the log. The default
+        # bound stays under a two-minute tool call; a job that outlasts it
+        # keeps running under its lifetime.
+        $startParameters = @{}
+        foreach ($entry in $PSBoundParameters.GetEnumerator()) {
+            if ($entry.Key -notin @('Action', 'TimeoutSeconds', 'Tail', 'LogPattern')) {
+                $startParameters[$entry.Key] = $entry.Value
+            }
+        }
+        $started = (& $PSCommandPath start @startParameters | Out-String) | ConvertFrom-Json
+        $runBound = if ($null -ne $TimeoutSeconds) { $TimeoutSeconds } else { 100 }
+        $summaryTail = if ($PSBoundParameters.ContainsKey('Tail')) { $Tail } else { 20 }
+        Write-ManagedJobSummary -Tail $summaryTail -Pattern $LogPattern -Outcome @(
+            Wait-ManagedJobCompletion -JobId $started.id -TimeoutSeconds $runBound)
+    }
     'list' {
         Write-JobCollection -Jobs (Get-ManagedJobCollection)
     }
@@ -1201,8 +1315,17 @@ switch ($Action) {
         }
     }
     'wait' {
-        if (-not $Id) { throw '-Id is required for wait.' }
-        Wait-ManagedJobCompletion -JobId $Id -TimeoutSeconds $TimeoutSeconds | ConvertTo-Json -Depth 12
+        # With several ids the wait returns when the first of those jobs ends.
+        if ($jobIds.Count -eq 0) { throw '-Id is required for wait.' }
+        $outcomes = @(Wait-ManagedJobCompletion -JobId $jobIds -TimeoutSeconds $TimeoutSeconds)
+        if ($Summary) {
+            $summaryTail = if ($PSBoundParameters.ContainsKey('Tail')) { $Tail } else { 20 }
+            Write-ManagedJobSummary -Outcome $outcomes -Tail $summaryTail -Pattern $LogPattern
+        } elseif ($jobIds.Count -eq 1) {
+            $outcomes[0] | ConvertTo-Json -Depth 12
+        } else {
+            ConvertTo-Json -InputObject $outcomes -Depth 12
+        }
     }
     'wait-ready' {
         if (-not $Id) { throw '-Id is required for wait-ready.' }
@@ -1227,7 +1350,11 @@ switch ($Action) {
         if (-not (Test-Path -LiteralPath $job.logPath -PathType Leaf)) {
             throw "Log does not exist yet: $($job.logPath)"
         }
-        Get-Content -LiteralPath $job.logPath -Tail $Tail -Wait:$Follow
+        if ($LogPattern) {
+            Get-Content -LiteralPath $job.logPath | Where-Object { $_ -match $LogPattern } | Select-Object -Last $Tail
+        } else {
+            Get-Content -LiteralPath $job.logPath -Tail $Tail -Wait:$Follow
+        }
     }
     'capture' {
         if (-not $Id) { throw '-Id is required for capture.' }
